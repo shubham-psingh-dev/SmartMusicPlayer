@@ -1,3 +1,13 @@
+<p align="center">
+<img src="assets/icons/logo/nirvana_logo.png" width="170">
+</p>
+
+<h1 align="center">🎵 NirVANA</h1>
+
+<p align="center">
+A futuristic offline desktop music player built with Python & PySide6.
+</p>
+
 # 🎧 NirVANA
 
 > Lose Yourself in Sound

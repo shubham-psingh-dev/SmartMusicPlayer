@@ -6,8 +6,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLineEdit,
-    QFrame,
 )
+
+from widgets.cards.music_card import MusicCard
 
 
 class HomeScreen(QWidget):
@@ -15,167 +16,140 @@ class HomeScreen(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.setWindowTitle("🎵 NirVANA")
+        self.resize(1400, 850)
         self.setMinimumSize(1200, 700)
 
         self.build_ui()
 
     def build_ui(self):
 
-        # ==========================
+        # -----------------------------
         # Main Layout
-        # ==========================
+        # -----------------------------
 
-        self.main_layout = QVBoxLayout(self)
+        self.main_layout = QVBoxLayout()
 
-        self.main_layout.setContentsMargins(40, 25, 40, 30)
+        self.main_layout.setContentsMargins(40, 30, 40, 30)
 
-        self.main_layout.setSpacing(25)
+        self.main_layout.setSpacing(20)
 
-        # ==========================
-        # Welcome Section
-        # ==========================
+        self.setLayout(self.main_layout)
 
-        welcome_layout = QVBoxLayout()
+        # -----------------------------
+        # Welcome
+        # -----------------------------
 
         title = QLabel("Good Evening 👋")
 
         title.setStyleSheet("""
-
-        QLabel{
-
             color:white;
-
-            font-size:32px;
-
-            font-weight:700;
-
-        }
-
+            font-size:28px;
+            font-weight:bold;
+            background:transparent;
         """)
 
         subtitle = QLabel("Lose Yourself in Sound")
 
         subtitle.setStyleSheet("""
-
-        QLabel{
-
-            color:#B8B8C8;
-
-            font-size:15px;
-
-        }
-
+            color:#B9B2D8;
+            font-size:14px;
+            background:transparent;
         """)
 
-        welcome_layout.addWidget(title)
+        self.main_layout.addWidget(title)
 
-        welcome_layout.addWidget(subtitle)
+        self.main_layout.addWidget(subtitle)
 
-        self.main_layout.addLayout(welcome_layout)
-
-        # ==========================
-        # Search Box
-        # ==========================
+        # -----------------------------
+        # Search Bar
+        # -----------------------------
 
         self.search = QLineEdit()
 
-        self.search.setPlaceholderText("Search Songs, Albums, Artists...")
+        self.search.setPlaceholderText(
+            "Search Songs, Albums, Artists..."
+        )
 
-        self.search.setFixedHeight(42)
+        self.search.setFixedHeight(45)
 
         self.search.setStyleSheet("""
-
         QLineEdit{
 
-            background:#231A42;
+            background:#2A1E4D;
+
+            border:2px solid #7C3AED;
+
+            border-radius:22px;
+
+            padding-left:20px;
 
             color:white;
-
-            border:none;
-
-            border-radius:20px;
-
-            padding-left:18px;
 
             font-size:14px;
 
         }
-
-        QLineEdit:focus{
-
-            border:2px solid #7A5AF8;
-
-        }
-
         """)
 
         self.main_layout.addWidget(self.search)
 
-        # ==========================
-        # Placeholder Card
-        # ==========================
-
-        card = QFrame()
-
-        card.setMinimumHeight(260)
-
-        card.setStyleSheet("""
-
-        QFrame{
-
-            background:#241B45;
-
-            border-radius:18px;
-
-        }
-
-        """)
-
-        card_layout = QVBoxLayout(card)
+        # -----------------------------
+        # Continue Listening
+        # -----------------------------
 
         heading = QLabel("🎵 Continue Listening")
 
         heading.setStyleSheet("""
-
-        QLabel{
-
             color:white;
-
-            font-size:22px;
-
-            font-weight:600;
-
-        }
-
+            font-size:24px;
+            font-weight:bold;
+            background:transparent;
         """)
 
-        info = QLabel("Music cards will be added in the next task.")
+        self.main_layout.addWidget(heading)
 
-        info.setStyleSheet("""
+        # -----------------------------
+        # Cards Layout
+        # -----------------------------
 
-        QLabel{
+        cards_layout = QHBoxLayout()
 
-            color:#A9A9C4;
+        cards_layout.setSpacing(20)
 
-            font-size:14px;
+        card1 = MusicCard(
+            "assets/album_art/believer.jpg",
+            "Believer",
+            "Imagine Dragons"
+        )
 
-        }
+        card2 = MusicCard(
+            "assets/album_art/faded.jpg",
+            "Faded",
+            "Alan Walker"
+        )
 
-        """)
+        card3 = MusicCard(
+            "assets/album_art/arcade.jpg",
+            "Arcade",
+            "Duncan Laurence"
+        )
 
-        card_layout.addWidget(heading)
+        card4 = MusicCard(
+            "assets/album_art/lethergo.jpg",
+            "Let Her Go",
+            "Passenger"
+        )
 
-        card_layout.addWidget(info)
+        cards_layout.addWidget(card1)
+        cards_layout.addWidget(card2)
+        cards_layout.addWidget(card3)
+        cards_layout.addWidget(card4)
 
-        card_layout.addStretch()
+        cards_layout.addStretch()
 
-        self.main_layout.addWidget(card)
+        self.main_layout.addLayout(cards_layout)
 
         self.main_layout.addStretch()
-
-    # ==========================================
-    # Background Gradient
-    # ==========================================
 
     def paintEvent(self, event):
 
@@ -188,8 +162,11 @@ class HomeScreen(QWidget):
             self.height()
         )
 
-        gradient.setColorAt(0.0, QColor("#171129"))
-        gradient.setColorAt(0.5, QColor("#21163F"))
-        gradient.setColorAt(1.0, QColor("#0B0915"))
+        gradient.setColorAt(0.0, QColor("#1B1433"))
+        gradient.setColorAt(0.5, QColor("#24153F"))
+        gradient.setColorAt(1.0, QColor("#0D0B16"))
 
-        painter.fillRect(self.rect(), gradient)
+        painter.fillRect(
+            self.rect(),
+            gradient
+        )

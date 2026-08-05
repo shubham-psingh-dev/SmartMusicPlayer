@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from widgets.sidebar import Sidebar
 from ui.home.hero_banner import HeroBanner
 from widgets.cards.music_card import MusicCard
+from ui.home.header import Header
 
 
 class HomeScreen(QWidget):
@@ -68,14 +69,20 @@ class HomeScreen(QWidget):
         )
 
         # ===============================
+        # HEADER
+        # ===============================
+
+        self.header = Header()
+
+        self.content_layout.addWidget(self.header)
+
+        # ===============================
         # HERO
         # ===============================
 
         self.hero = HeroBanner()
 
-        self.content_layout.addWidget(
-            self.hero
-        )
+        self.content_layout.addWidget(self.hero)
 
         # ===============================
         # SECTION TITLE

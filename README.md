@@ -47,4 +47,13 @@ Unlike traditional music players, NirVANA focuses on a premium user experience w
 
 🚧 Currently in Development
 
+## Development Progress
+
+- [x] Day 1 - Project Setup
+- [x] Day 2 - Git & GitHub
+- [x] Day 3 - PySide6 Basics
+- [x] Day 4 - Window Foundation
+- [x] Day 5 - Hero Banner & Music Cards
+- [x] Day 6 - HomeScreen Architecture
+
 Version: Alpha 1.0

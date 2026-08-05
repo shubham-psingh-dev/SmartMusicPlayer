@@ -2,12 +2,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (
     QWidget,
-    QLabel,
-    QVBoxLayout,
     QHBoxLayout,
-    QLineEdit,
+    QVBoxLayout,
+    QFrame,
 )
 
+from widgets.sidebar import Sidebar
+from ui.home.hero_banner import HeroBanner
 from widgets.cards.music_card import MusicCard
 
 
@@ -17,104 +18,108 @@ class HomeScreen(QWidget):
         super().__init__()
 
         self.setWindowTitle("🎵 NirVANA")
+
         self.resize(1400, 850)
+
         self.setMinimumSize(1200, 700)
 
         self.build_ui()
 
     def build_ui(self):
 
-        # -----------------------------
-        # Main Layout
-        # -----------------------------
+        # ===============================
+        # ROOT LAYOUT
+        # ===============================
 
-        self.main_layout = QVBoxLayout()
+        root = QHBoxLayout(self)
 
-        self.main_layout.setContentsMargins(40, 30, 40, 30)
+        root.setContentsMargins(0, 0, 0, 0)
 
-        self.main_layout.setSpacing(20)
+        root.setSpacing(0)
 
-        self.setLayout(self.main_layout)
+        # ===============================
+        # SIDEBAR
+        # ===============================
 
-        # -----------------------------
-        # Welcome
-        # -----------------------------
+        self.sidebar = Sidebar()
 
-        title = QLabel("Good Evening 👋")
+        root.addWidget(self.sidebar)
 
-        title.setStyleSheet("""
-            color:white;
-            font-size:28px;
-            font-weight:bold;
-            background:transparent;
-        """)
+        # ===============================
+        # CONTENT AREA
+        # ===============================
 
-        subtitle = QLabel("Lose Yourself in Sound")
+        self.content = QWidget()
 
-        subtitle.setStyleSheet("""
-            color:#B9B2D8;
-            font-size:14px;
-            background:transparent;
-        """)
+        self.content_layout = QVBoxLayout(self.content)
 
-        self.main_layout.addWidget(title)
-
-        self.main_layout.addWidget(subtitle)
-
-        # -----------------------------
-        # Search Bar
-        # -----------------------------
-
-        self.search = QLineEdit()
-
-        self.search.setPlaceholderText(
-            "Search Songs, Albums, Artists..."
+        self.content_layout.setContentsMargins(
+            30,
+            25,
+            30,
+            25
         )
 
-        self.search.setFixedHeight(45)
+        self.content_layout.setSpacing(25)
 
-        self.search.setStyleSheet("""
-        QLineEdit{
+        root.addWidget(
+            self.content,
+            1
+        )
 
-            background:#2A1E4D;
+        # ===============================
+        # HERO
+        # ===============================
 
-            border:2px solid #7C3AED;
+        self.hero = HeroBanner()
 
-            border-radius:22px;
+        self.content_layout.addWidget(
+            self.hero
+        )
 
-            padding-left:20px;
+        # ===============================
+        # SECTION TITLE
+        # ===============================
 
-            color:white;
+        from PySide6.QtWidgets import QLabel
 
-            font-size:14px;
+        title = QLabel(
+            "Continue Listening"
+        )
 
+        title.setStyleSheet("""
+
+        color:white;
+
+        font-size:26px;
+
+        font-weight:700;
+
+        """)
+
+        self.content_layout.addWidget(title)
+
+        # ===============================
+        # MUSIC CARDS
+        # ===============================
+
+        cards_container = QFrame()
+
+        cards_container.setStyleSheet("""
+        QFrame{
+            background:transparent;
         }
         """)
 
-        self.main_layout.addWidget(self.search)
+        cards_layout = QHBoxLayout(cards_container)
 
-        # -----------------------------
-        # Continue Listening
-        # -----------------------------
-
-        heading = QLabel("🎵 Continue Listening")
-
-        heading.setStyleSheet("""
-            color:white;
-            font-size:24px;
-            font-weight:bold;
-            background:transparent;
-        """)
-
-        self.main_layout.addWidget(heading)
-
-        # -----------------------------
-        # Cards Layout
-        # -----------------------------
-
-        cards_layout = QHBoxLayout()
+        cards_layout.setContentsMargins(0, 0, 0, 0)
 
         cards_layout.setSpacing(20)
+
+        # -------------------------------
+        # Card 1
+        # -------------------------------
 
         card1 = MusicCard(
             "assets/album_art/believer.jpg",
@@ -122,17 +127,29 @@ class HomeScreen(QWidget):
             "Imagine Dragons"
         )
 
+        # -------------------------------
+        # Card 2
+        # -------------------------------
+
         card2 = MusicCard(
             "assets/album_art/faded.jpg",
             "Faded",
             "Alan Walker"
         )
 
+        # -------------------------------
+        # Card 3
+        # -------------------------------
+
         card3 = MusicCard(
             "assets/album_art/arcade.jpg",
             "Arcade",
             "Duncan Laurence"
         )
+
+        # -------------------------------
+        # Card 4
+        # -------------------------------
 
         card4 = MusicCard(
             "assets/album_art/lethergo.jpg",
@@ -147,9 +164,26 @@ class HomeScreen(QWidget):
 
         cards_layout.addStretch()
 
-        self.main_layout.addLayout(cards_layout)
+        self.content_layout.addWidget(cards_container)
 
-        self.main_layout.addStretch()
+        # ===============================
+        # FUTURE PLACEHOLDERS
+        # ===============================
+
+        # Day 7
+        # Mood Section
+
+        # Day 8
+        # Recently Played
+
+        # Day 9
+        # Right Playing Panel
+
+        self.content_layout.addStretch()
+
+    # =====================================
+    # PREMIUM BACKGROUND
+    # =====================================
 
     def paintEvent(self, event):
 
@@ -162,11 +196,24 @@ class HomeScreen(QWidget):
             self.height()
         )
 
-        gradient.setColorAt(0.0, QColor("#1B1433"))
-        gradient.setColorAt(0.5, QColor("#24153F"))
-        gradient.setColorAt(1.0, QColor("#0D0B16"))
+        gradient.setColorAt(
+            0.0,
+            QColor("#0D0B16")
+        )
+
+        gradient.setColorAt(
+            0.45,
+            QColor("#171428")
+        )
+
+        gradient.setColorAt(
+            1.0,
+            QColor("#0B0913")
+        )
 
         painter.fillRect(
             self.rect(),
             gradient
         )
+
+        super().paintEvent(event)

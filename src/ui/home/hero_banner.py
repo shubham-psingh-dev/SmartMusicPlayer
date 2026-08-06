@@ -1,10 +1,32 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
+
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
     QHBoxLayout,
     QVBoxLayout,
-    QFrame,
+)
+
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+
+HEADPHONE_PATH = (
+    BASE_DIR
+    / "assets"
+    / "images"
+    / "hero"
+    / "headphones.png"
 )
 
 
@@ -13,108 +35,248 @@ class HeroBanner(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setFixedHeight(260)
-
-        self.setStyleSheet("""
-        QWidget{
-            background:qlineargradient(
-                x1:0,y1:0,
-                x2:1,y2:1,
-                stop:0 #31215E,
-                stop:1 #181327
-            );
-
-            border-radius:24px;
-        }
-        """)
+        self.setMinimumHeight(280)
+        self.setMaximumHeight(300)
 
         self.build_ui()
 
     def build_ui(self):
 
-        main_layout = QHBoxLayout(self)
+        root = QHBoxLayout(self)
 
-        main_layout.setContentsMargins(35, 30, 35, 30)
+        root.setContentsMargins(35, 28, 35, 28)
 
-        # -----------------------
-        # LEFT SIDE
-        # -----------------------
+        root.setSpacing(30)
+
+        # ============================
+        # LEFT
+        # ============================
 
         left = QVBoxLayout()
+
+        left.setSpacing(8)
 
         greeting = QLabel("Good Evening 👋")
 
         greeting.setStyleSheet("""
-        color:#CFC8FF;
-        font-size:16px;
-        background:transparent;
+        color:#C7BDF7;
+        font-size:14px;
         """)
 
-        title = QLabel("What do you want\n to hear today?")
+        title = QLabel(
+            "What do you want\n"
+            "to hear today?"
+        )
+
+        title.setWordWrap(True)
+
+        title.setFont(
+            QFont(
+                "Segoe UI",
+                26,
+                QFont.Bold
+            )
+        )
 
         title.setStyleSheet("""
         color:white;
-        font-size:34px;
-        font-weight:700;
-        background:transparent;
         """)
 
         subtitle = QLabel(
-            "Discover millions of songs\ncrafted for your mood."
+            "Discover millions of songs\n"
+            "crafted for your mood."
         )
 
         subtitle.setStyleSheet("""
-        color:#B8B3D6;
+        color:#C6C1E4;
         font-size:15px;
-        background:transparent;
+        line-height:22px;
         """)
 
         left.addWidget(greeting)
-        left.addSpacing(10)
         left.addWidget(title)
-        left.addSpacing(12)
+        left.addSpacing(8)
         left.addWidget(subtitle)
         left.addStretch()
 
-        # -----------------------
-        # RIGHT SIDE
-        # -----------------------
+        root.addLayout(left, 2)
 
-        image_placeholder = QFrame()
+        # ============================
+        # RIGHT
+        # ============================
 
-        image_placeholder.setFixedSize(260, 200)
+        right = QVBoxLayout()
 
-        image_placeholder.setStyleSheet("""
-        QFrame{
+        right.setAlignment(Qt.AlignCenter)
 
-            background:#2D2352;
+        self.image = QLabel()
 
-            border-radius:20px;
+        self.image.setAlignment(Qt.AlignCenter)
 
-            border:2px dashed #7C3AED;
+        if HEADPHONE_PATH.exists():
+
+            pix = QPixmap(str(HEADPHONE_PATH))
+
+            self.image.setPixmap(
+                pix.scaled(
+                    260,
+                    260,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+            )
+
+        self.image.setStyleSheet("""
+        QLabel{
+
+            background:transparent;
+
+            padding:10px;
 
         }
         """)
 
-        image_text = QLabel("🎧")
+        right.addStretch()
+        right.addWidget(self.image, alignment=Qt.AlignCenter)
+        right.addStretch()
 
-        image_text.setAlignment(Qt.AlignCenter)
+        root.addLayout(right, 1)
 
-        image_text.setStyleSheet("""
-        font-size:72px;
-        background:transparent;
-        color:white;
-        """)
+    # =====================================
+    # PAINT BACKGROUND
+    # =====================================
 
-        img_layout = QVBoxLayout(image_placeholder)
+    def paintEvent(self, event):
 
-        img_layout.addStretch()
-        img_layout.addWidget(image_text)
-        img_layout.addStretch()
+        painter = QPainter(self)
 
-        main_layout.addLayout(left, 3)
+        painter.setRenderHint(QPainter.Antialiasing)
 
-        main_layout.addWidget(
-            image_placeholder,
-            alignment=Qt.AlignRight
+        rect = self.rect()
+
+        # Rounded Shape
+        path = QPainterPath()
+
+        path.addRoundedRect(
+            rect.adjusted(1, 1, -1, -1),
+            26,
+            26
         )
+
+        # Background Gradient
+        gradient = QLinearGradient(
+            0,
+            0,
+            rect.width(),
+            rect.height()
+        )
+
+        gradient.setColorAt(
+            0.0,
+            QColor("#1A1430")
+        )
+
+        gradient.setColorAt(
+            0.45,
+            QColor("#2A1E4B")
+        )
+
+        gradient.setColorAt(
+            1.0,
+            QColor("#4C1D95")
+        )
+
+        painter.fillPath(
+            path,
+            gradient
+        )
+
+        # Border
+        pen = QPen(
+            QColor(124, 58, 237, 120)
+        )
+
+        pen.setWidth(2)
+
+        painter.setPen(pen)
+
+        painter.drawPath(path)
+
+        # =============================
+        # PURPLE GLOW
+        # =============================
+
+        painter.setPen(Qt.NoPen)
+
+        glow = QColor(139, 92, 246, 45)
+
+        painter.setBrush(glow)
+
+        painter.drawEllipse(
+            rect.width() - 320,
+            25,
+            260,
+            260
+        )
+
+        painter.setBrush(
+            QColor(168, 85, 247, 30)
+        )
+
+        painter.drawEllipse(
+            rect.width() - 250,
+            60,
+            170,
+            170
+        )
+
+        painter.setBrush(
+            QColor(124, 58, 237, 20)
+        )
+
+        painter.drawEllipse(
+            rect.width() - 420,
+            120,
+            120,
+            120
+        )
+
+        # =============================
+        # MUSIC NOTES
+        # =============================
+
+        painter.setPen(
+            QColor(190, 160, 255, 120)
+        )
+
+        font = QFont()
+
+        font.setPointSize(18)
+
+        painter.setFont(font)
+
+        painter.drawText(
+            rect.width() - 250,
+            55,
+            "♪"
+        )
+
+        painter.drawText(
+            rect.width() - 170,
+            90,
+            "♫"
+        )
+
+        painter.drawText(
+            rect.width() - 310,
+            135,
+            "♬"
+        )
+
+        painter.drawText(
+            rect.width() - 120,
+            165,
+            "♪"
+        )
+
+        painter.end()

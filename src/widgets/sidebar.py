@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -13,16 +13,23 @@ from PySide6.QtWidgets import (
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 LOGO_PATH = BASE_DIR / "assets" / "icons" / "logo" / "nirvana_logo.png"
+NAV_ICON_PATH = BASE_DIR / "assets" / "icons" / "navigation"
 
 
 class NavButton(QPushButton):
 
     clicked_name = Signal(str)
 
-    def __init__(self, text: str):
+    def __init__(self, text: str, icon_name: str):
         super().__init__(text)
 
         self.page_name = text
+        icon_file = NAV_ICON_PATH / icon_name
+
+        if icon_file.exists():
+            self.setIcon(QIcon(str(icon_file)))
+            self.setIconSize(QSize(20, 20))
+        
 
         self.setCursor(Qt.PointingHandCursor)
         self.setCheckable(True)
@@ -81,11 +88,45 @@ class Sidebar(QWidget):
         self.setFixedWidth(240)
 
         self.setStyleSheet("""
-        QWidget{
+        QPushButton{
 
-            background:#141021;
+            color:#D6D2F0;
 
-            border-right:1px solid #2A2344;
+            background:transparent;
+
+            border:none;
+
+            border-left:4px solid transparent;
+
+            border-radius:12px;
+
+            text-align:left;
+
+            padding-left:18px;
+
+            font-size:15px;
+
+            font-weight:600;
+
+        }
+
+        QPushButton:hover{
+
+            background:#2B2148;
+
+            border-left:4px solid #7C3AED;
+
+            color:white;
+
+        }
+
+        QPushButton:checked{
+
+            background:#38265F;
+
+            border-left:4px solid #A855F7;
+
+            color:white;
 
         }
         """)
@@ -160,17 +201,23 @@ class Sidebar(QWidget):
         # ----------------------
 
         menu = [
-            "🏠  Home",
-            "🔎  Discover",
-            "🎵  Library",
-            "❤  Favorites",
-            "📂  Playlists",
-            "⚙  Settings",
+
+            ("Home", "home.svg"),
+
+            ("Discover", "discover.svg"),
+
+            ("Library", "library.svg"),
+
+            ("Favorites", "favorites.svg"),
+
+            ("Playlists", "playlist.svg"),
+
+            ("Settings", "settings.svg"),
         ]
 
-        for item in menu:
+        for text, icon in menu:
 
-            button = NavButton(item)
+            button = NavButton(text, icon)
 
             button.clicked_name.connect(self.change_page)
 

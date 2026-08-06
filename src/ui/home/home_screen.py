@@ -11,6 +11,7 @@ from widgets.sidebar import Sidebar
 from ui.home.hero_banner import HeroBanner
 from widgets.cards.music_card import MusicCard
 from ui.home.header import Header
+from ui.home.hero_banner import HeroBanner
 
 
 class HomeScreen(QWidget):

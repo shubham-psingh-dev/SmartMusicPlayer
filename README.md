@@ -1,20 +1,20 @@
 <p align="center">
-<img src="assets/icons/logo/nirvana_logo.png" width="170">
+<img src="assets/icons/logo/LYRx.png" width="170">
 </p>
 
-<h1 align="center">🎵 NirVANA</h1>
+<h1 align="center">🎵 LYRx</h1>
 
 <p align="center">
 A futuristic offline desktop music player built with Python & PySide6.
 </p>
 
-# 🎧 NirVANA
+# 🎧 LYRx
 
 > Lose Yourself in Sound
 
-NirVANA is a modern offline desktop music player built with Python.
+LYRx is a modern offline desktop music player built with Python.
 
-Unlike traditional music players, NirVANA focuses on a premium user experience with beautiful animations, mood-based music discovery, and a clean modern interface.
+Unlike traditional music players, LYRx focuses on a premium user experience with beautiful animations, mood-based music discovery, and a clean modern interface.
 
 ---
 

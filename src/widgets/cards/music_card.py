@@ -1,16 +1,11 @@
 from pathlib import Path
 
-from PySide6.QtCore import (
-    Qt,
-    QPropertyAnimation,
-    QEasingCurve,
-    QRect,
-)
+from PySide6.QtCore import Qt
 
 from PySide6.QtGui import (
-    QPixmap,
-    QCursor,
     QColor,
+    QCursor,
+    QPixmap,
 )
 
 from PySide6.QtWidgets import (
@@ -22,136 +17,192 @@ from PySide6.QtWidgets import (
 )
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+# ==========================================
+# Paths
+# ==========================================
 
-ALBUM_DIR = (
-    BASE_DIR
-    / "assets"
-    / "album_art"
-)
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class MusicCard(QWidget):
 
     def __init__(
         self,
-        song,
-        song_name,
-        artist_name
+        image_path: str,
+        song_name: str,
+        artist_name: str
     ):
         super().__init__()
 
+        self.image_path = image_path
+        self.song_name = song_name
+        self.artist_name = artist_name
+
+        self.setup_card()
+
+        self.build_ui()
+
+        self.apply_shadow()
+
+    # ==========================================
+    # Card Styling
+    # ==========================================
+
+    def setup_card(self):
+
+        self.setFixedSize(205, 360)
+
         self.setCursor(QCursor(Qt.PointingHandCursor))
 
-        self.setFixedSize(195, 340)
+        self.setObjectName("musicCard")
 
         self.setStyleSheet("""
-        QWidget{
+        QWidget#musicCard{
 
             background:qlineargradient(
-                x1:0,y1:0,
-                x2:0,y2:1,
-                stop:0 #332255,
-                stop:1 #24163F
+                x1:0,
+                y1:0,
+                x2:0,
+                y2:1,
+                stop:0 #322153,
+                stop:1 #22173C
             );
 
-            border:1px solid #3F2A68;
+            border:1px solid #46306F;
 
-            border-radius:18px;
+            border-radius:20px;
 
         }
 
-        QWidget:hover{
+        QWidget#musicCard:hover{
 
             border:2px solid #8B5CF6;
 
             background:qlineargradient(
-                x1:0,y1:0,
-                x2:0,y2:1,
-                stop:0 #402B67,
-                stop:1 #291943
+                x1:0,
+                y1:0,
+                x2:0,
+                y2:1,
+                stop:0 #3D2966,
+                stop:1 #291A46
             );
 
         }
         """)
 
-        layout = QVBoxLayout(self)
+    # ==========================================
+    # UI
+    # ==========================================
 
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-        
+    def build_ui(self):
 
-        # ==========================
+        self.layout = QVBoxLayout(self)
+
+        self.layout.setContentsMargins(
+            14,
+            14,
+            14,
+            14
+        )
+
+        self.layout.setSpacing(12)
+
+        # -------------------------
         # Album Cover
-        # ==========================
+        # -------------------------
 
         self.cover = QLabel()
 
-        cover = Path(song)
+        self.cover.setFixedSize(175, 175)
 
-        pix = QPixmap(str(cover))
+        self.cover.setAlignment(Qt.AlignCenter)
 
-        self.cover.setPixmap(
-            pix.scaled(
-                170,
-                170,
-                Qt.KeepAspectRatioByExpanding,
-                Qt.SmoothTransformation
+        pix = QPixmap(self.image_path)
+
+        if not pix.isNull():
+
+            self.cover.setPixmap(
+                pix.scaled(
+                    175,
+                    175,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation
+                )
             )
-        )
-
-        self.cover.setFixedSize(170, 170)
 
         self.cover.setStyleSheet("""
         QLabel{
-            background:transparent;
+
+            background:#1B1432;
+
             border-radius:16px;
+
         }
         """)
 
-        layout.addWidget(
+        self.layout.addWidget(
             self.cover,
             alignment=Qt.AlignCenter
         )
 
-        # ==========================
+	
+	        # -------------------------
         # Song Name
-        # ==========================
+        # -------------------------
 
-        self.song = QLabel(song_name)
+        self.song = QLabel(self.song_name)
+
+        self.song.setWordWrap(True)
 
         self.song.setStyleSheet("""
-        color:white;
-        font-size:16px;
-        font-weight:bold;
-        background:transparent;
+        QLabel{
+
+            color:white;
+
+            background:transparent;
+
+            font-size:16px;
+
+            font-weight:700;
+
+        }
         """)
 
-        layout.addWidget(self.song)
+        self.layout.addWidget(self.song)
 
-        # ==========================
+        # -------------------------
         # Artist
-        # ==========================
+        # -------------------------
 
-        self.artist = QLabel(artist_name)
+        self.artist = QLabel(self.artist_name)
 
         self.artist.setStyleSheet("""
-        color:#B4A8D6;
-        font-size:12px;
-        background:transparent;
+        QLabel{
+
+            color:#B8AEDF;
+
+            background:transparent;
+
+            font-size:13px;
+
+        }
         """)
 
-        layout.addWidget(self.artist)
+        self.layout.addWidget(self.artist)
 
-        layout.addSpacing(8)
+        self.layout.addStretch()
 
-        # ==========================
+        # -------------------------
         # Play Button
-        # ==========================
+        # -------------------------
 
-        self.play_btn = QPushButton("▶ Play")
+        self.play_btn = QPushButton("▶  Play")
 
-        self.play_btn.setCursor(Qt.PointingHandCursor)
+        self.play_btn.setCursor(
+            QCursor(Qt.PointingHandCursor)
+        )
+
+        self.play_btn.setFixedHeight(42)
 
         self.play_btn.setStyleSheet("""
         QPushButton{
@@ -162,11 +213,9 @@ class MusicCard(QWidget):
 
             border:none;
 
-            border-radius:14px;
+            border-radius:12px;
 
-            padding:10px;
-
-            font-size:13px;
+            font-size:14px;
 
             font-weight:700;
 
@@ -185,69 +234,94 @@ class MusicCard(QWidget):
         }
         """)
 
-        layout.addWidget(self.play_btn)
+        self.layout.addWidget(self.play_btn)
 
-        layout.addStretch()
+    # ==========================================
+    # Shadow
+    # ==========================================
 
-        # ==========================
-        # Shadow
-        # ==========================
+    def apply_shadow(self):
 
         shadow = QGraphicsDropShadowEffect(self)
 
-        shadow.setBlurRadius(40)
+        shadow.setBlurRadius(38)
 
-        shadow.setOffset(0, 12)
+        shadow.setOffset(0, 10)
 
-        shadow.setColor(QColor(124, 58, 237, 120))
+        shadow.setColor(
+            QColor(124, 58, 237, 120)
+        )
 
         self.setGraphicsEffect(shadow)
-
-        # ==========================
-        # Hover Animation
-        # ==========================
-
-        self.anim = QPropertyAnimation(self, b"geometry")
-
-        self.anim.setDuration(170)
-
-        self.anim.setEasingCurve(QEasingCurve.OutCubic)
+	
+	    # ==========================================
+    	    # Hover Events
+    	    # ==========================================
 
     def enterEvent(self, event):
 
-        self.anim.stop()
+        self.setStyleSheet("""
+        QWidget#musicCard{
 
-        self.anim.setStartValue(self.geometry())
+            background:qlineargradient(
+                x1:0,
+                y1:0,
+                x2:0,
+                y2:1,
+                stop:0 #45306E,
+                stop:1 #2C1B49
+            );
 
-        self.anim.setEndValue(
-            QRect(
-                self.x(),
-                self.y() - 8,
-                self.width(),
-                self.height()
+            border:2px solid #9F67FF;
+
+            border-radius:20px;
+
+        }
+        """)
+
+        effect = self.graphicsEffect()
+
+        if effect:
+
+            effect.setBlurRadius(55)
+
+            effect.setColor(
+                QColor(155, 92, 255, 180)
             )
-        )
-
-        self.anim.start()
 
         super().enterEvent(event)
 
+    # ==========================================
 
     def leaveEvent(self, event):
 
-        self.anim.stop()
+        self.setStyleSheet("""
+        QWidget#musicCard{
 
-        self.anim.setStartValue(self.geometry())
+            background:qlineargradient(
+                x1:0,
+                y1:0,
+                x2:0,
+                y2:1,
+                stop:0 #322153,
+                stop:1 #22173C
+            );
 
-        self.anim.setEndValue(
-            QRect(
-                self.x(),
-                self.y() + 8,
-                self.width(),
-                self.height()
+            border:1px solid #46306F;
+
+            border-radius:20px;
+
+        }
+        """)
+
+        effect = self.graphicsEffect()
+
+        if effect:
+
+            effect.setBlurRadius(38)
+
+            effect.setColor(
+                QColor(124, 58, 237, 120)
             )
-        )
 
-        self.anim.start()
-
-        super().leaveEvent(event)    
+        super().leaveEvent(event)

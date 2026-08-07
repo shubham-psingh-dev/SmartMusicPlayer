@@ -30,7 +30,7 @@ class TitleBar(QWidget):
         # Logo
         # -----------------------------
 
-        self.logo = QLabel("🎵 NirVANA")
+        self.logo = QLabel("🎵 LYRx")
 
         self.logo.setStyleSheet("""
             QLabel{

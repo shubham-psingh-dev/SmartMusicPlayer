@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-LOGO_PATH = BASE_DIR / "assets" / "icons" / "logo" / "nirvana_logo.png"
+LOGO_PATH = BASE_DIR / "assets" / "icons" / "logo" / "LYRx.png"
 NAV_ICON_PATH = BASE_DIR / "assets" / "icons" / "navigation"
 
 
@@ -164,7 +164,7 @@ class Sidebar(QWidget):
                 )
             )
 
-        title = QLabel("NirVANA")
+        title = QLabel("LYRx")
 
         title.setAlignment(Qt.AlignCenter)
 
@@ -233,7 +233,7 @@ class Sidebar(QWidget):
         # Footer
         # ----------------------
 
-        version = QLabel("NirVANA v0.1")
+        version = QLabel("LYRx v0.1")
 
         version.setAlignment(Qt.AlignCenter)
 

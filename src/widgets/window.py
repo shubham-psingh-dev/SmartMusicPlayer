@@ -10,7 +10,7 @@ class AppWindow(QMainWindow):
         super().__init__()
 
         # Window Settings
-        self.setWindowTitle("🎵 NirVANA")
+        self.setWindowTitle("🎵 LYRx")
 
         self.resize(1400, 850)
 

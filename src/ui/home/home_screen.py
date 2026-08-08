@@ -1,16 +1,20 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt
+
 from PySide6.QtGui import (
-    QColor,
-    QLinearGradient,
+    QColor, 
+    QLinearGradient, 
     QPainter,
+    QPixmap,
 )
 
 from PySide6.QtWidgets import (
     QWidget,
-    QLabel,
-    QFrame,
     QHBoxLayout,
     QVBoxLayout,
+    QFrame,
+    QLabel,
     QScrollArea,
     QSizePolicy,
 )
@@ -31,7 +35,7 @@ class HomeScreen(QWidget):
 
         self.resize(1450, 900)
 
-        self.setMinimumSize(1280, 760)
+        self.setMinimumSize(1200, 720)
 
         self.build_ui()
 
@@ -41,130 +45,186 @@ class HomeScreen(QWidget):
 
     def build_ui(self):
 
+        # ==================================================
+        # ROOT
+        # ==================================================
+
         root = QHBoxLayout(self)
 
-        root.setContentsMargins(0, 0, 0, 0)
-
-        root.setSpacing(0)
-
-        # ============================================
-        # SIDEBAR
-        # ============================================
-
-        self.sidebar = Sidebar()
-
-        root.addWidget(self.sidebar)
-
-        # ============================================
-        # MAIN CONTAINER
-        # ============================================
-
-        self.main = QWidget()
-
-        root.addWidget(self.main, 1)
-
-        self.main_layout = QVBoxLayout(self.main)
-
-        self.main_layout.setContentsMargins(
-            30,
-            25,
-            30,
-            25
-        )
-
-        self.main_layout.setSpacing(24)
-
-        # ============================================
-        # HEADER
-        # ============================================
-
-        self.header = Header()
-
-        self.main_layout.addWidget(self.header)
-
-        # ============================================
-        # HERO
-        # ============================================
-
-        self.hero = HeroBanner()
-
-        self.hero.setSizePolicy(
-            QSizePolicy.Expanding,
-            QSizePolicy.Fixed
-        )
-
-        self.main_layout.addWidget(self.hero)
-
-        # ============================================
-        # BODY
-        # ============================================
-
-        self.body = QWidget()
-
-        self.main_layout.addWidget(
-            self.body,
-            1
-        )
-
-        self.body_layout = QHBoxLayout(self.body)
-
-        self.body_layout.setContentsMargins(
+        root.setContentsMargins(
             0,
             0,
             0,
             0
         )
 
-        self.body_layout.setSpacing(25)
+        root.setSpacing(0)
 
-                # ============================================
-        # LEFT SIDE
-        # ============================================
+        # ==================================================
+        # SIDEBAR
+        # ==================================================
+
+        self.sidebar = Sidebar()
+
+        self.sidebar.setSizePolicy(
+            QSizePolicy.Fixed,
+            QSizePolicy.Expanding
+        )
+
+        root.addWidget(self.sidebar)
+
+        # ==================================================
+        # MAIN AREA
+        # ==================================================
+
+        self.main = QWidget()
+
+        self.main.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
+
+        self.main.setStyleSheet("""
+        QWidget {
+            background: transparent;
+        }
+        """)
+
+        root.addWidget(
+            self.main,
+            1
+        )
+
+        self.main_layout = QHBoxLayout(
+            self.main
+        )
+
+        self.main_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        self.main_layout.setSpacing(0)
+
+
+        # ==================================================
+        # LEFT CONTENT AREA
+        # ==================================================
 
         self.left = QWidget()
+
+        self.left.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
+
+        self.left.setStyleSheet("""
+        QWidget {
+            background: transparent;
+        }
+        """)
 
         self.left.setSizePolicy(
             QSizePolicy.Expanding,
             QSizePolicy.Expanding
         )
 
-        self.body_layout.addWidget(
+        self.main_layout.addWidget(
             self.left,
             1
         )
 
-        self.left_layout = QVBoxLayout(self.left)
-
-        self.left_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0
+        self.left_layout = QVBoxLayout(
+            self.left
         )
 
-        self.left_layout.setSpacing(20)
+        self.left_layout.setContentsMargins(
+            28,
+            22,
+            22,
+            22
+        )
 
-        # ============================================
-        # LEFT SCROLL AREA
-        # ============================================
+        self.left_layout.setSpacing(22)
 
-        self.scroll = QScrollArea()
+        # ==================================================
+        # RIGHT PLAYER AREA
+        # ==================================================
 
-        self.scroll.setWidgetResizable(True)
+        self.right_area = QWidget()
 
-        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.right_area.setFixedWidth(330)
 
-        self.scroll.setHorizontalScrollBarPolicy(
+        self.right_area.setSizePolicy(
+            QSizePolicy.Fixed,
+            QSizePolicy.Expanding
+        )
+
+        self.main_layout.addWidget(
+            self.right_area
+        )
+
+        self.right_layout = QVBoxLayout(
+            self.right_area
+        )
+
+        self.right_layout.setContentsMargins(
+            0,
+            22,
+            22,
+            22
+        )
+
+        self.right_layout.setSpacing(18)
+
+        # ==================================================
+        # HEADER
+        # ==================================================
+
+        self.header = Header()
+
+        self.header.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed
+        )
+
+        self.left_layout.addWidget(
+            self.header
+        )
+
+        # ==================================================
+        # LEFT CONTENT SCROLL
+        # ==================================================
+
+        self.content_scroll = QScrollArea()
+
+        self.content_scroll.setWidgetResizable(
+            True
+        )
+
+        self.content_scroll.setFrameShape(
+            QFrame.NoFrame
+        )
+
+        self.content_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarAlwaysOff
         )
 
-        self.scroll.setStyleSheet("""
+        self.content_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
 
+        self.content_scroll.setStyleSheet("""
         QScrollArea{
 
             background:transparent;
 
             border:none;
+
+        }
+
+        QScrollArea > QWidget > QWidget {
+            background: transparent;
 
         }
 
@@ -174,7 +234,7 @@ class HomeScreen(QWidget):
 
             background:transparent;
 
-            margin:2px;
+            margin: 2px;
 
         }
 
@@ -207,117 +267,208 @@ class HomeScreen(QWidget):
             background:transparent;
 
         }
-
         """)
 
         self.left_layout.addWidget(
-            self.scroll
+            self.content_scroll,
+            1
         )
 
-        # ============================================
+        # ==================================================
         # SCROLL CONTENT
-        # ============================================
+        # ==================================================
 
-        self.scroll_content = QWidget()
+        self.content = QWidget()
 
-        self.scroll.setWidget(
-            self.scroll_content
+        self.content.setAttribute(
+            Qt.WA_TranslucentBackground
         )
 
-        self.scroll_layout = QVBoxLayout(
-            self.scroll_content
-        )
-
-        self.scroll_layout.setContentsMargins(
-            0,
-            0,
-            12,
-            20
-        )
-
-        self.scroll_layout.setSpacing(26)
-
-        self.scroll_layout.setAlignment(
-            Qt.AlignTop
-        )
-
-        self.scroll_content.setStyleSheet("""
-        QWidget{
-            background:transparent;
+        self.content.setStyleSheet("""
+        QWidget {
+            background: transparent;
         }
         """)
 
-        # ============================================
-        # RIGHT SIDE
-        # ============================================
-
-        self.right = QWidget()
-
-        self.right.setMinimumWidth(300)
-        self.right.setMaximumWidth(340)
-
-        self.body_layout.addWidget(
-            self.right
+        self.content.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Preferred
         )
 
-        self.right_layout = QVBoxLayout(self.right)
+        self.content_scroll.setWidget(
+            self.content
+        )
 
-        self.right_layout.setContentsMargins(
+        self.content_layout = QVBoxLayout(
+            self.content
+        )
+
+        self.content_layout.setContentsMargins(
+            0,
+            0,
+            8,
+            30
+        )
+
+        self.content_layout.setSpacing(
+            24
+        )
+
+        self.content_layout.setAlignment(
+            Qt.AlignTop
+        )
+
+        # ==================================================
+        # HERO BANNER
+        # ==================================================
+
+        self.hero = HeroBanner()
+
+        self.hero.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed
+        )
+
+        self.content_layout.addWidget(
+            self.hero
+        )
+
+        # ==================================================
+        # RIGHT PANEL
+        # ==================================================
+
+        self.now_playing = NowPlaying()
+
+        self.now_playing.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Preferred
+        )
+
+        self.right_layout.addWidget(
+            self.now_playing
+        )
+
+        # ==================================================
+        # RIGHT PANEL SPACER
+        # ==================================================
+
+        self.right_layout.addStretch()
+
+        # ==================================================
+        # RIGHT PANEL BACKGROUND
+        # ==================================================
+
+        self.right_area.setStyleSheet("""
+        QWidget{
+
+            background:transparent;
+
+        }
+        """)
+
+        # ==================================================
+        # CONTINUE LISTENING SECTION
+        # ==================================================
+
+        self.continue_header = QWidget()
+
+        continue_header_layout = QHBoxLayout(
+            self.continue_header
+        )
+
+        continue_header_layout.setContentsMargins(
             0,
             0,
             0,
             0
         )
 
-        self.right_layout.setSpacing(18)
+        continue_header_layout.setSpacing(10)
 
-        self.right_layout.setAlignment(
-            Qt.AlignTop
+        self.continue_title = QLabel(
+            "Continue Listening"
         )
 
-                # ============================================
-        # CONTINUE LISTENING
-        # ============================================
-
-        section = QLabel("Continue Listening")
-
-        section.setStyleSheet("""
+        self.continue_title.setStyleSheet("""
         QLabel{
 
             color:white;
 
-            font-size:26px;
+            font-size:24px;
 
             font-weight:700;
 
         }
         """)
 
-        self.scroll_layout.addWidget(section)
+        self.more_button = QLabel(
+            "More  ›"
+        )
 
-        # ============================================
-        # MUSIC CARDS ROW
-        # ============================================
+        self.more_button.setAlignment(
+            Qt.AlignRight |
+            Qt.AlignVCenter
+        )
 
-        cards_container = QWidget()
+        self.more_button.setStyleSheet("""
+        QLabel{
 
-        cards_layout = QHBoxLayout(cards_container)
+            color:#9B7AFF;
 
-        cards_layout.setContentsMargins(0, 0, 0, 0)
+            font-size:13px;
 
-        cards_layout.setSpacing(20)
+            font-weight:600;
 
-        self.scroll_layout.addWidget(cards_container)
-
-        cards_container.setStyleSheet("""
-        QWidget{
-            background:transparent;
         }
         """)
 
-        # ============================================
-        # CARDS
-        # ============================================
+        continue_header_layout.addWidget(
+            self.continue_title
+        )
+
+        continue_header_layout.addStretch()
+
+        continue_header_layout.addWidget(
+            self.more_button
+        )
+
+        self.content_layout.addWidget(
+            self.continue_header
+        )
+
+        # ==================================================
+        # MUSIC CARDS CONTAINER
+        # ==================================================
+
+        self.cards_container = QWidget()
+
+        self.cards_container.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed
+        )
+
+        self.cards_layout = QHBoxLayout(
+            self.cards_container
+        )
+
+        self.cards_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        self.cards_layout.setSpacing(
+            16
+        )
+
+        self.content_layout.addWidget(
+            self.cards_container
+        )
+
+        # ==================================================
+        # MUSIC CARDS
+        # ==================================================
 
         cards = [
 
@@ -347,112 +498,479 @@ class HomeScreen(QWidget):
 
         ]
 
-        for image, title, artist in cards:
+        for image_path, title, artist in cards:
 
             card = MusicCard(
-                image,
+                image_path,
                 title,
                 artist
             )
 
-            cards_layout.addWidget(card)
+            card.setSizePolicy(
+                QSizePolicy.Fixed,
+                QSizePolicy.Fixed
+            )
 
-        cards_layout.addStretch()
+            self.cards_layout.addWidget(
+                card
+            )
 
-        # ============================================
-        # FUTURE SECTIONS
-        # ============================================
+        self.cards_layout.addStretch()
 
-        self.scroll_layout.addSpacing(15)
+                # ==================================================
+        # YOUR VIBE / MOOD SECTION
+        # ==================================================
 
-        placeholder = QLabel(
-            "Mood • Recently Played • Playlist\n"
-            "(Coming in upcoming days)"
+        self.vibe_header = QWidget()
+
+        vibe_header_layout = QHBoxLayout(
+            self.vibe_header
         )
 
-        placeholder.setAlignment(Qt.AlignCenter)
+        vibe_header_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
 
-        placeholder.setStyleSheet("""
+        vibe_title = QLabel(
+            "Your Vibe"
+        )
+
+        vibe_title.setStyleSheet("""
         QLabel{
 
-            color:#8177B5;
+            color:white;
 
-            font-size:15px;
+            font-size:24px;
 
-            padding:40px;
-
-            border:1px dashed #43335F;
-
-            border-radius:16px;
-
-            background:#161122;
+            font-weight:700;
 
         }
         """)
 
-        self.scroll_layout.addWidget(placeholder)
-
-        self.scroll_layout.addStretch()
-
-                # ============================================
-        # NOW PLAYING PANEL
-        # ============================================
-
-        self.now_playing = NowPlaying()
-
-        self.now_playing.setSizePolicy(
-            QSizePolicy.Expanding,
-            QSizePolicy.Minimum
+        vibe_more = QLabel(
+            "Explore  ›"
         )
 
-        self.right_layout.addWidget(
-            self.now_playing
+        vibe_more.setStyleSheet("""
+        QLabel{
+
+            color:#9B7AFF;
+
+            font-size:13px;
+
+            font-weight:600;
+
+        }
+        """)
+
+        vibe_header_layout.addWidget(
+            vibe_title
         )
 
-        self.right_layout.addStretch()
+        vibe_header_layout.addStretch()
 
-        # ============================================
-        # WINDOW STRETCH
-        # ============================================
+        vibe_header_layout.addWidget(
+            vibe_more
+        )
 
-        self.main_layout.setStretch(
+        self.content_layout.addWidget(
+            self.vibe_header
+        )
+
+        # ==================================================
+        # MOOD ROW
+        # ==================================================
+
+        self.mood_container = QWidget()
+
+        mood_layout = QHBoxLayout(
+            self.mood_container
+        )
+
+        mood_layout.setContentsMargins(
+            0,
+            0,
             0,
             0
-        )  # Header
+        )
 
-        self.main_layout.setStretch(
-            1,
+        mood_layout.setSpacing(
+            14
+        )
+
+        moods = [
+            ("Chill", "🌙"),
+            ("Focus", "🎧"),
+            ("Happy", "☀"),
+            ("Workout", "⚡"),
+            ("Sleep", "✨"),
+        ]
+
+        for mood_name, icon in moods:
+
+            mood = QFrame()
+
+            mood.setFixedHeight(
+                82
+            )
+
+            mood.setMinimumWidth(
+                110
+            )
+
+            mood.setStyleSheet("""
+            QFrame{
+
+                background:#191329;
+
+                border:1px solid #30224B;
+
+                border-radius:16px;
+
+            }
+
+            QFrame:hover{
+
+                background:#24183D;
+
+                border:1px solid #7048C7;
+
+            }
+            """)
+
+            mood_layout_inner = QVBoxLayout(
+                mood
+            )
+
+            mood_layout_inner.setContentsMargins(
+                10,
+                8,
+                10,
+                8
+            )
+
+            icon_label = QLabel(
+                icon
+            )
+
+            icon_label.setAlignment(
+                Qt.AlignCenter
+            )
+
+            icon_label.setStyleSheet("""
+            QLabel{
+
+                background:transparent;
+
+                font-size:20px;
+
+            }
+            """)
+
+            name_label = QLabel(
+                mood_name
+            )
+
+            name_label.setAlignment(
+                Qt.AlignCenter
+            )
+
+            name_label.setStyleSheet("""
+            QLabel{
+
+                color:#D7D0EA;
+
+                background:transparent;
+
+                font-size:12px;
+
+                font-weight:600;
+
+            }
+            """)
+
+            mood_layout_inner.addWidget(
+                icon_label
+            )
+
+            mood_layout_inner.addWidget(
+                name_label
+            )
+
+            mood_layout.addWidget(
+                mood
+            )
+
+        mood_layout.addStretch()
+
+        self.content_layout.addWidget(
+            self.mood_container
+        )
+
+        # ==================================================
+        # PLAYLIST SECTION
+        # ==================================================
+
+        playlist_header = QWidget()
+
+        playlist_header_layout = QHBoxLayout(
+            playlist_header
+        )
+
+        playlist_header_layout.setContentsMargins(
+            0,
+            0,
+            0,
             0
-        )  # Hero
+        )
 
-        self.main_layout.setStretch(
-            2,
-            1
-        )  # Body
+        playlist_title = QLabel(
+            "Playlists for You"
+        )
 
-            # ============================================
-    # PREMIUM BACKGROUND
-    # ============================================
+        playlist_title.setStyleSheet("""
+        QLabel{
+
+            color:white;
+
+            font-size:24px;
+
+            font-weight:700;
+
+        }
+        """)
+
+        playlist_more = QLabel(
+            "View All  ›"
+        )
+
+        playlist_more.setStyleSheet("""
+        QLabel{
+
+            color:#9B7AFF;
+
+            font-size:13px;
+
+            font-weight:600;
+
+        }
+        """)
+
+        playlist_header_layout.addWidget(
+            playlist_title
+        )
+
+        playlist_header_layout.addStretch()
+
+        playlist_header_layout.addWidget(
+            playlist_more
+        )
+
+        self.content_layout.addWidget(
+            playlist_header
+        )
+
+        # ==================================================
+        # PLAYLIST CARDS
+        # ==================================================
+
+        playlist_container = QWidget()
+
+        playlist_layout = QHBoxLayout(
+            playlist_container
+        )
+
+        playlist_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        playlist_layout.setSpacing(
+            16
+        )
+
+        playlists = [
+            (
+                "assets/album_art/believer.jpg",
+                "Daily Mix"
+            ),
+            (
+                "assets/album_art/faded.jpg",
+                "Late Night"
+            ),
+            (
+                "assets/album_art/arcade.jpg",
+                "Emotional"
+            ),
+        ]
+
+        for image_path, name in playlists:
+
+            playlist = QFrame()
+
+            playlist.setFixedHeight(
+                105
+            )
+
+            playlist.setMinimumWidth(
+                180
+            )
+
+            playlist.setStyleSheet("""
+            QFrame{
+
+                background:#191329;
+
+                border:1px solid #30224B;
+
+                border-radius:16px;
+
+            }
+
+            QFrame:hover{
+
+                background:#24183D;
+
+                border:1px solid #7048C7;
+
+            }
+            """)
+
+            playlist_layout_inner = QHBoxLayout(
+                playlist
+            )
+
+            playlist_layout_inner.setContentsMargins(
+                10,
+                10,
+                10,
+                10
+            )
+
+            cover = QLabel()
+
+            cover.setFixedSize(
+                78,
+                78
+            )
+
+            pix = QPixmap(
+                str(
+                    Path(image_path)
+                )
+            )
+
+            if not pix.isNull():
+
+                cover.setPixmap(
+                    pix.scaled(
+                        78,
+                        78,
+                        Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation
+                    )
+                )
+
+            cover.setStyleSheet("""
+            QLabel{
+
+                border-radius:12px;
+
+                background:#251A3A;
+
+            }
+            """)
+
+            playlist_name = QLabel(
+                name
+            )
+
+            playlist_name.setWordWrap(
+                True
+            )
+
+            playlist_name.setStyleSheet("""
+            QLabel{
+
+                color:white;
+
+                font-size:14px;
+
+                font-weight:600;
+
+                background:transparent;
+
+            }
+            """)
+
+            playlist_layout_inner.addWidget(
+                cover
+            )
+
+            playlist_layout_inner.addWidget(
+                playlist_name
+            )
+
+            playlist_layout_inner.addStretch()
+
+            playlist_layout.addWidget(
+                playlist
+            )
+
+        playlist_layout.addStretch()
+
+        self.content_layout.addWidget(
+            playlist_container
+        )
+
+        # ==================================================
+        # BOTTOM SPACE
+        # ==================================================
+
+        self.content_layout.addSpacing(
+            20
+        )
+
+        self.content_layout.addStretch()
+
+    # ==================================================
+    # PAINT EVENT
+    # ==================================================
 
     def paintEvent(self, event):
 
         painter = QPainter(self)
 
+        painter.setRenderHint(
+            QPainter.Antialiasing
+        )
+
+        rect = self.rect()
+
+        # ==================================================
+        # MAIN BACKGROUND
+        # ==================================================
+
         gradient = QLinearGradient(
             0,
             0,
-            self.width(),
-            self.height()
+            rect.width(),
+            rect.height()
         )
 
         gradient.setColorAt(
             0.0,
-            QColor("#0D0B16")
+            QColor("#0B0913")
         )
 
         gradient.setColorAt(
             0.45,
-            QColor("#171428")
+            QColor("#151124")
         )
 
         gradient.setColorAt(
@@ -461,8 +979,54 @@ class HomeScreen(QWidget):
         )
 
         painter.fillRect(
-            self.rect(),
+            rect,
             gradient
         )
+
+        # ==================================================
+        # TOP PURPLE AMBIENT GLOW
+        # ==================================================
+
+        painter.setPen(
+            Qt.NoPen
+        )
+
+        painter.setBrush(
+            QColor(
+                124,
+                58,
+                237,
+                24
+            )
+        )
+
+        painter.drawEllipse(
+            -180,
+            -180,
+            500,
+            400
+        )
+
+        # ==================================================
+        # RIGHT AMBIENT GLOW
+        # ==================================================
+
+        painter.setBrush(
+            QColor(
+                139,
+                92,
+                246,
+                16
+            )
+        )
+
+        painter.drawEllipse(
+            rect.width() - 420,
+            120,
+            500,
+            500
+        )
+
+        painter.end()
 
         super().paintEvent(event)

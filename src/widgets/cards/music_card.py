@@ -1,327 +1,747 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-
 from PySide6.QtGui import (
     QColor,
-    QCursor,
+    QPainter,
+    QLinearGradient,
+    QPainterPath,
+    QPen,
     QPixmap,
 )
-
 from PySide6.QtWidgets import (
-    QWidget,
     QLabel,
     QPushButton,
     QVBoxLayout,
+    QFrame,
     QGraphicsDropShadowEffect,
 )
 
 
-# ==========================================
-# Paths
-# ==========================================
+# ============================================================
+# PATHS
+# ============================================================
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+FILE_DIR = Path(__file__).resolve()
+
+# music_player_desktop/
+PROJECT_DIR = FILE_DIR.parents[3]
+
+# music_player_desktop/src/
+SRC_DIR = FILE_DIR.parents[2]
 
 
-class MusicCard(QWidget):
+class CoverLabel(QLabel):
+
+    def __init__(self):
+        super().__init__()
+
+        self.setFixedSize(172, 172)
+        self.setAlignment(Qt.AlignCenter)
+
+        self.setStyleSheet("""
+        QLabel {
+            background: #211633;
+            border: none;
+            border-radius: 18px;
+        }
+        """)
+
+    def paintEvent(self, event):
+
+        if self.pixmap() is None:
+            super().paintEvent(event)
+            return
+
+        painter = QPainter(self)
+
+        painter.setRenderHint(
+            QPainter.Antialiasing
+        )
+
+        painter.setRenderHint(
+            QPainter.SmoothPixmapTransform
+        )
+
+        path = QPainterPath()
+
+        path.addRoundedRect(
+            self.rect(),
+            18,
+            18
+        )
+
+        painter.setClipPath(path)
+
+        painter.drawPixmap(
+            self.rect(),
+            self.pixmap()
+        )
+
+        painter.end()
+
+
+class MusicCard(QFrame):
 
     def __init__(
         self,
-        image_path: str,
-        song_name: str,
-        artist_name: str
+        image_path,
+        title,
+        artist
     ):
+
         super().__init__()
 
         self.image_path = image_path
-        self.song_name = song_name
-        self.artist_name = artist_name
+        self.title_text = title
+        self.artist_text = artist
 
-        self.setup_card()
+        self.is_hovered = False
+
+        # ------------------------------------------------
+        # CARD SIZE
+        # ------------------------------------------------
+
+        self.setFixedWidth(196)
+        self.setMinimumHeight(326)
+
+        self.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.setObjectName(
+            "MusicCard"
+        )
 
         self.build_ui()
 
-        self.apply_shadow()
+        self.load_cover()
 
-    # ==========================================
-    # Card Styling
-    # ==========================================
+        self.setup_shadow()
 
-    def setup_card(self):
-
-        self.setFixedSize(205, 360)
-
-        self.setCursor(QCursor(Qt.PointingHandCursor))
-
-        self.setObjectName("musicCard")
-
-        self.setStyleSheet("""
-        QWidget#musicCard{
-
-            background:qlineargradient(
-                x1:0,
-                y1:0,
-                x2:0,
-                y2:1,
-                stop:0 #322153,
-                stop:1 #22173C
-            );
-
-            border:1px solid #46306F;
-
-            border-radius:20px;
-
-        }
-
-        QWidget#musicCard:hover{
-
-            border:2px solid #8B5CF6;
-
-            background:qlineargradient(
-                x1:0,
-                y1:0,
-                x2:0,
-                y2:1,
-                stop:0 #3D2966,
-                stop:1 #291A46
-            );
-
-        }
-        """)
-
-    # ==========================================
+    # ============================================================
     # UI
-    # ==========================================
+    # ============================================================
 
     def build_ui(self):
 
-        self.layout = QVBoxLayout(self)
+        root = QVBoxLayout(self)
 
-        self.layout.setContentsMargins(
-            14,
-            14,
-            14,
-            14
+        root.setContentsMargins(
+            10,
+            10,
+            10,
+            12
         )
 
-        self.layout.setSpacing(12)
+        root.setSpacing(9)
 
-        # -------------------------
-        # Album Cover
-        # -------------------------
+        # ========================================================
+        # COVER AREA
+        # ========================================================
 
-        self.cover = QLabel()
+        self.cover_frame = QFrame()
 
-        self.cover.setFixedSize(175, 175)
+        self.cover_frame.setFixedSize(
+            176,
+            176
+        )
 
-        self.cover.setAlignment(Qt.AlignCenter)
+        self.cover_frame.setObjectName(
+            "CoverFrame"
+        )
 
-        pix = QPixmap(self.image_path)
+        self.cover_frame.setStyleSheet("""
+        QFrame#CoverFrame {
+            background: #211633;
+            border: 1px solid rgba(139, 92, 246, 45);
+            border-radius: 20px;
+        }
+        """)
 
-        if not pix.isNull():
+        cover_layout = QVBoxLayout(
+            self.cover_frame
+        )
 
-            self.cover.setPixmap(
-                pix.scaled(
-                    175,
-                    175,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation
-                )
-            )
+        cover_layout.setContentsMargins(
+            2,
+            2,
+            2,
+            2
+        )
 
-        self.cover.setStyleSheet("""
-        QLabel{
+        cover_layout.setSpacing(0)
 
-            background:#1B1432;
+        # ========================================================
+        # COVER IMAGE
+        # ========================================================
 
-            border-radius:16px;
+        self.cover = CoverLabel()
+
+        cover_layout.addWidget(
+            self.cover
+        )
+
+        # ========================================================
+        # PLAY BUTTON
+        # ========================================================
+
+        self.play_btn = QPushButton(
+            "▶"
+        )
+
+        self.play_btn.setFixedSize(
+            54,
+            54
+        )
+
+        self.play_btn.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.play_btn.setObjectName(
+            "PlayButton"
+        )
+
+        self.play_btn.setStyleSheet("""
+        QPushButton#PlayButton {
+
+            background: #8B5CF6;
+
+            color: white;
+
+            border: 2px solid rgba(255,255,255,45);
+
+            border-radius: 27px;
+
+            font-size: 19px;
+
+            font-weight: 700;
+
+            padding-left: 3px;
+
+        }
+
+        QPushButton#PlayButton:hover {
+
+            background: #A970FF;
+
+            border: 2px solid rgba(255,255,255,90);
+
+        }
+
+        QPushButton#PlayButton:pressed {
+
+            background: #6D28D9;
 
         }
         """)
 
-        self.layout.addWidget(
-            self.cover,
+        self.play_btn.hide()
+
+        # Important:
+        # button stays inside cover_frame
+        self.play_btn.setParent(
+            self.cover_frame
+        )
+
+        # ========================================================
+        # TITLE
+        # ========================================================
+
+        self.title = QLabel(
+            self.title_text
+        )
+
+        self.title.setWordWrap(
+            False
+        )
+
+        self.title.setTextInteractionFlags(
+            Qt.NoTextInteraction
+        )
+
+        self.title.setStyleSheet("""
+        QLabel {
+
+            color: #FFFFFF;
+
+            font-size: 15px;
+
+            font-weight: 700;
+
+            background: transparent;
+
+            border: none;
+
+            padding: 0px;
+
+        }
+        """)
+
+        # ========================================================
+        # ARTIST
+        # ========================================================
+
+        self.artist = QLabel(
+            self.artist_text
+        )
+
+        self.artist.setWordWrap(
+            False
+        )
+
+        self.artist.setStyleSheet("""
+        QLabel {
+
+            color: #AFA4C8;
+
+            font-size: 13px;
+
+            background: transparent;
+
+            border: none;
+
+            padding: 0px;
+
+        }
+        """)
+
+        # ========================================================
+        # DURATION
+        # ========================================================
+
+        self.duration = QLabel(
+            "3:45"
+        )
+
+        self.duration.setStyleSheet("""
+        QLabel {
+
+            color: #756A91;
+
+            font-size: 11px;
+
+            background: transparent;
+
+            border: none;
+
+            padding: 0px;
+
+        }
+        """)
+
+        # ========================================================
+        # ADD TO LAYOUT
+        # ========================================================
+
+        root.addWidget(
+            self.cover_frame,
             alignment=Qt.AlignCenter
         )
 
-	
-	        # -------------------------
-        # Song Name
-        # -------------------------
+        root.addSpacing(2)
 
-        self.song = QLabel(self.song_name)
-
-        self.song.setWordWrap(True)
-
-        self.song.setStyleSheet("""
-        QLabel{
-
-            color:white;
-
-            background:transparent;
-
-            font-size:16px;
-
-            font-weight:700;
-
-        }
-        """)
-
-        self.layout.addWidget(self.song)
-
-        # -------------------------
-        # Artist
-        # -------------------------
-
-        self.artist = QLabel(self.artist_name)
-
-        self.artist.setStyleSheet("""
-        QLabel{
-
-            color:#B8AEDF;
-
-            background:transparent;
-
-            font-size:13px;
-
-        }
-        """)
-
-        self.layout.addWidget(self.artist)
-
-        self.layout.addStretch()
-
-        # -------------------------
-        # Play Button
-        # -------------------------
-
-        self.play_btn = QPushButton("▶  Play")
-
-        self.play_btn.setCursor(
-            QCursor(Qt.PointingHandCursor)
+        root.addWidget(
+            self.title
         )
 
-        self.play_btn.setFixedHeight(42)
+        root.addWidget(
+            self.artist
+        )
 
-        self.play_btn.setStyleSheet("""
-        QPushButton{
+        root.addWidget(
+            self.duration
+        )
 
-            background:#7C3AED;
+        root.addStretch()
 
-            color:white;
+    # ============================================================
+    # LOAD COVER
+    # ============================================================
 
-            border:none;
+    def load_cover(self):
 
-            border-radius:12px;
+        possible_paths = [
 
-            font-size:14px;
+            # Given path relative to project
+            PROJECT_DIR / self.image_path,
 
-            font-weight:700;
+            # Given path relative to src
+            SRC_DIR / self.image_path,
 
-        }
+            # Current working directory
+            Path.cwd() / self.image_path,
 
-        QPushButton:hover{
+            # Absolute path, if supplied
+            Path(self.image_path),
 
-            background:#9F67FF;
+        ]
 
-        }
+        image_file = None
 
-        QPushButton:pressed{
+        for path in possible_paths:
 
-            background:#6D28D9;
+            try:
+
+                if path.exists() and path.is_file():
+
+                    image_file = path
+                    break
+
+            except Exception:
+                continue
+
+        # --------------------------------------------------------
+        # IMAGE FOUND
+        # --------------------------------------------------------
+
+        if image_file:
+
+            pixmap = QPixmap(
+                str(image_file)
+            )
+
+            if not pixmap.isNull():
+
+                scaled = pixmap.scaled(
+                    172,
+                    172,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation
+                )
+
+                self.cover.setPixmap(
+                    scaled
+                )
+
+                return
+
+        # --------------------------------------------------------
+        # IMAGE NOT FOUND
+        # --------------------------------------------------------
+
+        self.cover.setPixmap(
+            QPixmap()
+        )
+
+        self.cover.setText(
+            "♪"
+        )
+
+        self.cover.setStyleSheet("""
+        QLabel {
+
+            background: #211633;
+
+            color: #8B5CF6;
+
+            font-size: 42px;
+
+            border-radius: 18px;
 
         }
         """)
 
-        self.layout.addWidget(self.play_btn)
+    # ============================================================
+    # SHADOW
+    # ============================================================
 
-    # ==========================================
-    # Shadow
-    # ==========================================
+    def setup_shadow(self):
 
-    def apply_shadow(self):
-
-        shadow = QGraphicsDropShadowEffect(self)
-
-        shadow.setBlurRadius(38)
-
-        shadow.setOffset(0, 10)
-
-        shadow.setColor(
-            QColor(124, 58, 237, 120)
+        self.shadow = QGraphicsDropShadowEffect(
+            self
         )
 
-        self.setGraphicsEffect(shadow)
-	
-	    # ==========================================
-    	    # Hover Events
-    	    # ==========================================
+        self.shadow.setBlurRadius(
+            24
+        )
+
+        self.shadow.setOffset(
+            0,
+            8
+        )
+
+        self.shadow.setColor(
+            QColor(
+                124,
+                58,
+                237,
+                55
+            )
+        )
+
+        self.setGraphicsEffect(
+            self.shadow
+        )
+
+    # ============================================================
+    # POSITION PLAY BUTTON
+    # ============================================================
+
+    def position_play_button(self):
+
+        x = (
+            self.cover_frame.width()
+            - self.play_btn.width()
+        ) // 2
+
+        y = (
+            self.cover_frame.height()
+            - self.play_btn.height()
+        ) // 2
+
+        self.play_btn.move(
+            x,
+            y
+        )
+
+    # ============================================================
+    # RESIZE EVENT
+    # ============================================================
+
+    def resizeEvent(self, event):
+
+        self.position_play_button()
+
+        super().resizeEvent(
+            event
+        )
+
+    # ============================================================
+    # HOVER ENTER
+    # ============================================================
 
     def enterEvent(self, event):
 
-        self.setStyleSheet("""
-        QWidget#musicCard{
+        self.is_hovered = True
 
-            background:qlineargradient(
-                x1:0,
-                y1:0,
-                x2:0,
-                y2:1,
-                stop:0 #45306E,
-                stop:1 #2C1B49
-            );
+        self.play_btn.show()
 
-            border:2px solid #9F67FF;
+        self.position_play_button()
 
-            border-radius:20px;
+        self.cover_frame.setStyleSheet("""
+        QFrame#CoverFrame {
+
+            background: #24163E;
+
+            border: 2px solid #8B5CF6;
+
+            border-radius: 20px;
 
         }
         """)
 
-        effect = self.graphicsEffect()
+        self.shadow.setBlurRadius(
+            34
+        )
 
-        if effect:
+        self.shadow.setOffset(
+            0,
+            10
+        )
 
-            effect.setBlurRadius(55)
-
-            effect.setColor(
-                QColor(155, 92, 255, 180)
+        self.shadow.setColor(
+            QColor(
+                139,
+                92,
+                246,
+                105
             )
+        )
 
-        super().enterEvent(event)
+        super().enterEvent(
+            event
+        )
 
-    # ==========================================
+    # ============================================================
+    # HOVER LEAVE
+    # ============================================================
 
     def leaveEvent(self, event):
 
-        self.setStyleSheet("""
-        QWidget#musicCard{
+        self.is_hovered = False
 
-            background:qlineargradient(
-                x1:0,
-                y1:0,
-                x2:0,
-                y2:1,
-                stop:0 #322153,
-                stop:1 #22173C
-            );
+        self.play_btn.hide()
 
-            border:1px solid #46306F;
+        self.cover_frame.setStyleSheet("""
+        QFrame#CoverFrame {
 
-            border-radius:20px;
+            background: #211633;
+
+            border: 1px solid rgba(139, 92, 246, 45);
+
+            border-radius: 20px;
 
         }
         """)
 
-        effect = self.graphicsEffect()
+        self.shadow.setBlurRadius(
+            24
+        )
 
-        if effect:
+        self.shadow.setOffset(
+            0,
+            8
+        )
 
-            effect.setBlurRadius(38)
+        self.shadow.setColor(
+            QColor(
+                124,
+                58,
+                237,
+                55
+            )
+        )
 
-            effect.setColor(
-                QColor(124, 58, 237, 120)
+        super().leaveEvent(
+            event
+        )
+
+    # ============================================================
+    # PAINT EVENT
+    # ============================================================
+
+    def paintEvent(self, event):
+
+        painter = QPainter(
+            self
+        )
+
+        painter.setRenderHint(
+            QPainter.Antialiasing
+        )
+
+        rect = self.rect()
+
+        # --------------------------------------------------------
+        # CARD SHAPE
+        # --------------------------------------------------------
+
+        path = QPainterPath()
+
+        path.addRoundedRect(
+            rect.adjusted(
+                1,
+                1,
+                -1,
+                -1
+            ),
+            20,
+            20
+        )
+
+        # --------------------------------------------------------
+        # DARK PURPLE GRADIENT
+        # --------------------------------------------------------
+
+        gradient = QLinearGradient(
+            0,
+            0,
+            0,
+            rect.height()
+        )
+
+        gradient.setColorAt(
+            0.0,
+            QColor("#211633")
+        )
+
+        gradient.setColorAt(
+            0.55,
+            QColor("#191226")
+        )
+
+        gradient.setColorAt(
+            1.0,
+            QColor("#110D1B")
+        )
+
+        painter.fillPath(
+            path,
+            gradient
+        )
+
+        # --------------------------------------------------------
+        # BORDER
+        # --------------------------------------------------------
+
+        if self.is_hovered:
+
+            border_color = QColor(
+                139,
+                92,
+                246,
+                150
             )
 
-        super().leaveEvent(event)
+        else:
+
+            border_color = QColor(
+                139,
+                92,
+                246,
+                42
+            )
+
+        pen = QPen(
+            border_color
+        )
+
+        pen.setWidth(
+            1
+        )
+
+        painter.setPen(
+            pen
+        )
+
+        painter.drawPath(
+            path
+        )
+
+        # --------------------------------------------------------
+        # TOP PURPLE GLOW
+        # --------------------------------------------------------
+
+        painter.setPen(
+            Qt.NoPen
+        )
+
+        painter.setBrush(
+            QColor(
+                139,
+                92,
+                246,
+                15
+            )
+        )
+
+        painter.drawEllipse(
+            rect.width() - 75,
+            -30,
+            100,
+            100
+        )
+
+        # --------------------------------------------------------
+        # BOTTOM GLOW
+        # --------------------------------------------------------
+
+        painter.setBrush(
+            QColor(
+                168,
+                85,
+                247,
+                10
+            )
+        )
+
+        painter.drawEllipse(
+            -25,
+            rect.height() - 70,
+            90,
+            90
+        )
+
+        painter.end()

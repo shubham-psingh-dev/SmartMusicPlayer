@@ -55,5 +55,8 @@ Unlike traditional music players, LYRx focuses on a premium user experience with
 - [x] Day 4 - Window Foundation
 - [x] Day 5 - Hero Banner & Music Cards
 - [x] Day 6 - HomeScreen Architecture
+- [x] Day 7 - Sidebar & Navigation UI
+- [x] Day 8 - Main UI Components & Visual Enhancement
+- [x] Day 9 - HomeScreen & Now Playing UI Polish
 
-Version: Alpha 1.0
+Version: LYRx Alpha 1.0

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QPainter,
@@ -82,6 +82,8 @@ class CoverLabel(QLabel):
 
 
 class MusicCard(QFrame):
+
+    play_requested = Signal(str, str, str)
 
     def __init__(
         self,
@@ -243,6 +245,10 @@ class MusicCard(QFrame):
         # button stays inside cover_frame
         self.play_btn.setParent(
             self.cover_frame
+        )
+
+        self.play_btn.clicked.connect(
+            self.request_play
         )
 
         # ========================================================
@@ -596,6 +602,18 @@ class MusicCard(QFrame):
 
         super().leaveEvent(
             event
+        )
+
+    # ============================================================
+    # PLAY REQUEST
+    # ============================================================
+
+    def request_play(self):
+
+        self.play_requested.emit(
+            self.image_path,
+            self.title_text,
+            self.artist_text
         )
 
     # ============================================================

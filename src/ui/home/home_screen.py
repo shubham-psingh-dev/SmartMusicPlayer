@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from widgets.sidebar import Sidebar
 from ui.home.header import Header
 from ui.home.hero_banner import HeroBanner
+from ui.home.mood_section import MoodSection
 from widgets.cards.music_card import MusicCard
 from ui.player.now_playing import NowPlaying
 
@@ -339,6 +340,18 @@ class HomeScreen(QWidget):
 
         self.now_playing = NowPlaying()
 
+        self.now_playing.previous_requested.connect(
+            self.play_previous
+        )
+
+        self.now_playing.next_requested.connect(
+            self.play_next
+        )
+
+        self.now_playing.next_song_requested.connect(
+            self.play_selected_song
+        )
+
         self.now_playing.setSizePolicy(
             QSizePolicy.Expanding,
             QSizePolicy.Preferred
@@ -511,203 +524,40 @@ class HomeScreen(QWidget):
                 QSizePolicy.Fixed
             )
 
+            card.play_requested.connect(
+                self.handle_play_request
+            )
+
             self.cards_layout.addWidget(
                 card
             )
 
         self.cards_layout.addStretch()
 
-                # ==================================================
+        # ==================================================
+        # PLAYER QUEUE
+        # ==================================================
+
+        self.player_queue = cards
+
+        self.current_index = 0
+
+        # ==================================================
         # YOUR VIBE / MOOD SECTION
         # ==================================================
 
-        self.vibe_header = QWidget()
+        self.mood_section = MoodSection()
 
-        vibe_header_layout = QHBoxLayout(
-            self.vibe_header
+        self.mood_section.mood_selected.connect(
+            self.handle_mood_selected
         )
 
-        vibe_header_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        vibe_title = QLabel(
-            "Your Vibe"
-        )
-
-        vibe_title.setStyleSheet("""
-        QLabel{
-
-            color:white;
-
-            font-size:24px;
-
-            font-weight:700;
-
-        }
-        """)
-
-        vibe_more = QLabel(
-            "Explore  ›"
-        )
-
-        vibe_more.setStyleSheet("""
-        QLabel{
-
-            color:#9B7AFF;
-
-            font-size:13px;
-
-            font-weight:600;
-
-        }
-        """)
-
-        vibe_header_layout.addWidget(
-            vibe_title
-        )
-
-        vibe_header_layout.addStretch()
-
-        vibe_header_layout.addWidget(
-            vibe_more
+        self.mood_section.see_all_clicked.connect(
+            self.handle_mood_see_all
         )
 
         self.content_layout.addWidget(
-            self.vibe_header
-        )
-
-        # ==================================================
-        # MOOD ROW
-        # ==================================================
-
-        self.mood_container = QWidget()
-
-        mood_layout = QHBoxLayout(
-            self.mood_container
-        )
-
-        mood_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        mood_layout.setSpacing(
-            14
-        )
-
-        moods = [
-            ("Chill", "🌙"),
-            ("Focus", "🎧"),
-            ("Happy", "☀"),
-            ("Workout", "⚡"),
-            ("Sleep", "✨"),
-        ]
-
-        for mood_name, icon in moods:
-
-            mood = QFrame()
-
-            mood.setFixedHeight(
-                82
-            )
-
-            mood.setMinimumWidth(
-                110
-            )
-
-            mood.setStyleSheet("""
-            QFrame{
-
-                background:#191329;
-
-                border:1px solid #30224B;
-
-                border-radius:16px;
-
-            }
-
-            QFrame:hover{
-
-                background:#24183D;
-
-                border:1px solid #7048C7;
-
-            }
-            """)
-
-            mood_layout_inner = QVBoxLayout(
-                mood
-            )
-
-            mood_layout_inner.setContentsMargins(
-                10,
-                8,
-                10,
-                8
-            )
-
-            icon_label = QLabel(
-                icon
-            )
-
-            icon_label.setAlignment(
-                Qt.AlignCenter
-            )
-
-            icon_label.setStyleSheet("""
-            QLabel{
-
-                background:transparent;
-
-                font-size:20px;
-
-            }
-            """)
-
-            name_label = QLabel(
-                mood_name
-            )
-
-            name_label.setAlignment(
-                Qt.AlignCenter
-            )
-
-            name_label.setStyleSheet("""
-            QLabel{
-
-                color:#D7D0EA;
-
-                background:transparent;
-
-                font-size:12px;
-
-                font-weight:600;
-
-            }
-            """)
-
-            mood_layout_inner.addWidget(
-                icon_label
-            )
-
-            mood_layout_inner.addWidget(
-                name_label
-            )
-
-            mood_layout.addWidget(
-                mood
-            )
-
-        mood_layout.addStretch()
-
-        self.content_layout.addWidget(
-            self.mood_container
+            self.mood_section
         )
 
         # ==================================================
@@ -937,6 +787,135 @@ class HomeScreen(QWidget):
         )
 
         self.content_layout.addStretch()
+
+    # ==================================================
+    # HANDLE MUSIC CARD PLAY
+    # ==================================================
+
+    def handle_play_request(
+        self,
+        image_path,
+        title,
+        artist
+    ):
+
+        for index, song in enumerate(
+            self.player_queue
+        ):
+
+            if song[0] == image_path:
+
+                self.current_index = index
+                break
+
+        self.now_playing.update_song(
+            image_path,
+            title,
+            artist
+        )
+
+    # ==================================================
+    # PLAY NEXT
+    # ==================================================
+
+    def play_next(self):
+
+        if not self.player_queue:
+            return
+
+        self.current_index += 1
+
+        if self.current_index >= len(
+            self.player_queue
+        ):
+
+            self.current_index = 0
+
+        image_path, title, artist = (
+            self.player_queue[
+                self.current_index
+            ]
+        )
+
+        self.now_playing.update_song(
+            image_path,
+            title,
+            artist
+        )
+
+    # ==================================================
+    # PLAY PREVIOUS
+    # ==================================================
+
+    def play_previous(self):
+
+        if not self.player_queue:
+            return
+
+        self.current_index -= 1
+
+        if self.current_index < 0:
+
+            self.current_index = (
+                len(self.player_queue) - 1
+            )
+
+        image_path, title, artist = (
+            self.player_queue[
+                self.current_index
+            ]
+        )
+
+        self.now_playing.update_song(
+            image_path,
+            title,
+            artist
+        )
+
+    def play_selected_song(
+        self,
+        image_path,
+        title,
+        artist
+    ):
+
+        for index, song in enumerate(
+            self.player_queue
+        ):
+
+            if song[0] == image_path:
+
+                self.current_index = index
+                break
+
+        self.now_playing.update_song(
+            image_path,
+            title,
+            artist
+        )
+
+    # ==================================================
+    # MOOD HANDLERS
+    # ==================================================
+
+    def handle_mood_selected(
+        self,
+        mood_name
+    ):
+
+        print(
+            "Mood selected:",
+            mood_name
+        )
+
+
+    def handle_mood_see_all(
+        self
+    ):
+
+        print(
+            "See All moods clicked"
+        )
 
     # ==================================================
     # PAINT EVENT

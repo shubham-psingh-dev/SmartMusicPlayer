@@ -1,16 +1,4 @@
-<p align="center">
-<img src="assets/icons/logo/LYRx.png" width="170">
-</p>
-
-<h1 align="center">🎵 LYRx</h1>
-
-<p align="center">
-A futuristic offline desktop music player built with Python & PySide6.
-</p>
-
-# 🎧 LYRx
-
-> Lose Yourself in Sound
+# LYRx
 
 LYRx is a modern offline desktop music player built with Python.
 
@@ -58,5 +46,6 @@ Unlike traditional music players, LYRx focuses on a premium user experience with
 - [x] Day 7 - Sidebar & Navigation UI
 - [x] Day 8 - Main UI Components & Visual Enhancement
 - [x] Day 9 - HomeScreen & Now Playing UI Polish
+- [x] Day 10 - Premium Hero Banner, Mood Section & Music UI Enhancement
 
 Version: LYRx Alpha 1.0

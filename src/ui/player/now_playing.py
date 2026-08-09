@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QUrl
 from PySide6.QtGui import (
     QColor,
     QLinearGradient,
@@ -8,6 +8,11 @@ from PySide6.QtGui import (
     QPainterPath,
     QPen,
     QPixmap,
+)
+
+from PySide6.QtMultimedia import (
+    QAudioOutput,
+    QMediaPlayer,
 )
 
 from PySide6.QtWidgets import (
@@ -74,6 +79,10 @@ DEFAULT_ART = find_asset(
 
 class NowPlaying(QWidget):
 
+    next_requested = Signal()
+    previous_requested = Signal()
+    next_song_requested = Signal(str, str, str)
+
     def __init__(self):
 
         super().__init__()
@@ -98,7 +107,36 @@ class NowPlaying(QWidget):
         self.is_shuffle = False
         self.is_repeat = False
 
+        # ========================================================
+        # AUDIO PLAYER
+        # ========================================================
+
+        self.audio_player = QMediaPlayer(self)
+
+        self.audio_output = QAudioOutput(self)
+
+        self.audio_player.setAudioOutput(
+            self.audio_output
+        )
+
+        self.audio_output.setVolume(
+            0.75
+        )
+
+        self.audio_player.positionChanged.connect(
+            self.update_progress
+        )
+
+        self.audio_player.durationChanged.connect(
+            self.update_duration
+        )
+
         self.build_ui()
+
+        self.slider.sliderMoved.connect(
+            self.seek_audio
+        )
+
 
     # ========================================================
     # BUILD UI
@@ -341,7 +379,7 @@ class NowPlaying(QWidget):
         )
 
         self.slider.setValue(
-            35
+            0
         )
 
         self.slider.setStyleSheet("""
@@ -394,17 +432,17 @@ class NowPlaying(QWidget):
 
         time_layout = QHBoxLayout()
 
-        current = QLabel(
-            "1:24"
+        self.current_time = QLabel(
+            "0:00"
         )
 
-        total = QLabel(
-            "3:45"
+        self.total_time = QLabel(
+            "0:00"
         )
 
         for label in (
-            current,
-            total
+            self.current_time,
+            self.total_time
         ):
 
             label.setStyleSheet("""
@@ -420,13 +458,13 @@ class NowPlaying(QWidget):
             """)
 
         time_layout.addWidget(
-            current
+            self.current_time
         )
 
         time_layout.addStretch()
 
         time_layout.addWidget(
-            total
+            self.total_time
         )
 
         root.addLayout(
@@ -503,6 +541,14 @@ class NowPlaying(QWidget):
 
         self.play_btn.clicked.connect(
             self.toggle_play
+        )
+
+        self.prev_btn.clicked.connect(
+            self.previous_requested.emit
+        )
+
+        self.next_btn.clicked.connect(
+            self.next_requested.emit
         )
 
         self.shuffle_btn.clicked.connect(
@@ -1151,17 +1197,107 @@ class NowPlaying(QWidget):
             duration_label
         )
 
+        item.mousePressEvent = lambda event: (
+        self.next_song_requested.emit(
+            image_path,
+            title,
+            artist
+        )
+    )
+
         return item
 
-    # ========================================================
-    # PLAY / PAUSE
-    # ========================================================
+# ========================================================
+# UPDATE SONG
+# ========================================================
 
-    def toggle_play(self):
+    def update_song(
+        self,
+        image_path,
+        title,
+        artist
+    ):
 
-        self.is_playing = not self.is_playing
+    # ----------------------------------------------------
+    # SONG INFO
+    # ----------------------------------------------------
+        self.audio_player.stop()
 
-        if self.is_playing:
+        self.song.setText(
+            title
+        )
+
+        self.artist.setText(
+            artist
+        )
+
+    # ----------------------------------------------------
+    # ALBUM ART
+    # ----------------------------------------------------
+
+        image_file = find_asset(
+            image_path
+        )
+
+        if image_file:
+
+            pix = QPixmap(
+                str(image_file)
+            )
+
+            if not pix.isNull():
+
+                self.album.setPixmap(
+                    pix.scaled(
+                        232,
+                        232,
+                        Qt.KeepAspectRatioByExpanding,
+                        Qt.SmoothTransformation
+                    )
+                )
+
+    # ----------------------------------------------------
+    # RESET PROGRESS
+    # ----------------------------------------------------
+
+        self.slider.setValue(
+            0
+        )
+
+    # ----------------------------------------------------
+    # FIND AUDIO FILE
+    # ----------------------------------------------------
+
+        music_path = image_path
+
+        music_path = music_path.replace(
+            "assets/album_art/",
+            "assets/music/"
+        )
+
+        music_path = str(
+            Path(music_path).with_suffix(".mp3")
+        )   
+
+        audio_file = find_asset(
+            music_path
+        )
+
+    # ----------------------------------------------------
+    # LOAD AUDIO
+    # ----------------------------------------------------
+
+        if audio_file:
+
+            self.audio_player.setSource(
+                QUrl.fromLocalFile(
+                    str(audio_file.resolve())
+                )
+            )
+
+            self.audio_player.play()
+
+            self.is_playing = True
 
             self.play_btn.setText(
                 "Ⅱ"
@@ -1169,9 +1305,117 @@ class NowPlaying(QWidget):
 
         else:
 
+            self.is_playing = False
+
             self.play_btn.setText(
                 "▶"
             )
+
+            print(
+                "Audio file not found:",
+                music_path
+            )
+
+# ========================================================
+# PLAY / PAUSE
+# ========================================================
+
+    def toggle_play(self):
+
+        if self.audio_player.playbackState() == QMediaPlayer.PlayingState:
+
+            self.audio_player.pause()
+
+            self.is_playing = False
+
+            self.play_btn.setText(
+                "▶"
+            )
+
+        else:
+
+            self.audio_player.play()
+
+            self.is_playing = True
+
+            self.play_btn.setText(
+                "Ⅱ"
+            )
+
+    # ========================================================
+    # UPDATE DURATION
+    # ========================================================
+
+    def update_duration(self, duration):
+
+        if duration <= 0:
+            self.total_time.setText("0:00")
+            return
+
+        total_seconds = duration // 1000
+
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+
+        self.total_time.setText(
+            f"{minutes}:{seconds:02d}"
+        )
+
+        self.slider.setRange(
+            0,
+            100
+        )
+
+    # ========================================================
+    # UPDATE PROGRESS
+    # ========================================================
+
+    def update_progress(self, position):
+
+        duration = self.audio_player.duration()
+
+        if duration <= 0:
+            return
+
+        progress = int(
+            (position / duration) * 100
+        )
+
+        self.slider.blockSignals(True)
+
+        self.slider.setValue(
+            progress
+        )
+
+        self.slider.blockSignals(False)
+
+        total_seconds = position // 1000
+
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+
+        self.current_time.setText(
+            f"{minutes}:{seconds:02d}"
+        )
+
+    # ========================================================
+    # SEEK AUDIO
+    # ========================================================
+
+    def seek_audio(self, value):
+
+        duration = self.audio_player.duration()
+
+        if duration <= 0:
+            return
+
+        position = int(
+            (value / 100) * duration
+        )
+
+        self.audio_player.setPosition(
+            position
+        )
 
     # ========================================================
     # SHUFFLE

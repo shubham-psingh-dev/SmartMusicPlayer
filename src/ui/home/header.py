@@ -1,15 +1,19 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
-    QVBoxLayout,
-    QLabel,
     QLineEdit,
     QPushButton,
 )
 
 
 class Header(QWidget):
+
+    # ==================================
+    # SIGNALS
+    # ==================================
+
+    search_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
@@ -18,151 +22,191 @@ class Header(QWidget):
 
         self.build_ui()
 
+    # ==================================
+    # UI
+    # ==================================
+
     def build_ui(self):
 
         root = QHBoxLayout(self)
 
-        root.setContentsMargins(0, 0, 0, 0)
+        root.setContentsMargins(
+            0,
+            0,
+            8,
+            0
+        )
 
-        root.setSpacing(15)
+        root.setSpacing(10)
 
-        # ==========================
-        # LEFT SIDE
-        # ==========================
-
-        left = QVBoxLayout()
-
-        welcome = QLabel("Good Evening 👋")
-
-        welcome.setStyleSheet("""
-        color:#B9B3D6;
-        font-size:14px;
-        """)
-
-        title = QLabel("Welcome Back")
-
-        title.setStyleSheet("""
-        color:white;
-        font-size:26px;
-        font-weight:700;
-        """)
-
-        left.addWidget(welcome)
-        left.addWidget(title)
-
-        root.addLayout(left)
+        # ==================================
+        # LEFT SPACE
+        # ==================================
 
         root.addStretch()
 
-        # ==========================
+        # ==================================
         # SEARCH BAR
-        # ==========================
+        # ==================================
 
         self.search = QLineEdit()
 
-        self.search.setPlaceholderText("Search music...")
+        self.search.setPlaceholderText(
+            "Search your music..."
+        )
 
         self.search.setFixedWidth(320)
 
         self.search.setFixedHeight(42)
 
         self.search.setStyleSheet("""
-        QLineEdit{
+        QLineEdit {
 
-            background:#221B38;
+            background: #1D172F;
 
-            color:white;
+            color: white;
 
-            border:2px solid #312850;
+            border: 1px solid #312850;
 
-            border-radius:20px;
+            border-radius: 21px;
 
-            padding-left:15px;
+            padding-left: 18px;
+            padding-right: 18px;
 
-            font-size:14px;
+            font-size: 14px;
+
+            selection-background-color: #7C3AED;
         }
 
-        QLineEdit:focus{
+        QLineEdit:hover {
 
-            border:2px solid #7C3AED;
+            border: 1px solid #4A3970;
 
+            background: #211A35;
+        }
+
+        QLineEdit:focus {
+
+            border: 1px solid #7C3AED;
+
+            background: #211A35;
         }
         """)
 
-        root.addWidget(self.search)
+        root.addWidget(
+            self.search
+        )
 
-        # ==========================
-        # RIGHT SIDE
-        # ==========================
+        # ==================================
+        # SEARCH SIGNAL
+        # ==================================
 
-        self.notification = QPushButton("🔔")
+        self.search.textChanged.connect(
+            self.search_changed.emit
+        )
 
-        self.notification.setFixedSize(42,42)
+        # ==================================
+        # NOTIFICATION
+        # ==================================
+
+        self.notification = QPushButton("♧")
+
+        self.notification.setFixedSize(
+            42,
+            42
+        )
+
+        self.notification.setCursor(
+            Qt.PointingHandCursor
+        )
 
         self.notification.setStyleSheet("""
-        QPushButton{
+        QPushButton {
 
-            background:#221B38;
+            background: #211A35;
 
-            border:none;
+            color: #CFC7EA;
 
-            border-radius:21px;
+            border: 1px solid #312850;
 
-            color:white;
+            border-radius: 21px;
 
-            font-size:18px;
+            font-size: 17px;
 
         }
 
-        QPushButton:hover{
+        QPushButton:hover {
 
-            background:#7C3AED;
+            background: #30204F;
 
+            color: white;
+
+            border: 1px solid #7C3AED;
+        }
+
+        QPushButton:pressed {
+
+            background: #7C3AED;
         }
         """)
 
-        root.addWidget(self.notification)
+        root.addWidget(
+            self.notification
+        )
 
-        # ==========================
+        # ==================================
         # PROFILE
-        # ==========================
+        # ==================================
 
-        self.profile = QPushButton("👤 Duggu")
+        self.profile = QPushButton(
+            "•  Duggu"
+        )
 
         self.profile.setFixedHeight(42)
 
+        self.profile.setCursor(
+            Qt.PointingHandCursor
+        )
+
         self.profile.setStyleSheet("""
-        QPushButton{
+        QPushButton {
 
-            background:#221B38;
+            background: #211A35;
 
-            color:white;
+            color: white;
 
-            border:none;
+            border: 1px solid #312850;
 
-            border-radius:20px;
+            border-radius: 21px;
 
-            padding-left:15px;
-            padding-right:15px;
+            padding-left: 16px;
+            padding-right: 16px;
 
-            font-size:14px;
+            font-size: 14px;
 
-            font-weight:600;
-
+            font-weight: 600;
         }
 
-        QPushButton:hover{
+        QPushButton:hover {
 
-            background:#7C3AED;
+            background: #30204F;
 
+            border: 1px solid #7C3AED;
+        }
+
+        QPushButton:pressed {
+
+            background: #7C3AED;
         }
         """)
 
-        root.addWidget(self.profile)
+        root.addWidget(
+            self.profile
+        )
 
-        # ==========================
+        # ==================================
         # WINDOW BUTTONS
-        # ==========================
+        # ==================================
 
         self.btn_minimize = QPushButton("—")
         self.btn_maximize = QPushButton("□")
@@ -176,37 +220,76 @@ class Header(QWidget):
 
         for btn in buttons:
 
-            btn.setFixedSize(36, 36)
+            btn.setFixedSize(
+                36,
+                36
+            )
+
+            btn.setCursor(
+                Qt.PointingHandCursor
+            )
 
             btn.setStyleSheet("""
-            QPushButton{
+            QPushButton {
 
-                background:#221B38;
+                background: #211A35;
 
-                color:white;
+                color: #D8D2EA;
 
-                border:none;
+                border: 1px solid #2C2445;
 
-                border-radius:18px;
+                border-radius: 18px;
 
-                font-size:14px;
+                font-size: 14px;
 
-                font-weight:bold;
-
+                font-weight: bold;
             }
 
-            QPushButton:hover{
+            QPushButton:hover {
 
-                background:#7C3AED;
+                background: #30204F;
 
+                color: white;
+
+                border: 1px solid #7C3AED;
             }
             """)
 
             root.addWidget(btn)
 
-        # ==========================
-        # SIGNALS
-        # ==========================
+        # ==================================
+        # CLOSE BUTTON SPECIAL STYLE
+        # ==================================
+
+        self.btn_close.setStyleSheet("""
+        QPushButton {
+
+            background: #211A35;
+
+            color: #D8D2EA;
+
+            border: 1px solid #2C2445;
+
+            border-radius: 18px;
+
+            font-size: 14px;
+
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+
+            background: #7F1D3A;
+
+            color: white;
+
+            border: 1px solid #BE123C;
+        }
+        """)
+
+        # ==================================
+        # WINDOW SIGNALS
+        # ==================================
 
         self.btn_minimize.clicked.connect(
             lambda: self.window().showMinimized()
@@ -229,6 +312,9 @@ class Header(QWidget):
         window = self.window()
 
         if window.isMaximized():
+
             window.showNormal()
+
         else:
+
             window.showMaximized()

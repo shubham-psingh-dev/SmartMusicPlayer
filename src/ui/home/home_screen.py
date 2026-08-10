@@ -1,14 +1,12 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-
 from PySide6.QtGui import (
-    QColor, 
-    QLinearGradient, 
+    QColor,
+    QLinearGradient,
     QPainter,
     QPixmap,
 )
-
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -36,7 +34,43 @@ class HomeScreen(QWidget):
 
         self.resize(1450, 900)
 
-        self.setMinimumSize(1200, 720)
+        self.setMinimumSize(
+            1200,
+            720
+        )
+
+        # ==================================================
+        # MUSIC DATA
+        # ==================================================
+
+        self.player_queue = [
+            (
+                "assets/album_art/believer.jpg",
+                "Believer",
+                "Imagine Dragons"
+            ),
+            (
+                "assets/album_art/faded.jpg",
+                "Faded",
+                "Alan Walker"
+            ),
+            (
+                "assets/album_art/arcade.jpg",
+                "Arcade",
+                "Duncan Laurence"
+            ),
+            (
+                "assets/album_art/lethergo.jpg",
+                "Let Her Go",
+                "Passenger"
+            ),
+        ]
+
+        self.current_index = 0
+
+        # Stores:
+        # (card widget, title, artist)
+        self.music_cards = []
 
         self.build_ui()
 
@@ -72,7 +106,9 @@ class HomeScreen(QWidget):
             QSizePolicy.Expanding
         )
 
-        root.addWidget(self.sidebar)
+        root.addWidget(
+            self.sidebar
+        )
 
         # ==================================================
         # MAIN AREA
@@ -106,8 +142,9 @@ class HomeScreen(QWidget):
             0
         )
 
-        self.main_layout.setSpacing(0)
-
+        self.main_layout.setSpacing(
+            0
+        )
 
         # ==================================================
         # LEFT CONTENT AREA
@@ -146,7 +183,9 @@ class HomeScreen(QWidget):
             22
         )
 
-        self.left_layout.setSpacing(22)
+        self.left_layout.setSpacing(
+            22
+        )
 
         # ==================================================
         # RIGHT PLAYER AREA
@@ -154,7 +193,9 @@ class HomeScreen(QWidget):
 
         self.right_area = QWidget()
 
-        self.right_area.setFixedWidth(330)
+        self.right_area.setFixedWidth(
+            330
+        )
 
         self.right_area.setSizePolicy(
             QSizePolicy.Fixed,
@@ -176,7 +217,9 @@ class HomeScreen(QWidget):
             22
         )
 
-        self.right_layout.setSpacing(18)
+        self.right_layout.setSpacing(
+            18
+        )
 
         # ==================================================
         # HEADER
@@ -191,6 +234,11 @@ class HomeScreen(QWidget):
 
         self.left_layout.addWidget(
             self.header
+        )
+
+        # Search signal
+        self.header.search_changed.connect(
+            self.filter_music_cards
         )
 
         # ==================================================
@@ -216,57 +264,51 @@ class HomeScreen(QWidget):
         )
 
         self.content_scroll.setStyleSheet("""
-        QScrollArea{
+        QScrollArea {
 
-            background:transparent;
+            background: transparent;
 
-            border:none;
-
+            border: none;
         }
 
         QScrollArea > QWidget > QWidget {
+
+            background: transparent;
+        }
+
+        QScrollBar:vertical {
+
+            width: 9px;
+
             background: transparent;
 
-        }
-
-        QScrollBar:vertical{
-
-            width:9px;
-
-            background:transparent;
-
             margin: 2px;
-
         }
 
-        QScrollBar::handle:vertical{
+        QScrollBar::handle:vertical {
 
-            background:#7C3AED;
+            background: #7C3AED;
 
-            border-radius:4px;
+            border-radius: 4px;
 
-            min-height:55px;
-
+            min-height: 55px;
         }
 
-        QScrollBar::handle:vertical:hover{
+        QScrollBar::handle:vertical:hover {
 
-            background:#9F67FF;
-
+            background: #9F67FF;
         }
 
         QScrollBar::add-line:vertical,
-        QScrollBar::sub-line:vertical{
+        QScrollBar::sub-line:vertical {
 
-            height:0px;
-
+            height: 0px;
         }
 
         QScrollBar::add-page:vertical,
-        QScrollBar::sub-page:vertical{
+        QScrollBar::sub-page:vertical {
 
-            background:transparent;
-
+            background: transparent;
         }
         """)
 
@@ -335,7 +377,7 @@ class HomeScreen(QWidget):
         )
 
         # ==================================================
-        # RIGHT PANEL
+        # NOW PLAYING
         # ==================================================
 
         self.now_playing = NowPlaying()
@@ -361,26 +403,17 @@ class HomeScreen(QWidget):
             self.now_playing
         )
 
-        # ==================================================
-        # RIGHT PANEL SPACER
-        # ==================================================
-
         self.right_layout.addStretch()
 
-        # ==================================================
-        # RIGHT PANEL BACKGROUND
-        # ==================================================
-
         self.right_area.setStyleSheet("""
-        QWidget{
+        QWidget {
 
-            background:transparent;
-
+            background: transparent;
         }
         """)
 
         # ==================================================
-        # CONTINUE LISTENING SECTION
+        # CONTINUE LISTENING HEADER
         # ==================================================
 
         self.continue_header = QWidget()
@@ -396,21 +429,27 @@ class HomeScreen(QWidget):
             0
         )
 
-        continue_header_layout.setSpacing(10)
+        continue_header_layout.setSpacing(
+            10
+        )
 
         self.continue_title = QLabel(
             "Continue Listening"
         )
 
+        self.continue_title.setProperty(
+            "default_title",
+            True
+        )
+
         self.continue_title.setStyleSheet("""
-        QLabel{
+        QLabel {
 
-            color:white;
+            color: white;
 
-            font-size:24px;
+            font-size: 24px;
 
-            font-weight:700;
-
+            font-weight: 700;
         }
         """)
 
@@ -424,14 +463,13 @@ class HomeScreen(QWidget):
         )
 
         self.more_button.setStyleSheet("""
-        QLabel{
+        QLabel {
 
-            color:#9B7AFF;
+            color: #9B7AFF;
 
-            font-size:13px;
+            font-size: 13px;
 
-            font-weight:600;
-
+            font-weight: 600;
         }
         """)
 
@@ -483,33 +521,7 @@ class HomeScreen(QWidget):
         # MUSIC CARDS
         # ==================================================
 
-        cards = [
-
-            (
-                "assets/album_art/believer.jpg",
-                "Believer",
-                "Imagine Dragons"
-            ),
-
-            (
-                "assets/album_art/faded.jpg",
-                "Faded",
-                "Alan Walker"
-            ),
-
-            (
-                "assets/album_art/arcade.jpg",
-                "Arcade",
-                "Duncan Laurence"
-            ),
-
-            (
-                "assets/album_art/lethergo.jpg",
-                "Let Her Go",
-                "Passenger"
-            ),
-
-        ]
+        cards = self.player_queue
 
         for image_path, title, artist in cards:
 
@@ -532,15 +544,56 @@ class HomeScreen(QWidget):
                 card
             )
 
+            self.music_cards.append(
+                (
+                    card,
+                    title,
+                    artist
+                )
+            )
+
         self.cards_layout.addStretch()
 
         # ==================================================
-        # PLAYER QUEUE
+        # NO RESULTS MESSAGE
         # ==================================================
 
-        self.player_queue = cards
+        self.no_results = QLabel(
+            "🎵  No music found"
+        )
 
-        self.current_index = 0
+        self.no_results.setAlignment(
+            Qt.AlignCenter
+        )
+
+        self.no_results.setMinimumHeight(
+            150
+        )
+
+        self.no_results.setStyleSheet("""
+        QLabel {
+
+            color: #B9AFD5;
+
+            background: #151024;
+
+            border: 1px solid #2D2348;
+
+            border-radius: 18px;
+
+            font-size: 16px;
+
+            font-weight: 600;
+
+            padding: 30px;
+        }
+        """)
+
+        self.no_results.hide()
+
+        self.content_layout.addWidget(
+            self.no_results
+        )
 
         # ==================================================
         # YOUR VIBE / MOOD SECTION
@@ -582,14 +635,13 @@ class HomeScreen(QWidget):
         )
 
         playlist_title.setStyleSheet("""
-        QLabel{
+        QLabel {
 
-            color:white;
+            color: white;
 
-            font-size:24px;
+            font-size: 24px;
 
-            font-weight:700;
-
+            font-weight: 700;
         }
         """)
 
@@ -598,14 +650,13 @@ class HomeScreen(QWidget):
         )
 
         playlist_more.setStyleSheet("""
-        QLabel{
+        QLabel {
 
-            color:#9B7AFF;
+            color: #9B7AFF;
 
-            font-size:13px;
+            font-size: 13px;
 
-            font-weight:600;
-
+            font-weight: 600;
         }
         """)
 
@@ -672,22 +723,20 @@ class HomeScreen(QWidget):
             )
 
             playlist.setStyleSheet("""
-            QFrame{
+            QFrame {
 
-                background:#191329;
+                background: #191329;
 
-                border:1px solid #30224B;
+                border: 1px solid #30224B;
 
-                border-radius:16px;
-
+                border-radius: 16px;
             }
 
-            QFrame:hover{
+            QFrame:hover {
 
-                background:#24183D;
+                background: #24183D;
 
-                border:1px solid #7048C7;
-
+                border: 1px solid #7048C7;
             }
             """)
 
@@ -727,12 +776,11 @@ class HomeScreen(QWidget):
                 )
 
             cover.setStyleSheet("""
-            QLabel{
+            QLabel {
 
-                border-radius:12px;
+                border-radius: 12px;
 
-                background:#251A3A;
-
+                background: #251A3A;
             }
             """)
 
@@ -745,16 +793,15 @@ class HomeScreen(QWidget):
             )
 
             playlist_name.setStyleSheet("""
-            QLabel{
+            QLabel {
 
-                color:white;
+                color: white;
 
-                font-size:14px;
+                font-size: 14px;
 
-                font-weight:600;
+                font-weight: 600;
 
-                background:transparent;
-
+                background: transparent;
             }
             """)
 
@@ -789,6 +836,105 @@ class HomeScreen(QWidget):
         self.content_layout.addStretch()
 
     # ==================================================
+    # SEARCH / FILTER MUSIC
+    # ==================================================
+
+    def filter_music_cards(
+        self,
+        search_text: str
+    ):
+
+        search_text = (
+            search_text
+            .strip()
+            .lower()
+        )
+
+        visible_count = 0
+
+        # ==================================================
+        # FILTER MUSIC CARDS
+        # ==================================================
+
+        for card, title, artist in self.music_cards:
+
+            searchable_text = (
+                f"{title} {artist}"
+            ).lower()
+
+            matches = (
+                not search_text
+                or search_text in searchable_text
+            )
+
+            card.setVisible(matches)
+
+            if matches:
+                visible_count += 1
+
+        # ==================================================
+        # NORMAL STATE
+        # ==================================================
+
+        if not search_text:
+
+            self.continue_title.setText(
+                "Continue Listening"
+            )
+
+            self.more_button.setText(
+                "More  ›"
+            )
+
+            self.no_results.hide()
+
+            return
+
+        # ==================================================
+        # SEARCH RESULTS
+        # ==================================================
+
+        if visible_count > 0:
+
+            track_word = (
+                "track"
+                if visible_count == 1
+                else "tracks"
+            )
+
+            self.continue_title.setText(
+                f"Search Results · "
+                f"{visible_count} {track_word}"
+            )
+
+            self.more_button.setText(
+                "Clear  ×"
+            )
+
+            self.no_results.hide()
+
+        # ==================================================
+        # NO RESULTS
+        # ==================================================
+
+        else:
+
+            self.continue_title.setText(
+                "Search Results"
+            )
+
+            self.more_button.setText(
+                "Clear  ×"
+            )
+
+            self.no_results.setText(
+                "🎵  No music found\n\n"
+                "Try searching for another song or artist."
+            )
+
+            self.no_results.show()
+
+    # ==================================================
     # HANDLE MUSIC CARD PLAY
     # ==================================================
 
@@ -806,6 +952,7 @@ class HomeScreen(QWidget):
             if song[0] == image_path:
 
                 self.current_index = index
+
                 break
 
         self.now_playing.update_song(
@@ -821,6 +968,7 @@ class HomeScreen(QWidget):
     def play_next(self):
 
         if not self.player_queue:
+
             return
 
         self.current_index += 1
@@ -850,6 +998,7 @@ class HomeScreen(QWidget):
     def play_previous(self):
 
         if not self.player_queue:
+
             return
 
         self.current_index -= 1
@@ -872,6 +1021,10 @@ class HomeScreen(QWidget):
             artist
         )
 
+    # ==================================================
+    # PLAY SELECTED SONG
+    # ==================================================
+
     def play_selected_song(
         self,
         image_path,
@@ -886,6 +1039,7 @@ class HomeScreen(QWidget):
             if song[0] == image_path:
 
                 self.current_index = index
+
                 break
 
         self.now_playing.update_song(
@@ -908,7 +1062,6 @@ class HomeScreen(QWidget):
             mood_name
         )
 
-
     def handle_mood_see_all(
         self
     ):
@@ -921,7 +1074,10 @@ class HomeScreen(QWidget):
     # PAINT EVENT
     # ==================================================
 
-    def paintEvent(self, event):
+    def paintEvent(
+        self,
+        event
+    ):
 
         painter = QPainter(self)
 
@@ -1008,4 +1164,6 @@ class HomeScreen(QWidget):
 
         painter.end()
 
-        super().paintEvent(event)
+        super().paintEvent(
+            event
+        )

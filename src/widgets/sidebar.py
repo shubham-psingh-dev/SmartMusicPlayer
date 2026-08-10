@@ -12,7 +12,23 @@ from PySide6.QtWidgets import (
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-LOGO_PATH = BASE_DIR / "assets" / "icons" / "logo" / "LYRx.png"
+
+SYMBOL_PATH = (
+    BASE_DIR
+    / "assets"
+    / "icons"
+    / "logo"
+    / "LYRx_symbol.png"
+)
+
+WORDMARK_PATH = (
+    BASE_DIR
+    / "assets"
+    / "icons"
+    / "logo"
+    / "LYRx_wordmark.png"
+)
+
 NAV_ICON_PATH = BASE_DIR / "assets" / "icons" / "navigation"
 
 
@@ -144,54 +160,92 @@ class Sidebar(QWidget):
         layout.setSpacing(12)
 
         # ----------------------
-        # Logo
+        # BRANDING
         # ----------------------
 
-        logo = QLabel()
+        symbol = QLabel()
 
-        logo.setAlignment(Qt.AlignCenter)
+        symbol.setAlignment(Qt.AlignCenter)
 
-        if LOGO_PATH.exists():
+        if SYMBOL_PATH.exists():
 
-            pix = QPixmap(str(LOGO_PATH))
+            pix = QPixmap(str(SYMBOL_PATH))
 
-            logo.setPixmap(
+        symbol.setPixmap(
+            pix.scaled(
+                82,
+                82,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+        )
+
+        symbol.setStyleSheet("""
+        QLabel {
+
+            background:transparent;
+
+        }
+        """)
+
+
+        wordmark = QLabel()
+
+        wordmark.setAlignment(Qt.AlignCenter)
+
+        if WORDMARK_PATH.exists():
+
+            pix = QPixmap(str(WORDMARK_PATH))
+
+            wordmark.setPixmap(
                 pix.scaled(
-                    120,
-                    120,
+                    118,
+                    32,
                     Qt.KeepAspectRatio,
                     Qt.SmoothTransformation
                 )
             )
 
-        title = QLabel("LYRx")
+        wordmark.setStyleSheet("""
+        QLabel {
 
-        title.setAlignment(Qt.AlignCenter)
+            background:transparent;
 
-        title.setStyleSheet("""
-
-        color:white;
-
-        font-size:24px;
-
-        font-weight:700;
-
+        }
         """)
 
-        subtitle = QLabel("Lose Yourself in Sound")
+
+        subtitle = QLabel(
+            "Lose Yourself in Sound"
+        )
 
         subtitle.setAlignment(Qt.AlignCenter)
 
         subtitle.setStyleSheet("""
+        QLabel {
 
-        color:#A79FD2;
+            color:#A79FD2;
 
-        font-size:12px;
+            font-size:11px;
 
+            font-weight:500;
+
+            letter-spacing:0.5px;
+
+            background:transparent;
+
+        }
         """)
 
-        layout.addWidget(logo)
-        layout.addWidget(title)
+
+        layout.addWidget(symbol)
+
+        layout.addSpacing(2)
+
+        layout.addWidget(wordmark)
+
+        layout.addSpacing(3)
+
         layout.addWidget(subtitle)
 
         layout.addSpacing(20)

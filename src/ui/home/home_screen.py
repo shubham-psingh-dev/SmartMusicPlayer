@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -28,11 +29,17 @@ from ui.player.now_playing import NowPlaying
 class HomeScreen(QWidget):
 
     def __init__(self):
+
         super().__init__()
 
-        self.setWindowTitle("🎵 LYRx")
+        self.setWindowTitle(
+            "🎵 LYRx"
+        )
 
-        self.resize(1450, 900)
+        self.resize(
+            1450,
+            900
+        )
 
         self.setMinimumSize(
             1200,
@@ -44,32 +51,38 @@ class HomeScreen(QWidget):
         # ==================================================
 
         self.player_queue = [
+
             (
                 "assets/album_art/believer.jpg",
                 "Believer",
                 "Imagine Dragons"
             ),
+
             (
                 "assets/album_art/faded.jpg",
                 "Faded",
                 "Alan Walker"
             ),
+
             (
                 "assets/album_art/arcade.jpg",
                 "Arcade",
                 "Duncan Laurence"
             ),
+
             (
                 "assets/album_art/lethergo.jpg",
                 "Let Her Go",
                 "Passenger"
             ),
+
         ]
 
         self.current_index = 0
 
         # Stores:
         # (card widget, title, artist)
+
         self.music_cards = []
 
         self.build_ui()
@@ -84,7 +97,9 @@ class HomeScreen(QWidget):
         # ROOT
         # ==================================================
 
-        root = QHBoxLayout(self)
+        root = QHBoxLayout(
+            self
+        )
 
         root.setContentsMargins(
             0,
@@ -93,7 +108,9 @@ class HomeScreen(QWidget):
             0
         )
 
-        root.setSpacing(0)
+        root.setSpacing(
+            0
+        )
 
         # ==================================================
         # SIDEBAR
@@ -236,7 +253,10 @@ class HomeScreen(QWidget):
             self.header
         )
 
-        # Search signal
+        # ==================================================
+        # SEARCH
+        # ==================================================
+
         self.header.search_changed.connect(
             self.filter_music_cards
         )
@@ -696,18 +716,22 @@ class HomeScreen(QWidget):
         )
 
         playlists = [
+
             (
                 "assets/album_art/believer.jpg",
                 "Daily Mix"
             ),
+
             (
                 "assets/album_art/faded.jpg",
                 "Late Night"
             ),
+
             (
                 "assets/album_art/arcade.jpg",
                 "Emotional"
             ),
+
         ]
 
         for image_path, name in playlists:
@@ -867,9 +891,12 @@ class HomeScreen(QWidget):
                 or search_text in searchable_text
             )
 
-            card.setVisible(matches)
+            card.setVisible(
+                matches
+            )
 
             if matches:
+
                 visible_count += 1
 
         # ==================================================
@@ -971,13 +998,60 @@ class HomeScreen(QWidget):
 
             return
 
-        self.current_index += 1
+        # ==================================================
+        # SHUFFLE ON
+        # ==================================================
 
-        if self.current_index >= len(
-            self.player_queue
-        ):
+        if self.now_playing.is_shuffle:
 
-            self.current_index = 0
+            # Only one song
+            if len(
+                self.player_queue
+            ) == 1:
+
+                next_index = (
+                    self.current_index
+                )
+
+            else:
+
+                available_indexes = [
+
+                    index
+
+                    for index in range(
+                        len(self.player_queue)
+                    )
+
+                    if index != self.current_index
+
+                ]
+
+                next_index = random.choice(
+                    available_indexes
+                )
+
+            self.current_index = (
+                next_index
+            )
+
+        # ==================================================
+        # SHUFFLE OFF
+        # ==================================================
+
+        else:
+
+            self.current_index += 1
+
+            if self.current_index >= len(
+                self.player_queue
+            ):
+
+                self.current_index = 0
+
+        # ==================================================
+        # PLAY NEXT SONG
+        # ==================================================
 
         image_path, title, artist = (
             self.player_queue[
@@ -1001,12 +1075,18 @@ class HomeScreen(QWidget):
 
             return
 
+        # ==================================================
+        # PREVIOUS ALWAYS FOLLOWS QUEUE ORDER
+        # ==================================================
+
         self.current_index -= 1
 
         if self.current_index < 0:
 
             self.current_index = (
-                len(self.player_queue) - 1
+                len(
+                    self.player_queue
+                ) - 1
             )
 
         image_path, title, artist = (
@@ -1079,7 +1159,9 @@ class HomeScreen(QWidget):
         event
     ):
 
-        painter = QPainter(self)
+        painter = QPainter(
+            self
+        )
 
         painter.setRenderHint(
             QPainter.Antialiasing

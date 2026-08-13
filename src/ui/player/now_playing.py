@@ -1,7 +1,11 @@
 from pathlib import Path
 import random
 
-from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QUrl,
+)
 from PySide6.QtGui import (
     QColor,
     QLinearGradient,
@@ -10,12 +14,10 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
-
 from PySide6.QtMultimedia import (
     QAudioOutput,
     QMediaPlayer,
 )
-
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
@@ -36,6 +38,7 @@ from PySide6.QtWidgets import (
 FILE_DIR = Path(__file__).resolve()
 
 PROJECT_DIR = FILE_DIR.parents[3]
+
 SRC_DIR = FILE_DIR.parents[2]
 
 
@@ -66,12 +69,87 @@ def find_asset(relative_path):
 
 
 # ============================================================
-# DEFAULT ART
+# TIME FORMATTER
 # ============================================================
 
-DEFAULT_ART = find_asset(
-    "assets/album_art/believer.jpg"
-)
+def format_duration(milliseconds):
+
+    if milliseconds is None or milliseconds <= 0:
+        return "0:00"
+
+    total_seconds = milliseconds // 1000
+
+    minutes = total_seconds // 60
+
+    seconds = total_seconds % 60
+
+    return f"{minutes}:{seconds:02d}"
+
+
+# ============================================================
+# NEXT SONG DURATION PROBE
+# ============================================================
+
+class DurationProbe:
+
+    def __init__(
+        self,
+        parent
+    ):
+
+        self.parent = parent
+
+        self.players = []
+
+    def load(
+        self,
+        audio_file,
+        callback
+    ):
+
+        player = QMediaPlayer(
+            self.parent
+        )
+
+        player.durationChanged.connect(
+            lambda duration,
+            p=player,
+            cb=callback: self.handle_duration(
+                p,
+                duration,
+                cb
+            )
+        )
+
+        player.setSource(
+            QUrl.fromLocalFile(
+                str(
+                    audio_file.resolve()
+                )
+            )
+        )
+
+        self.players.append(
+            player
+        )
+
+    def handle_duration(
+        self,
+        player,
+        duration,
+        callback
+    ):
+
+        if duration <= 0:
+            return
+
+        callback(
+            format_duration(duration)
+        )
+
+        # No playback.
+        # Keep player alive so Qt can finish
+        # reading the media metadata.
 
 
 # ============================================================
@@ -81,11 +159,15 @@ DEFAULT_ART = find_asset(
 class NowPlaying(QWidget):
 
     next_requested = Signal()
-    previous_requested = Signal()
-    next_song_requested = Signal(str, str, str)
 
-    # IMPORTANT:
-    # Emitted when current audio reaches the end.
+    previous_requested = Signal()
+
+    next_song_requested = Signal(
+        str,
+        str,
+        str
+    )
+
     song_finished = Signal()
 
     def __init__(self):
@@ -118,9 +200,10 @@ class NowPlaying(QWidget):
 
         self.is_repeat = False
 
-        # Current song information
         self.current_image_path = ""
+
         self.current_title = ""
+
         self.current_artist = ""
 
         # ========================================================
@@ -143,9 +226,17 @@ class NowPlaying(QWidget):
             0.75
         )
 
-        # --------------------------------------------------------
+        # ========================================================
+        # DURATION PROBE
+        # ========================================================
+
+        self.duration_probe = DurationProbe(
+            self
+        )
+
+        # ========================================================
         # PLAYER SIGNALS
-        # --------------------------------------------------------
+        # ========================================================
 
         self.audio_player.positionChanged.connect(
             self.update_progress
@@ -155,7 +246,6 @@ class NowPlaying(QWidget):
             self.update_duration
         )
 
-        # THIS IS THE IMPORTANT DAY 11 FIX
         self.audio_player.mediaStatusChanged.connect(
             self.handle_media_status
         )
@@ -319,10 +409,14 @@ class NowPlaying(QWidget):
         }
         """)
 
-        if DEFAULT_ART:
+        default_art = find_asset(
+            "assets/album_art/believer.jpg"
+        )
+
+        if default_art:
 
             pix = QPixmap(
-                str(DEFAULT_ART)
+                str(default_art)
             )
 
             if not pix.isNull():
@@ -506,7 +600,7 @@ class NowPlaying(QWidget):
         )
 
         # ====================================================
-        # PLAYER CONTROLS
+        # CONTROLS
         # ====================================================
 
         controls = QHBoxLayout()
@@ -568,10 +662,6 @@ class NowPlaying(QWidget):
         root.addLayout(
             controls
         )
-
-        # ====================================================
-        # CONTROL SIGNALS
-        # ====================================================
 
         self.play_btn.clicked.connect(
             self.toggle_play
@@ -865,41 +955,40 @@ class NowPlaying(QWidget):
             7
         )
 
+        # ====================================================
+        # NEXT SONG DATA
+        # ====================================================
+
         next_songs = [
 
             (
                 "assets/album_art/faded.jpg",
                 "Faded",
-                "Alan Walker",
-                "3:32"
+                "Alan Walker"
             ),
 
             (
                 "assets/album_art/arcade.jpg",
                 "Arcade",
-                "Duncan Laurence",
-                "3:05"
+                "Duncan Laurence"
             ),
 
             (
                 "assets/album_art/lethergo.jpg",
                 "Let Her Go",
-                "Passenger",
-                "4:12"
+                "Passenger"
             ),
 
             (
                 "assets/album_art/believer.jpg",
                 "Thunder",
-                "Imagine Dragons",
-                "3:07"
+                "Imagine Dragons"
             ),
 
             (
                 "assets/album_art/faded.jpg",
                 "On My Way",
-                "Alan Walker",
-                "3:37"
+                "Alan Walker"
             ),
 
         ]
@@ -907,15 +996,13 @@ class NowPlaying(QWidget):
         for (
             image_path,
             title,
-            artist,
-            duration
+            artist
         ) in next_songs:
 
             item = self.create_next_song(
                 image_path,
                 title,
-                artist,
-                duration
+                artist
             )
 
             next_layout.addWidget(
@@ -1044,8 +1131,7 @@ class NowPlaying(QWidget):
         self,
         image_path,
         title,
-        artist,
-        duration
+        artist
     ):
 
         item = QFrame()
@@ -1071,7 +1157,7 @@ class NowPlaying(QWidget):
 
         QFrame#NextSong:hover {
 
-            background: rgba(139,92,246,20);
+            background: rgba(139,58,246,20);
 
             border: 1px solid rgba(139,92,246,55);
 
@@ -1093,9 +1179,9 @@ class NowPlaying(QWidget):
             9
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # THUMBNAIL
-        # ----------------------------------------------------
+        # ====================================================
 
         thumb = QLabel()
 
@@ -1143,9 +1229,9 @@ class NowPlaying(QWidget):
             thumb
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # SONG TEXT
-        # ----------------------------------------------------
+        # ====================================================
 
         text_layout = QVBoxLayout()
 
@@ -1207,12 +1293,12 @@ class NowPlaying(QWidget):
             1
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # DURATION
-        # ----------------------------------------------------
+        # ====================================================
 
         duration_label = QLabel(
-            duration
+            "Loading..."
         )
 
         duration_label.setStyleSheet("""
@@ -1230,6 +1316,49 @@ class NowPlaying(QWidget):
         layout.addWidget(
             duration_label
         )
+
+        # ====================================================
+        # LOAD ACTUAL MP3 DURATION
+        # ====================================================
+
+        music_path = image_path.replace(
+            "assets/album_art/",
+            "assets/music/"
+        )
+
+        music_path = str(
+            Path(music_path).with_suffix(
+                ".mp3"
+            )
+        )
+
+        audio_file = find_asset(
+            music_path
+        )
+
+        if audio_file:
+
+            self.duration_probe.load(
+                audio_file,
+                lambda duration,
+                label=duration_label:
+                label.setText(duration)
+            )
+
+        else:
+
+            duration_label.setText(
+                "0:00"
+            )
+
+            print(
+                "Next Up audio not found:",
+                music_path
+            )
+
+        # ====================================================
+        # CLICK
+        # ====================================================
 
         item.mousePressEvent = lambda event: (
             self.next_song_requested.emit(
@@ -1252,25 +1381,13 @@ class NowPlaying(QWidget):
         artist
     ):
 
-        # ----------------------------------------------------
-        # STORE CURRENT SONG
-        # ----------------------------------------------------
-
         self.current_image_path = image_path
 
         self.current_title = title
 
         self.current_artist = artist
 
-        # ----------------------------------------------------
-        # STOP OLD AUDIO
-        # ----------------------------------------------------
-
         self.audio_player.stop()
-
-        # ----------------------------------------------------
-        # SONG INFO
-        # ----------------------------------------------------
 
         self.song.setText(
             title
@@ -1279,10 +1396,6 @@ class NowPlaying(QWidget):
         self.artist.setText(
             artist
         )
-
-        # ----------------------------------------------------
-        # ALBUM ART
-        # ----------------------------------------------------
 
         image_file = find_asset(
             image_path
@@ -1305,10 +1418,6 @@ class NowPlaying(QWidget):
                     )
                 )
 
-        # ----------------------------------------------------
-        # RESET PROGRESS
-        # ----------------------------------------------------
-
         self.slider.blockSignals(
             True
         )
@@ -1329,13 +1438,11 @@ class NowPlaying(QWidget):
             "0:00"
         )
 
-        # ----------------------------------------------------
-        # FIND AUDIO FILE
-        # ----------------------------------------------------
+        # ====================================================
+        # AUDIO FILE
+        # ====================================================
 
-        music_path = image_path
-
-        music_path = music_path.replace(
+        music_path = image_path.replace(
             "assets/album_art/",
             "assets/music/"
         )
@@ -1349,10 +1456,6 @@ class NowPlaying(QWidget):
         audio_file = find_asset(
             music_path
         )
-
-        # ----------------------------------------------------
-        # LOAD + PLAY AUDIO
-        # ----------------------------------------------------
 
         if audio_file:
 
@@ -1386,12 +1489,16 @@ class NowPlaying(QWidget):
             )
 
     # ========================================================
-    # MEDIA STATUS / SONG FINISHED
+    # MEDIA STATUS
     # ========================================================
 
-    def handle_media_status(self, status):
+    def handle_media_status(
+        self,
+        status
+    ):
 
         if status != QMediaPlayer.MediaStatus.EndOfMedia:
+
             return
 
         print(
@@ -1399,13 +1506,12 @@ class NowPlaying(QWidget):
             self.song.text()
         )
 
-        # ====================================================
-        # REPEAT ON
-        # ====================================================
-
         if self.is_repeat:
 
-            self.audio_player.setPosition(0)
+            self.audio_player.setPosition(
+                0
+            )
+
             self.audio_player.play()
 
             self.is_playing = True
@@ -1415,10 +1521,6 @@ class NowPlaying(QWidget):
             )
 
             return
-
-        # ====================================================
-        # REPEAT OFF → ASK HOME SCREEN FOR NEXT SONG
-        # ====================================================
 
         self.is_playing = False
 
@@ -1475,14 +1577,8 @@ class NowPlaying(QWidget):
 
             return
 
-        total_seconds = duration // 1000
-
-        minutes = total_seconds // 60
-
-        seconds = total_seconds % 60
-
         self.total_time.setText(
-            f"{minutes}:{seconds:02d}"
+            format_duration(duration)
         )
 
         self.slider.setRange(
@@ -1523,14 +1619,8 @@ class NowPlaying(QWidget):
             False
         )
 
-        total_seconds = position // 1000
-
-        minutes = total_seconds // 60
-
-        seconds = total_seconds % 60
-
         self.current_time.setText(
-            f"{minutes}:{seconds:02d}"
+            format_duration(position)
         )
 
     # ========================================================
@@ -1747,10 +1837,6 @@ class NowPlaying(QWidget):
             24
         )
 
-        # ----------------------------------------------------
-        # BACKGROUND
-        # ----------------------------------------------------
-
         gradient = QLinearGradient(
             0,
             0,
@@ -1778,10 +1864,6 @@ class NowPlaying(QWidget):
             gradient
         )
 
-        # ----------------------------------------------------
-        # BORDER
-        # ----------------------------------------------------
-
         pen = QPen(
             QColor(
                 139,
@@ -1802,10 +1884,6 @@ class NowPlaying(QWidget):
         painter.drawPath(
             path
         )
-
-        # ----------------------------------------------------
-        # AMBIENT GLOW
-        # ----------------------------------------------------
 
         painter.setPen(
             Qt.NoPen

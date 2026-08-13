@@ -560,6 +560,10 @@ class HomeScreen(QWidget):
                 self.handle_play_request
             )
 
+            card.favorite_changed.connect(
+                self.handle_favorite_changed
+            )
+
             self.cards_layout.addWidget(
                 card
             )
@@ -572,7 +576,11 @@ class HomeScreen(QWidget):
                 )
             )
 
-        self.cards_layout.addStretch()
+        self.cards_layout.setAlignment(
+            Qt.AlignLeft
+        )
+
+        self.update_card_sizes()
 
         # ==================================================
         # NO RESULTS MESSAGE
@@ -618,17 +626,17 @@ class HomeScreen(QWidget):
         # ==================================================
         # YOUR VIBE / MOOD SECTION
         # ==================================================
-
+        
         self.mood_section = MoodSection()
-
+        
         self.mood_section.mood_selected.connect(
             self.handle_mood_selected
         )
-
+        
         self.mood_section.see_all_clicked.connect(
             self.handle_mood_see_all
         )
-
+        
         self.content_layout.addWidget(
             self.mood_section
         )
@@ -636,160 +644,160 @@ class HomeScreen(QWidget):
         # ==================================================
         # PLAYLIST SECTION
         # ==================================================
-
+     
         playlist_header = QWidget()
-
+     
         playlist_header_layout = QHBoxLayout(
             playlist_header
         )
-
+     
         playlist_header_layout.setContentsMargins(
             0,
             0,
             0,
             0
         )
-
+     
         playlist_title = QLabel(
             "Playlists for You"
         )
-
+     
         playlist_title.setStyleSheet("""
         QLabel {
-
+     
             color: white;
-
+     
             font-size: 24px;
-
+     
             font-weight: 700;
         }
         """)
-
+     
         playlist_more = QLabel(
             "View All  ›"
         )
-
+     
         playlist_more.setStyleSheet("""
         QLabel {
-
+     
             color: #9B7AFF;
-
+     
             font-size: 13px;
-
+     
             font-weight: 600;
         }
         """)
-
+     
         playlist_header_layout.addWidget(
             playlist_title
         )
-
+     
         playlist_header_layout.addStretch()
-
+     
         playlist_header_layout.addWidget(
             playlist_more
         )
-
+     
         self.content_layout.addWidget(
             playlist_header
         )
-
+     
         # ==================================================
         # PLAYLIST CARDS
         # ==================================================
-
+     
         playlist_container = QWidget()
-
+     
         playlist_layout = QHBoxLayout(
             playlist_container
         )
-
+     
         playlist_layout.setContentsMargins(
             0,
             0,
             0,
             0
         )
-
+     
         playlist_layout.setSpacing(
             16
         )
-
+     
         playlists = [
-
+     
             (
                 "assets/album_art/believer.jpg",
                 "Daily Mix"
             ),
-
+     
             (
                 "assets/album_art/faded.jpg",
                 "Late Night"
             ),
-
+     
             (
                 "assets/album_art/arcade.jpg",
                 "Emotional"
             ),
-
+     
         ]
-
+     
         for image_path, name in playlists:
-
+     
             playlist = QFrame()
-
+     
             playlist.setFixedHeight(
                 105
             )
-
+     
             playlist.setMinimumWidth(
                 180
             )
-
+     
             playlist.setStyleSheet("""
             QFrame {
-
+     
                 background: #191329;
-
+     
                 border: 1px solid #30224B;
-
+     
                 border-radius: 16px;
             }
-
+     
             QFrame:hover {
-
+     
                 background: #24183D;
-
+     
                 border: 1px solid #7048C7;
             }
             """)
-
+     
             playlist_layout_inner = QHBoxLayout(
                 playlist
             )
-
+     
             playlist_layout_inner.setContentsMargins(
                 10,
                 10,
                 10,
                 10
             )
-
+     
             cover = QLabel()
-
+     
             cover.setFixedSize(
                 78,
                 78
             )
-
+     
             pix = QPixmap(
                 str(
                     Path(image_path)
                 )
             )
-
+     
             if not pix.isNull():
-
+     
                 cover.setPixmap(
                     pix.scaled(
                         78,
@@ -798,66 +806,141 @@ class HomeScreen(QWidget):
                         Qt.SmoothTransformation
                     )
                 )
-
+     
             cover.setStyleSheet("""
             QLabel {
-
+     
                 border-radius: 12px;
-
+     
                 background: #251A3A;
             }
             """)
-
+     
             playlist_name = QLabel(
                 name
             )
-
+     
             playlist_name.setWordWrap(
                 True
             )
-
+     
             playlist_name.setStyleSheet("""
             QLabel {
-
+     
                 color: white;
-
+     
                 font-size: 14px;
-
+     
                 font-weight: 600;
-
+     
                 background: transparent;
             }
             """)
-
+     
             playlist_layout_inner.addWidget(
                 cover
             )
-
+     
             playlist_layout_inner.addWidget(
                 playlist_name
             )
-
+     
             playlist_layout_inner.addStretch()
-
+     
             playlist_layout.addWidget(
                 playlist
             )
+     
+            playlist_layout.addStretch()
+     
+            self.content_layout.addWidget(
+                playlist_container
+            )
+     
+            # ==================================================
+            # BOTTOM SPACE
+            # ==================================================
+     
+            self.content_layout.addSpacing(
+                20
+            )
+     
+            self.content_layout.addStretch()   
+            
+    # ==================================================
+    # RESPONSIVE MUSIC CARD SIZING
+    # ==================================================
 
-        playlist_layout.addStretch()
+    def update_card_sizes(self):
 
-        self.content_layout.addWidget(
-            playlist_container
+        if not hasattr(self, "cards_container"):
+            return
+
+        available_width = self.cards_container.width()
+
+        if available_width <= 0:
+            return
+
+        card_count = len(self.music_cards)
+
+        if card_count == 0:
+            return
+
+        # Space between cards
+        spacing = self.cards_layout.spacing()
+
+        total_spacing = spacing * (card_count - 1)
+
+        # Calculate width available for each card
+        card_width = (
+            available_width - total_spacing
+        ) // card_count
+
+        # Keep cards within a comfortable range
+        card_width = max(
+            150,
+            min(
+                card_width,
+                196
+            )
         )
 
-        # ==================================================
-        # BOTTOM SPACE
-        # ==================================================
+        for card, title, artist in self.music_cards:
 
-        self.content_layout.addSpacing(
-            20
+            card.setFixedWidth(
+                card_width
+            )
+
+    # ==================================================
+    # RESPONSIVE WINDOW RESIZE
+    # ==================================================
+
+    def resizeEvent(self, event):
+
+        super().resizeEvent(event)
+
+        self.update_card_sizes()
+
+    # ==================================================
+    # FAVORITE HANDLER
+    # ==================================================
+
+    def handle_favorite_changed(
+        self,
+        image_path,
+        title,
+        is_favorite
+    ):
+
+        state = (
+            "added to"
+            if is_favorite
+            else "removed from"
         )
 
-        self.content_layout.addStretch()
+        print(
+            f"{title} {state} favorites"
+        )
 
     # ==================================================
     # SEARCH / FILTER MUSIC

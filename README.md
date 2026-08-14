@@ -59,5 +59,11 @@ Unlike traditional music players, LYRx focuses on a premium user experience with
 - [x] Day 9 - HomeScreen & Now Playing UI Polish
 - [x] Day 10 - Premium Hero Banner, Mood Section & Music UI Enhancement
 - [x] Day 11 - Complete automatic next-song playback
+- [x] Day 12 - Implemented shuffle and repeat playback controls
+- [x] Day 13 - (a) Upgraded MusicCard UI and interaction experience
+             - (b) Implemented persistent Favorites functionality
+             - (c) Improved song duration and metadata handling
+             - (d) Refined music browsing and selection flow
+- [x] Day 14 - Navigation & Floating Player Integration
 
 Version: LYRx Alpha 1.0

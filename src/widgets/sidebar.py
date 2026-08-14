@@ -171,14 +171,16 @@ class Sidebar(QWidget):
 
             pix = QPixmap(str(SYMBOL_PATH))
 
-        symbol.setPixmap(
-            pix.scaled(
-                82,
-                82,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-        )
+            if not pix.isNull():
+
+                symbol.setPixmap(
+                    pix.scaled(
+                        82,
+                        82,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation
+                    )
+                )
 
         symbol.setStyleSheet("""
         QLabel {
@@ -265,6 +267,8 @@ class Sidebar(QWidget):
             ("Favorites", "favorites.svg"),
 
             ("Playlists", "playlist.svg"),
+
+            ("AI Assistant", "sparkles.svg"),
 
             ("Settings", "settings.svg"),
         ]

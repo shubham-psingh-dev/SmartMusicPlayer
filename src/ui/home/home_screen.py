@@ -402,6 +402,10 @@ class HomeScreen(QWidget):
 
         self.now_playing = NowPlaying()
 
+        # ==================================================
+        # PLAYER CONNECTIONS
+        # ==================================================
+
         self.now_playing.previous_requested.connect(
             self.play_previous
         )
@@ -412,6 +416,14 @@ class HomeScreen(QWidget):
 
         self.now_playing.next_song_requested.connect(
             self.play_selected_song
+        )
+
+        # ==================================================
+        # GIVE NOW PLAYING THE MASTER QUEUE
+        # ==================================================
+
+        self.now_playing.set_queue(
+            self.player_queue
         )
 
         self.now_playing.setSizePolicy(
@@ -1065,6 +1077,10 @@ class HomeScreen(QWidget):
 
                 break
 
+        self.now_playing.set_current_index(
+            self.current_index
+        )
+
         self.now_playing.update_song(
             image_path,
             title,
@@ -1078,48 +1094,36 @@ class HomeScreen(QWidget):
     def play_next(self):
 
         if not self.player_queue:
-
             return
 
         # ==================================================
-        # SHUFFLE ON
+        # SHUFFLE
         # ==================================================
 
         if self.now_playing.is_shuffle:
 
-            # Only one song
-            if len(
-                self.player_queue
-            ) == 1:
+            if len(self.player_queue) == 1:
 
-                next_index = (
-                    self.current_index
-                )
+                next_index = self.current_index
 
             else:
 
                 available_indexes = [
-
                     index
-
                     for index in range(
                         len(self.player_queue)
                     )
-
                     if index != self.current_index
-
                 ]
 
                 next_index = random.choice(
                     available_indexes
                 )
 
-            self.current_index = (
-                next_index
-            )
+            self.current_index = next_index
 
         # ==================================================
-        # SHUFFLE OFF
+        # NORMAL QUEUE
         # ==================================================
 
         else:
@@ -1133,19 +1137,11 @@ class HomeScreen(QWidget):
                 self.current_index = 0
 
         # ==================================================
-        # PLAY NEXT SONG
+        # PLAY
         # ==================================================
 
-        image_path, title, artist = (
-            self.player_queue[
-                self.current_index
-            ]
-        )
-
-        self.now_playing.update_song(
-            image_path,
-            title,
-            artist
+        self._play_queue_index(
+            self.current_index
         )
 
     # ==================================================
@@ -1155,33 +1151,18 @@ class HomeScreen(QWidget):
     def play_previous(self):
 
         if not self.player_queue:
-
             return
-
-        # ==================================================
-        # PREVIOUS ALWAYS FOLLOWS QUEUE ORDER
-        # ==================================================
 
         self.current_index -= 1
 
         if self.current_index < 0:
 
             self.current_index = (
-                len(
-                    self.player_queue
-                ) - 1
+                len(self.player_queue) - 1
             )
 
-        image_path, title, artist = (
-            self.player_queue[
-                self.current_index
-            ]
-        )
-
-        self.now_playing.update_song(
-            image_path,
-            title,
-            artist
+        self._play_queue_index(
+            self.current_index
         )
 
     # ==================================================
@@ -1202,13 +1183,56 @@ class HomeScreen(QWidget):
             if song[0] == image_path:
 
                 self.current_index = index
-
                 break
+
+        self._play_queue_index(
+            self.current_index
+        )
+
+    # ==================================================
+    # PLAY QUEUE INDEX
+    # ==================================================
+
+    def _play_queue_index(
+        self,
+        index
+    ):
+
+        if not self.player_queue:
+            return
+
+        if index < 0 or index >= len(
+            self.player_queue
+        ):
+            return
+
+        self.current_index = index
+
+        image_path, title, artist = (
+            self.player_queue[index]
+        )
+
+        # --------------------------------------------------
+        # Sync queue position with Now Playing
+        # --------------------------------------------------
+
+        self.now_playing.set_current_index(
+            self.current_index
+        )
+
+        # --------------------------------------------------
+        # Update actual player
+        # --------------------------------------------------
 
         self.now_playing.update_song(
             image_path,
             title,
             artist
+        )
+
+        print(
+            f"Queue playing: "
+            f"{title} - {artist}"
         )
 
     # ==================================================

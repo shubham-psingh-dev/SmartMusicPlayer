@@ -65,5 +65,6 @@ Unlike traditional music players, LYRx focuses on a premium user experience with
              - (c) Improved song duration and metadata handling
              - (d) Refined music browsing and selection flow
 - [x] Day 14 - Navigation & Floating Player Integration
+- [x] Day 15 - Refine sidebar and make Library playable
 
 Version: LYRx Alpha 1.0

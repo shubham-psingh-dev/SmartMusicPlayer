@@ -16,6 +16,7 @@ from ui.home.home_screen import HomeScreen
 from ui.favorites.favorites_screen import FavoritesScreen
 from ui.discover.discover_screen import DiscoverScreen
 from ui.basic_page import BasicPage
+from ui.library.library_screen import LibraryScreen
 
 
 # ============================================================
@@ -49,9 +50,10 @@ class FloatingPlayer(QFrame):
         # SIZE
         # ====================================================
 
-        # IMPORTANT:
-        # Do not let the player resize/shrink based on layout.
-        self.setFixedSize(820, 82)
+        self.setFixedSize(
+            820,
+            82
+        )
 
         # ====================================================
         # STYLE
@@ -185,7 +187,9 @@ class FloatingPlayer(QFrame):
         }
         """)
 
-        root.addWidget(self.album)
+        root.addWidget(
+            self.album
+        )
 
         # ====================================================
         # SONG INFORMATION
@@ -474,8 +478,13 @@ class FloatingPlayer(QFrame):
         self.current_title = title
         self.current_artist = artist
 
-        self.song_label.setText(title)
-        self.artist_label.setText(artist)
+        self.song_label.setText(
+            title
+        )
+
+        self.artist_label.setText(
+            artist
+        )
 
         # ====================================================
         # FIND IMAGE
@@ -521,12 +530,12 @@ class FloatingPlayer(QFrame):
 
         if image_file:
 
-            pix = QPixmap(str(image_file))
+            pix = QPixmap(
+                str(image_file)
+            )
 
             if not pix.isNull():
 
-                # IMPORTANT:
-                # Always keep thumbnail exactly 58x58.
                 scaled = pix.scaled(
                     58,
                     58,
@@ -542,24 +551,38 @@ class FloatingPlayer(QFrame):
         # RESET PROGRESS
         # ====================================================
 
-        self.progress.blockSignals(True)
+        self.progress.blockSignals(
+            True
+        )
 
-        self.progress.setValue(0)
+        self.progress.setValue(
+            0
+        )
 
-        self.progress.blockSignals(False)
+        self.progress.blockSignals(
+            False
+        )
 
-        self.current_time.setText("0:00")
-        self.total_time.setText("0:00")
+        self.current_time.setText(
+            "0:00"
+        )
+
+        self.total_time.setText(
+            "0:00"
+        )
 
         self.is_playing = True
 
-        self.play_button.setText("Ⅱ")
+        self.play_button.setText(
+            "Ⅱ"
+        )
 
         # ====================================================
         # SHOW
         # ====================================================
 
         self.show()
+
         self.raise_()
 
     # ========================================================
@@ -575,11 +598,15 @@ class FloatingPlayer(QFrame):
 
         if playing:
 
-            self.play_button.setText("Ⅱ")
+            self.play_button.setText(
+                "Ⅱ"
+            )
 
         else:
 
-            self.play_button.setText("▶")
+            self.play_button.setText(
+                "▶"
+            )
 
     # ========================================================
     # PROGRESS
@@ -592,11 +619,17 @@ class FloatingPlayer(QFrame):
         total_time=None
     ):
 
-        self.progress.blockSignals(True)
+        self.progress.blockSignals(
+            True
+        )
 
-        self.progress.setValue(value)
+        self.progress.setValue(
+            value
+        )
 
-        self.progress.blockSignals(False)
+        self.progress.blockSignals(
+            False
+        )
 
         if current_time is not None:
 
@@ -625,7 +658,9 @@ class AppWindow(QMainWindow):
         # WINDOW SETTINGS
         # ====================================================
 
-        self.setWindowTitle("🎵 LYRx")
+        self.setWindowTitle(
+            "🎵 LYRx"
+        )
 
         self.setWindowFlags(
             Qt.FramelessWindowHint
@@ -728,14 +763,18 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # OTHER PAGES
+        # LIBRARY
         # ====================================================
 
-        self.library = BasicPage(
-            "Library",
-            "Your music collection will live here.",
-            "♫"
+        self.library = LibraryScreen()
+
+        self.library.song_requested.connect(
+            self.play_library_song
         )
+
+        # ====================================================
+        # OTHER PAGES
+        # ====================================================
 
         self.playlists = BasicPage(
             "Playlists",
@@ -749,9 +788,17 @@ class AppWindow(QMainWindow):
             "⚙"
         )
 
-        self.pages.addWidget(self.library)
-        self.pages.addWidget(self.playlists)
-        self.pages.addWidget(self.settings)
+        self.pages.addWidget(
+            self.library
+        )
+
+        self.pages.addWidget(
+            self.playlists
+        )
+
+        self.pages.addWidget(
+            self.settings
+        )
 
         # ====================================================
         # SIDEBARS
@@ -794,10 +841,10 @@ class AppWindow(QMainWindow):
         # FLOATING PLAYER
         # ====================================================
 
-        self.floating_player = FloatingPlayer(self)
+        self.floating_player = FloatingPlayer(
+            self
+        )
 
-        # IMPORTANT:
-        # Start hidden.
         self.floating_player.hide()
 
         # ====================================================
@@ -820,45 +867,41 @@ class AppWindow(QMainWindow):
             self.close_floating_player
         )
 
-        # ========================================================
+        # ====================================================
         # HOME PLAYER SIGNAL SYNC
-        # ========================================================
+        # ====================================================
 
         try:
 
             now_playing = self.home.now_playing
 
-            # ----------------------------------------------------
+            # ------------------------------------------------
             # SONG CHANGE
-            # ----------------------------------------------------
-            # IMPORTANT:
-            # This keeps floating player's thumbnail,
-            # title and artist synchronized when using
-            # Previous / Next buttons.
+            # ------------------------------------------------
 
             now_playing.song_changed.connect(
                 self.sync_floating_song
             )
 
-            # ----------------------------------------------------
+            # ------------------------------------------------
             # PROGRESS
-            # ----------------------------------------------------
+            # ------------------------------------------------
 
             now_playing.audio_player.positionChanged.connect(
                 self.sync_floating_progress
             )
 
-            # ----------------------------------------------------
+            # ------------------------------------------------
             # DURATION
-            # ----------------------------------------------------
+            # ------------------------------------------------
 
             now_playing.audio_player.durationChanged.connect(
                 self.sync_floating_duration
             )
 
-            # ----------------------------------------------------
-            # PLAY / PAUSE STATE
-            # ----------------------------------------------------
+            # ------------------------------------------------
+            # PLAY / PAUSE
+            # ------------------------------------------------
 
             now_playing.audio_player.playbackStateChanged.connect(
                 self.sync_floating_play_state
@@ -883,10 +926,6 @@ class AppWindow(QMainWindow):
             "Home"
         )
 
-        # ====================================================
-        # FORCE INITIAL FLOATING STATE
-        # ====================================================
-
         self.update_floating_visibility()
 
     # ========================================================
@@ -901,10 +940,15 @@ class AppWindow(QMainWindow):
         page_map = {
 
             "Home": self.home,
+
             "Discover": self.discover,
+
             "Library": self.library,
+
             "Favorites": self.favorites,
+
             "Playlists": self.playlists,
+
             "Settings": self.settings
 
         }
@@ -942,10 +986,12 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # FLOATING PLAYER VISIBILITY
+        # FLOATING PLAYER
         # ====================================================
 
         self.update_floating_visibility()
+
+        self.position_floating_player()
 
         print(
             f"Page changed: {page_name}"
@@ -966,26 +1012,32 @@ class AppWindow(QMainWindow):
         if current is self.home:
 
             self.floating_player.hide()
+
             return
 
         # ====================================================
-        # DISCOVER
-        # FAVORITES
+        # DISCOVER / FAVORITES / LIBRARY
         # ====================================================
 
-        if (
-            current is self.discover
-            or current is self.favorites
+        if current in (
+            self.discover,
+            self.favorites,
+            self.library
         ):
 
-            # Only show if a song actually exists.
+            # ------------------------------------------------
+            # Show only when a song exists
+            # ------------------------------------------------
+
             if (
                 self.floating_player.current_title
                 and self.floating_player.current_image
             ):
 
                 self.floating_player.show()
+
                 self.position_floating_player()
+
                 self.floating_player.raise_()
 
             return
@@ -1009,13 +1061,17 @@ class AppWindow(QMainWindow):
 
             for button in sidebar.buttons:
 
-                button.blockSignals(True)
+                button.blockSignals(
+                    True
+                )
 
                 button.setChecked(
                     button.page_name == page_name
                 )
 
-                button.blockSignals(False)
+                button.blockSignals(
+                    False
+                )
 
     # ========================================================
     # DISCOVER SONG
@@ -1034,7 +1090,7 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # START ACTUAL AUDIO
+        # START AUDIO
         # ====================================================
 
         self.home.play_selected_song(
@@ -1069,6 +1125,8 @@ class AppWindow(QMainWindow):
 
         self.position_floating_player()
 
+        self.floating_player.raise_()
+
     # ========================================================
     # FAVORITE SONG
     # ========================================================
@@ -1085,17 +1143,29 @@ class AppWindow(QMainWindow):
             f"{title} - {artist}"
         )
 
+        # ====================================================
+        # START AUDIO
+        # ====================================================
+
         self.home.play_selected_song(
             image_path,
             title,
             artist
         )
 
+        # ====================================================
+        # UPDATE FLOATING PLAYER
+        # ====================================================
+
         self.floating_player.set_song(
             image_path,
             title,
             artist
         )
+
+        # ====================================================
+        # STAY ON FAVORITES
+        # ====================================================
 
         self.pages.setCurrentWidget(
             self.favorites
@@ -1108,6 +1178,67 @@ class AppWindow(QMainWindow):
         self.update_floating_visibility()
 
         self.position_floating_player()
+
+        self.floating_player.raise_()
+
+    # ========================================================
+    # LIBRARY SONG
+    # ========================================================
+
+    def play_library_song(
+        self,
+        image_path,
+        title,
+        artist
+    ):
+
+        print(
+            f"Playing from Library: "
+            f"{title} - {artist}"
+        )
+
+        # ====================================================
+        # START ACTUAL AUDIO
+        # ====================================================
+
+        self.home.play_selected_song(
+            image_path,
+            title,
+            artist
+        )
+
+        # ====================================================
+        # UPDATE FLOATING PLAYER
+        # ====================================================
+        # THIS WAS MISSING BEFORE.
+
+        self.floating_player.set_song(
+            image_path,
+            title,
+            artist
+        )
+
+        # ====================================================
+        # STAY ON LIBRARY
+        # ====================================================
+
+        self.pages.setCurrentWidget(
+            self.library
+        )
+
+        self.update_sidebar_states(
+            "Library"
+        )
+
+        # ====================================================
+        # SHOW + POSITION
+        # ====================================================
+
+        self.update_floating_visibility()
+
+        self.position_floating_player()
+
+        self.floating_player.raise_()
 
     # ========================================================
     # FLOATING PLAY / PAUSE
@@ -1228,9 +1359,6 @@ class AppWindow(QMainWindow):
                 artist
             )
 
-            # Make sure floating player remains visible
-            # when we are on Discover/Favorites.
-
             self.update_floating_visibility()
 
             self.position_floating_player()
@@ -1263,6 +1391,7 @@ class AppWindow(QMainWindow):
             )
 
             if duration <= 0:
+
                 return
 
             progress = int(
@@ -1302,10 +1431,13 @@ class AppWindow(QMainWindow):
     ):
 
         if duration <= 0:
+
             return
 
         self.floating_player.total_time.setText(
-            self.format_time(duration)
+            self.format_time(
+                duration
+            )
         )
 
     # ========================================================
@@ -1355,11 +1487,17 @@ class AppWindow(QMainWindow):
 
             return "0:00"
 
-        total_seconds = milliseconds // 1000
+        total_seconds = (
+            milliseconds // 1000
+        )
 
-        minutes = total_seconds // 60
+        minutes = (
+            total_seconds // 60
+        )
 
-        seconds = total_seconds % 60
+        seconds = (
+            total_seconds % 60
+        )
 
         return (
             f"{minutes}:"
@@ -1375,7 +1513,9 @@ class AppWindow(QMainWindow):
         event
     ):
 
-        super().resizeEvent(event)
+        super().resizeEvent(
+            event
+        )
 
         self.position_floating_player()
 
@@ -1401,28 +1541,22 @@ class AppWindow(QMainWindow):
         current = self.pages.currentWidget()
 
         # ====================================================
-        # ONLY DISCOVER / FAVORITES
+        # DISCOVER / FAVORITES / LIBRARY
         # ====================================================
 
         if current not in (
             self.discover,
-            self.favorites
+            self.favorites,
+            self.library
         ):
 
             return
 
         # ====================================================
-        # FIND PAGE MAIN CONTENT AREA
+        # FIND PAGE MAIN CONTENT
         # ====================================================
 
         page = current
-
-        # Both Discover and Favorites use:
-        #
-        # page.sidebar
-        # page.main
-        #
-        # So calculate the center relative to main.
 
         main = getattr(
             page,
@@ -1430,15 +1564,8 @@ class AppWindow(QMainWindow):
             None
         )
 
-        sidebar = getattr(
-            page,
-            "sidebar",
-            None
-        )
-
         if main is None:
 
-            # Safe fallback
             parent_width = self.width()
 
             x = (
@@ -1448,7 +1575,6 @@ class AppWindow(QMainWindow):
 
         else:
 
-            # Main widget position relative to AppWindow.
             main_top_left = main.mapTo(
                 self,
                 main.rect().topLeft()
@@ -1468,7 +1594,6 @@ class AppWindow(QMainWindow):
         # BOTTOM POSITION
         # ====================================================
 
-        # Keep the player above the bottom edge.
         margin_bottom = 18
 
         y = (
@@ -1521,7 +1646,9 @@ class AppWindow(QMainWindow):
         event
     ):
 
-        super().showEvent(event)
+        super().showEvent(
+            event
+        )
 
         self.update_floating_visibility()
 

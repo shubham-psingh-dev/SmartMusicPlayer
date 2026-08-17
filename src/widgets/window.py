@@ -17,6 +17,7 @@ from ui.favorites.favorites_screen import FavoritesScreen
 from ui.discover.discover_screen import DiscoverScreen
 from ui.basic_page import BasicPage
 from ui.library.library_screen import LibraryScreen
+from core.theme_manager import ThemeManager
 
 
 # ============================================================
@@ -36,112 +37,20 @@ class FloatingPlayer(QFrame):
 
         self.setObjectName("FloatingPlayer")
 
-        # ====================================================
-        # PLAYER STATE
-        # ====================================================
-
         self.current_image = ""
         self.current_title = ""
         self.current_artist = ""
 
         self.is_playing = True
 
-        # ====================================================
-        # SIZE
-        # ====================================================
-
         self.setFixedSize(
             820,
             82
         )
 
-        # ====================================================
-        # STYLE
-        # ====================================================
-
-        self.setStyleSheet("""
-        QFrame#FloatingPlayer {
-
-            background: rgba(24, 18, 42, 248);
-
-            border: 1px solid rgba(139, 92, 246, 115);
-
-            border-radius: 20px;
-
-        }
-
-        QLabel {
-
-            background: transparent;
-
-        }
-
-        QPushButton {
-
-            background: transparent;
-
-            color: #AAA0C5;
-
-            border: none;
-
-            border-radius: 18px;
-
-        }
-
-        QPushButton:hover {
-
-            background: rgba(139, 92, 246, 45);
-
-            color: white;
-
-        }
-
-        QPushButton:pressed {
-
-            background: rgba(139, 92, 246, 75);
-
-        }
-
-        QSlider::groove:horizontal {
-
-            height: 3px;
-
-            background: #3A304F;
-
-            border-radius: 2px;
-
-        }
-
-        QSlider::sub-page:horizontal {
-
-            background: #8B5CF6;
-
-            border-radius: 2px;
-
-        }
-
-        QSlider::handle:horizontal {
-
-            width: 9px;
-
-            height: 9px;
-
-            margin: -3px 0;
-
-            border-radius: 5px;
-
-            background: white;
-
-        }
-
-        QSlider::handle:horizontal:hover {
-
-            background: #B58AFF;
-
-        }
-        """)
-
         self.build_ui()
+
+        self.apply_theme(True)
 
         self.hide()
 
@@ -156,7 +65,7 @@ class FloatingPlayer(QFrame):
         root.setContentsMargins(
             14,
             10,
-            14,
+            10,
             10
         )
 
@@ -177,22 +86,14 @@ class FloatingPlayer(QFrame):
             Qt.AlignCenter
         )
 
-        self.album.setStyleSheet("""
-        QLabel {
-
-            background: #24183D;
-
-            border-radius: 11px;
-
-        }
-        """)
+        self.album.setScaledContents(False)
 
         root.addWidget(
             self.album
         )
 
         # ====================================================
-        # SONG INFORMATION
+        # SONG INFO
         # ====================================================
 
         info = QVBoxLayout()
@@ -210,31 +111,25 @@ class FloatingPlayer(QFrame):
             "Nothing Playing"
         )
 
-        self.song_label.setStyleSheet("""
-        QLabel {
+        self.song_label.setObjectName(
+            "FloatingSongTitle"
+        )
 
-            color: white;
-
-            font-size: 13px;
-
-            font-weight: 700;
-
-        }
-        """)
+        self.song_label.setMinimumWidth(
+            110
+        )
 
         self.artist_label = QLabel(
             "Select a song to start listening"
         )
 
-        self.artist_label.setStyleSheet("""
-        QLabel {
+        self.artist_label.setObjectName(
+            "FloatingArtist"
+        )
 
-            color: #8F84A8;
-
-            font-size: 11px;
-
-        }
-        """)
+        self.artist_label.setMinimumWidth(
+            110
+        )
 
         info.addWidget(
             self.song_label
@@ -243,6 +138,8 @@ class FloatingPlayer(QFrame):
         info.addWidget(
             self.artist_label
         )
+
+        info.addStretch()
 
         root.addLayout(
             info,
@@ -257,9 +154,17 @@ class FloatingPlayer(QFrame):
             "⏮"
         )
 
+        self.previous_button.setObjectName(
+            "previousButton"
+        )
+
         self.previous_button.setFixedSize(
             36,
             36
+        )
+
+        self.previous_button.setCursor(
+            Qt.PointingHandCursor
         )
 
         self.previous_button.clicked.connect(
@@ -278,40 +183,18 @@ class FloatingPlayer(QFrame):
             "Ⅱ"
         )
 
+        self.play_button.setObjectName(
+            "floatingPlayButton"
+        )
+
         self.play_button.setFixedSize(
             44,
             44
         )
 
-        self.play_button.setStyleSheet("""
-        QPushButton {
-
-            background: #8B5CF6;
-
-            color: white;
-
-            border: none;
-
-            border-radius: 22px;
-
-            font-size: 16px;
-
-            font-weight: 700;
-
-        }
-
-        QPushButton:hover {
-
-            background: #A970FF;
-
-        }
-
-        QPushButton:pressed {
-
-            background: #6D28D9;
-
-        }
-        """)
+        self.play_button.setCursor(
+            Qt.PointingHandCursor
+        )
 
         self.play_button.clicked.connect(
             self.play_pause_requested.emit
@@ -329,9 +212,17 @@ class FloatingPlayer(QFrame):
             "⏭"
         )
 
+        self.next_button.setObjectName(
+            "nextButton"
+        )
+
         self.next_button.setFixedSize(
             36,
             36
+        )
+
+        self.next_button.setCursor(
+            Qt.PointingHandCursor
         )
 
         self.next_button.clicked.connect(
@@ -343,7 +234,7 @@ class FloatingPlayer(QFrame):
         )
 
         # ====================================================
-        # PROGRESS
+        # PROGRESS AREA
         # ====================================================
 
         progress_layout = QVBoxLayout()
@@ -355,10 +246,16 @@ class FloatingPlayer(QFrame):
             0
         )
 
-        progress_layout.setSpacing(2)
+        progress_layout.setSpacing(
+            2
+        )
 
         self.progress = QSlider(
             Qt.Horizontal
+        )
+
+        self.progress.setObjectName(
+            "floatingProgress"
         )
 
         self.progress.setRange(
@@ -368,6 +265,10 @@ class FloatingPlayer(QFrame):
 
         self.progress.setValue(
             0
+        )
+
+        self.progress.setCursor(
+            Qt.PointingHandCursor
         )
 
         progress_layout.addWidget(
@@ -380,28 +281,28 @@ class FloatingPlayer(QFrame):
 
         time_layout = QHBoxLayout()
 
+        time_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
         self.current_time = QLabel(
             "0:00"
+        )
+
+        self.current_time.setObjectName(
+            "floatingCurrentTime"
         )
 
         self.total_time = QLabel(
             "0:00"
         )
 
-        for label in (
-            self.current_time,
-            self.total_time
-        ):
-
-            label.setStyleSheet("""
-            QLabel {
-
-                color: #756A91;
-
-                font-size: 9px;
-
-            }
-            """)
+        self.total_time.setObjectName(
+            "floatingTotalTime"
+        )
 
         time_layout.addWidget(
             self.current_time
@@ -423,37 +324,38 @@ class FloatingPlayer(QFrame):
         )
 
         # ====================================================
-        # CLOSE
+        # CLOSE BUTTON
         # ====================================================
+        #
+        # IMPORTANT:
+        # Do NOT use Unicode "×" here.
+        # On some Windows/font combinations it can render
+        # incorrectly like a tiny dot.
+        #
+        # Using normal ASCII "X" with Segoe UI makes it
+        # reliably visible.
+        #
 
         self.close_button = QPushButton(
-            "×"
+            "X"
+        )
+
+        self.close_button.setObjectName(
+            "floatingCloseButton"
         )
 
         self.close_button.setFixedSize(
-            30,
-            30
+            32,
+            32
         )
 
-        self.close_button.setStyleSheet("""
-        QPushButton {
+        self.close_button.setCursor(
+            Qt.PointingHandCursor
+        )
 
-            color: #756A91;
-
-            font-size: 20px;
-
-            border-radius: 15px;
-
-        }
-
-        QPushButton:hover {
-
-            color: white;
-
-            background: rgba(255,255,255,20);
-
-        }
-        """)
+        self.close_button.setFocusPolicy(
+            Qt.NoFocus
+        )
 
         self.close_button.clicked.connect(
             self.close_requested.emit
@@ -462,6 +364,557 @@ class FloatingPlayer(QFrame):
         root.addWidget(
             self.close_button
         )
+
+    # ========================================================
+    # THEME
+    # ========================================================
+
+    def apply_theme(
+        self,
+        is_dark
+    ):
+
+        if is_dark:
+
+            self.setStyleSheet("""
+            /* =================================================
+               FLOATING PLAYER
+               ================================================= */
+
+            QFrame#FloatingPlayer {
+
+                background: rgba(18, 14, 32, 248);
+
+                border: 1px solid rgba(139, 92, 246, 110);
+
+                border-radius: 20px;
+            }
+
+
+            /* =================================================
+               GENERAL LABEL
+               ================================================= */
+
+            QLabel {
+
+                background: transparent;
+
+                border: none;
+            }
+
+
+            /* =================================================
+               NORMAL BUTTONS
+               ================================================= */
+
+            QPushButton {
+
+                background: transparent;
+
+                color: #AAA0C5;
+
+                border: none;
+
+                border-radius: 18px;
+
+                font-family: "Segoe UI";
+
+                outline: none;
+            }
+
+
+            QPushButton:hover {
+
+                background: rgba(139, 92, 246, 45);
+
+                color: white;
+            }
+
+
+            QPushButton:pressed {
+
+                background: rgba(139, 92, 246, 75);
+            }
+
+
+            /* =================================================
+               PREVIOUS / NEXT
+               ================================================= */
+
+            QPushButton#previousButton,
+            QPushButton#nextButton {
+
+                font-family: "Segoe UI Symbol";
+
+                font-size: 15px;
+
+                font-weight: 600;
+            }
+
+
+            /* =================================================
+               PLAY BUTTON
+               ================================================= */
+
+            QPushButton#floatingPlayButton {
+
+                background: #8B5CF6;
+
+                color: white;
+
+                border: none;
+
+                border-radius: 22px;
+
+                font-family: "Segoe UI";
+
+                font-size: 17px;
+
+                font-weight: 700;
+            }
+
+
+            QPushButton#floatingPlayButton:hover {
+
+                background: #A78BFA;
+
+                color: white;
+            }
+
+
+            QPushButton#floatingPlayButton:pressed {
+
+                background: #7C3AED;
+            }
+
+
+            /* =================================================
+               CLOSE BUTTON
+               ================================================= */
+
+            QPushButton#floatingCloseButton {
+
+                background: transparent;
+
+                color: #8D83A3;
+
+                border: none;
+
+                border-radius: 16px;
+
+                font-family: "Segoe UI";
+
+                font-size: 14px;
+
+                font-weight: 700;
+
+                padding: 0px;
+
+                margin: 0px;
+            }
+
+
+            QPushButton#floatingCloseButton:hover {
+
+                background: rgba(239, 68, 68, 45);
+
+                color: #FFFFFF;
+            }
+
+
+            QPushButton#floatingCloseButton:pressed {
+
+                background: rgba(239, 68, 68, 80);
+
+                color: #FFFFFF;
+            }
+
+
+            /* =================================================
+               SONG TITLE
+               ================================================= */
+
+            QLabel#FloatingSongTitle {
+
+                color: white;
+
+                font-family: "Segoe UI";
+
+                font-size: 13px;
+
+                font-weight: 700;
+            }
+
+
+            /* =================================================
+               ARTIST
+               ================================================= */
+
+            QLabel#FloatingArtist {
+
+                color: #9185AA;
+
+                font-family: "Segoe UI";
+
+                font-size: 11px;
+
+                font-weight: 400;
+            }
+
+
+            /* =================================================
+               CURRENT TIME
+               ================================================= */
+
+            QLabel#floatingCurrentTime {
+
+                color: #756A91;
+
+                font-family: "Segoe UI";
+
+                font-size: 9px;
+            }
+
+
+            /* =================================================
+               TOTAL TIME
+               ================================================= */
+
+            QLabel#floatingTotalTime {
+
+                color: #756A91;
+
+                font-family: "Segoe UI";
+
+                font-size: 9px;
+            }
+
+
+            /* =================================================
+               SLIDER
+               ================================================= */
+
+            QSlider#floatingProgress::groove:horizontal {
+
+                height: 3px;
+
+                background: #332A48;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::sub-page:horizontal {
+
+                background: #8B5CF6;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::add-page:horizontal {
+
+                background: #332A48;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::handle:horizontal {
+
+                width: 9px;
+
+                height: 9px;
+
+                margin: -3px 0px;
+
+                border-radius: 5px;
+
+                background: white;
+            }
+            """)
+
+            self.album.setStyleSheet("""
+            QLabel {
+
+                background: #211936;
+
+                border: none;
+
+                border-radius: 11px;
+            }
+            """)
+
+        else:
+
+            self.setStyleSheet("""
+            /* =================================================
+               FLOATING PLAYER
+               ================================================= */
+
+            QFrame#FloatingPlayer {
+
+                background: rgba(255, 255, 255, 245);
+
+                border: 1px solid rgba(124, 58, 237, 65);
+
+                border-radius: 20px;
+            }
+
+
+            /* =================================================
+               GENERAL LABEL
+               ================================================= */
+
+            QLabel {
+
+                background: transparent;
+
+                border: none;
+            }
+
+
+            /* =================================================
+               NORMAL BUTTONS
+               ================================================= */
+
+            QPushButton {
+
+                background: transparent;
+
+                color: #67567D;
+
+                border: none;
+
+                border-radius: 18px;
+
+                font-family: "Segoe UI";
+
+                outline: none;
+            }
+
+
+            QPushButton:hover {
+
+                background: rgba(124, 58, 237, 25);
+
+                color: #4B2875;
+            }
+
+
+            QPushButton:pressed {
+
+                background: rgba(124, 58, 237, 45);
+            }
+
+
+            /* =================================================
+               PREVIOUS / NEXT
+               ================================================= */
+
+            QPushButton#previousButton,
+            QPushButton#nextButton {
+
+                font-family: "Segoe UI Symbol";
+
+                font-size: 15px;
+
+                font-weight: 600;
+            }
+
+
+            /* =================================================
+               PLAY BUTTON
+               ================================================= */
+
+            QPushButton#floatingPlayButton {
+
+                background: #7C3AED;
+
+                color: white;
+
+                border: none;
+
+                border-radius: 22px;
+
+                font-family: "Segoe UI";
+
+                font-size: 17px;
+
+                font-weight: 700;
+            }
+
+
+            QPushButton#floatingPlayButton:hover {
+
+                background: #8B5CF6;
+
+                color: white;
+            }
+
+
+            QPushButton#floatingPlayButton:pressed {
+
+                background: #6D28D9;
+            }
+
+
+            /* =================================================
+               CLOSE BUTTON
+               ================================================= */
+
+            QPushButton#floatingCloseButton {
+
+                background: transparent;
+
+                color: #8A779C;
+
+                border: none;
+
+                border-radius: 16px;
+
+                font-family: "Segoe UI";
+
+                font-size: 14px;
+
+                font-weight: 700;
+
+                padding: 0px;
+
+                margin: 0px;
+            }
+
+
+            QPushButton#floatingCloseButton:hover {
+
+                background: rgba(124, 58, 237, 25);
+
+                color: #4B2875;
+            }
+
+
+            QPushButton#floatingCloseButton:pressed {
+
+                background: rgba(124, 58, 237, 45);
+
+                color: #3B1E62;
+            }
+
+
+            /* =================================================
+               SONG TITLE
+               ================================================= */
+
+            QLabel#FloatingSongTitle {
+
+                color: #2B2140;
+
+                font-family: "Segoe UI";
+
+                font-size: 13px;
+
+                font-weight: 700;
+            }
+
+
+            /* =================================================
+               ARTIST
+               ================================================= */
+
+            QLabel#FloatingArtist {
+
+                color: #806D95;
+
+                font-family: "Segoe UI";
+
+                font-size: 11px;
+
+                font-weight: 400;
+            }
+
+
+            /* =================================================
+               CURRENT TIME
+               ================================================= */
+
+            QLabel#floatingCurrentTime {
+
+                color: #8A779C;
+
+                font-family: "Segoe UI";
+
+                font-size: 9px;
+            }
+
+
+            /* =================================================
+               TOTAL TIME
+               ================================================= */
+
+            QLabel#floatingTotalTime {
+
+                color: #8A779C;
+
+                font-family: "Segoe UI";
+
+                font-size: 9px;
+            }
+
+
+            /* =================================================
+               SLIDER
+               ================================================= */
+
+            QSlider#floatingProgress::groove:horizontal {
+
+                height: 3px;
+
+                background: #DDD4E7;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::sub-page:horizontal {
+
+                background: #7C3AED;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::add-page:horizontal {
+
+                background: #DDD4E7;
+
+                border-radius: 2px;
+            }
+
+
+            QSlider#floatingProgress::handle:horizontal {
+
+                width: 9px;
+
+                height: 9px;
+
+                margin: -3px 0px;
+
+                border-radius: 5px;
+
+                background: #7C3AED;
+            }
+            """)
+
+            self.album.setStyleSheet("""
+            QLabel {
+
+                background: #EDE7F4;
+
+                border: none;
+
+                border-radius: 11px;
+            }
+            """)
 
     # ========================================================
     # SET SONG
@@ -478,6 +931,10 @@ class FloatingPlayer(QFrame):
         self.current_title = title
         self.current_artist = artist
 
+        # ====================================================
+        # TEXT
+        # ====================================================
+
         self.song_label.setText(
             title
         )
@@ -492,20 +949,17 @@ class FloatingPlayer(QFrame):
 
         from pathlib import Path
 
-        file_dir = Path(__file__).resolve()
+        file_dir = Path(
+            __file__
+        ).resolve()
 
         project_dir = file_dir.parents[2]
 
         candidates = [
-
             project_dir / image_path,
-
             file_dir.parents[1] / image_path,
-
             Path.cwd() / image_path,
-
             Path(image_path)
-
         ]
 
         image_file = None
@@ -514,18 +968,20 @@ class FloatingPlayer(QFrame):
 
             try:
 
-                if path.exists() and path.is_file():
+                if (
+                    path.exists()
+                    and path.is_file()
+                ):
 
                     image_file = path
 
                     break
 
             except Exception:
-
                 pass
 
         # ====================================================
-        # SET IMAGE
+        # ALBUM ART
         # ====================================================
 
         if image_file:
@@ -536,7 +992,7 @@ class FloatingPlayer(QFrame):
 
             if not pix.isNull():
 
-                scaled = pix.scaled(
+                scaled_pix = pix.scaled(
                     58,
                     58,
                     Qt.KeepAspectRatioByExpanding,
@@ -544,8 +1000,16 @@ class FloatingPlayer(QFrame):
                 )
 
                 self.album.setPixmap(
-                    scaled
+                    scaled_pix
                 )
+
+            else:
+
+                self.album.clear()
+
+        else:
+
+            self.album.clear()
 
         # ====================================================
         # RESET PROGRESS
@@ -570,6 +1034,10 @@ class FloatingPlayer(QFrame):
         self.total_time.setText(
             "0:00"
         )
+
+        # ====================================================
+        # PLAY STATE
+        # ====================================================
 
         self.is_playing = True
 
@@ -596,17 +1064,11 @@ class FloatingPlayer(QFrame):
 
         self.is_playing = playing
 
-        if playing:
-
-            self.play_button.setText(
-                "Ⅱ"
-            )
-
-        else:
-
-            self.play_button.setText(
-                "▶"
-            )
+        self.play_button.setText(
+            "Ⅱ"
+            if playing
+            else "▶"
+        )
 
     # ========================================================
     # PROGRESS
@@ -655,7 +1117,17 @@ class AppWindow(QMainWindow):
         super().__init__()
 
         # ====================================================
-        # WINDOW SETTINGS
+        # THEME
+        # ====================================================
+
+        self.theme_manager = ThemeManager()
+
+        self.theme_manager.theme_changed.connect(
+            self.apply_theme
+        )
+
+        # ====================================================
+        # WINDOW
         # ====================================================
 
         self.setWindowTitle(
@@ -667,7 +1139,7 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # SCREEN SIZE
+        # SCREEN
         # ====================================================
 
         screen = QApplication.primaryScreen()
@@ -699,10 +1171,6 @@ class AppWindow(QMainWindow):
             window_height
         )
 
-        # ====================================================
-        # CENTER WINDOW
-        # ====================================================
-
         self.move(
             available.x()
             + (
@@ -727,6 +1195,10 @@ class AppWindow(QMainWindow):
         # ====================================================
 
         self.pages = QStackedWidget()
+
+        self.pages.setObjectName(
+            "PageStack"
+        )
 
         self.setCentralWidget(
             self.pages
@@ -772,6 +1244,10 @@ class AppWindow(QMainWindow):
             self.play_library_song
         )
 
+        self.pages.addWidget(
+            self.library
+        )
+
         # ====================================================
         # OTHER PAGES
         # ====================================================
@@ -789,10 +1265,6 @@ class AppWindow(QMainWindow):
         )
 
         self.pages.addWidget(
-            self.library
-        )
-
-        self.pages.addWidget(
             self.playlists
         )
 
@@ -805,14 +1277,12 @@ class AppWindow(QMainWindow):
         # ====================================================
 
         self.sidebars = [
-
             self.home.sidebar,
             self.discover.sidebar,
             self.favorites.sidebar,
             self.library.sidebar,
             self.playlists.sidebar,
             self.settings.sidebar
-
         ]
 
         for sidebar in self.sidebars:
@@ -821,8 +1291,12 @@ class AppWindow(QMainWindow):
                 self.handle_page_change
             )
 
+            sidebar.theme_toggle_requested.connect(
+                self.theme_manager.toggle
+            )
+
         # ====================================================
-        # DISCOVER SONG
+        # DISCOVER
         # ====================================================
 
         self.discover.song_requested.connect(
@@ -830,7 +1304,7 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # FAVORITE SONG
+        # FAVORITES
         # ====================================================
 
         self.favorites.play_requested.connect(
@@ -846,10 +1320,6 @@ class AppWindow(QMainWindow):
         )
 
         self.floating_player.hide()
-
-        # ====================================================
-        # FLOATING PLAYER SIGNALS
-        # ====================================================
 
         self.floating_player.play_pause_requested.connect(
             self.toggle_floating_play
@@ -868,40 +1338,24 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # HOME PLAYER SIGNAL SYNC
+        # HOME PLAYER SYNC
         # ====================================================
 
         try:
 
             now_playing = self.home.now_playing
 
-            # ------------------------------------------------
-            # SONG CHANGE
-            # ------------------------------------------------
-
             now_playing.song_changed.connect(
                 self.sync_floating_song
             )
-
-            # ------------------------------------------------
-            # PROGRESS
-            # ------------------------------------------------
 
             now_playing.audio_player.positionChanged.connect(
                 self.sync_floating_progress
             )
 
-            # ------------------------------------------------
-            # DURATION
-            # ------------------------------------------------
-
             now_playing.audio_player.durationChanged.connect(
                 self.sync_floating_duration
             )
-
-            # ------------------------------------------------
-            # PLAY / PAUSE
-            # ------------------------------------------------
 
             now_playing.audio_player.playbackStateChanged.connect(
                 self.sync_floating_play_state
@@ -926,7 +1380,187 @@ class AppWindow(QMainWindow):
             "Home"
         )
 
-        self.update_floating_visibility()
+        # ====================================================
+        # APPLY THEME
+        # ====================================================
+
+        self.apply_theme()
+
+    # ========================================================
+    # THEME → ALL PAGES
+    # ========================================================
+
+    def apply_theme_to_pages(
+        self,
+        is_dark
+    ):
+
+        pages = [
+            self.home,
+            self.discover,
+            self.favorites,
+            self.library,
+            self.playlists,
+            self.settings
+        ]
+
+        for page in pages:
+
+            try:
+
+                if hasattr(
+                    page,
+                    "set_theme_state"
+                ):
+
+                    page.set_theme_state(
+                        is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "Page theme error:",
+                    type(page).__name__,
+                    error
+                )
+
+        if is_dark:
+
+            self.pages.setStyleSheet("""
+            QStackedWidget#PageStack {
+                background: #0B0913;
+                border: none;
+            }
+            """)
+
+        else:
+
+            self.pages.setStyleSheet("""
+            QStackedWidget#PageStack {
+                background: #F7F4FB;
+                border: none;
+            }
+            """)
+
+    # ========================================================
+    # GLOBAL THEME
+    # ========================================================
+
+    def apply_theme(
+        self,
+        theme=None
+    ):
+
+        app = QApplication.instance()
+
+        if app is None:
+            return
+
+        is_dark = (
+            self.theme_manager.current_theme
+            == ThemeManager.DARK
+        )
+
+        app.setStyleSheet(
+            self.theme_manager.get_stylesheet()
+        )
+
+        self.apply_theme_to_pages(
+            is_dark
+        )
+
+        # ====================================================
+        # SIDEBARS
+        # ====================================================
+
+        for sidebar in self.sidebars:
+
+            try:
+
+                sidebar.set_theme_state(
+                    is_dark
+                )
+
+            except Exception as error:
+
+                print(
+                    "Sidebar theme error:",
+                    error
+                )
+
+        # ====================================================
+        # HOME
+        # ====================================================
+
+        try:
+
+            self.home.set_theme_state(
+                is_dark
+            )
+
+        except Exception as error:
+
+            print(
+                "Home theme error:",
+                error
+            )
+
+        # ====================================================
+        # FLOATING PLAYER
+        # ====================================================
+
+        if hasattr(
+            self,
+            "floating_player"
+        ):
+
+            try:
+
+                self.floating_player.apply_theme(
+                    is_dark
+                )
+
+            except Exception as error:
+
+                print(
+                    "Floating player theme error:",
+                    error
+                )
+
+        # ====================================================
+        # REFRESH
+        # ====================================================
+
+        self.setUpdatesEnabled(
+            False
+        )
+
+        self.setUpdatesEnabled(
+            True
+        )
+
+        self.update()
+
+        self.pages.update()
+
+        for page in (
+            self.home,
+            self.discover,
+            self.favorites,
+            self.library,
+            self.playlists,
+            self.settings
+        ):
+
+            page.update()
+
+        print(
+            "THEME:",
+            "DARK"
+            if is_dark
+            else "LIGHT"
+        )
 
     # ========================================================
     # PAGE NAVIGATION
@@ -950,7 +1584,6 @@ class AppWindow(QMainWindow):
             "Playlists": self.playlists,
 
             "Settings": self.settings
-
         }
 
         target_page = page_map.get(
@@ -966,16 +1599,21 @@ class AppWindow(QMainWindow):
             return
 
         # ====================================================
-        # REFRESH FAVORITES
+        # FAVORITES REFRESH
         # ====================================================
 
         if page_name == "Favorites":
 
-            self.favorites.reload_favorites()
+            try:
 
-        # ====================================================
-        # CHANGE PAGE
-        # ====================================================
+                self.favorites.reload_favorites()
+
+            except Exception as error:
+
+                print(
+                    "Favorites reload error:",
+                    error
+                )
 
         self.pages.setCurrentWidget(
             target_page
@@ -985,10 +1623,6 @@ class AppWindow(QMainWindow):
             page_name
         )
 
-        # ====================================================
-        # FLOATING PLAYER
-        # ====================================================
-
         self.update_floating_visibility()
 
         self.position_floating_player()
@@ -996,57 +1630,6 @@ class AppWindow(QMainWindow):
         print(
             f"Page changed: {page_name}"
         )
-
-    # ========================================================
-    # FLOATING PLAYER VISIBILITY
-    # ========================================================
-
-    def update_floating_visibility(self):
-
-        current = self.pages.currentWidget()
-
-        # ====================================================
-        # HOME
-        # ====================================================
-
-        if current is self.home:
-
-            self.floating_player.hide()
-
-            return
-
-        # ====================================================
-        # DISCOVER / FAVORITES / LIBRARY
-        # ====================================================
-
-        if current in (
-            self.discover,
-            self.favorites,
-            self.library
-        ):
-
-            # ------------------------------------------------
-            # Show only when a song exists
-            # ------------------------------------------------
-
-            if (
-                self.floating_player.current_title
-                and self.floating_player.current_image
-            ):
-
-                self.floating_player.show()
-
-                self.position_floating_player()
-
-                self.floating_player.raise_()
-
-            return
-
-        # ====================================================
-        # OTHER PAGES
-        # ====================================================
-
-        self.floating_player.hide()
 
     # ========================================================
     # SIDEBAR STATES
@@ -1066,12 +1649,60 @@ class AppWindow(QMainWindow):
                 )
 
                 button.setChecked(
-                    button.page_name == page_name
+                    button.page_name
+                    == page_name
                 )
 
                 button.blockSignals(
                     False
                 )
+
+    # ========================================================
+    # FLOATING PLAYER VISIBILITY
+    # ========================================================
+
+    def update_floating_visibility(self):
+
+        current = self.pages.currentWidget()
+
+        # ----------------------------------------------------
+        # HOME
+        # ----------------------------------------------------
+
+        if current is self.home:
+
+            self.floating_player.hide()
+
+            return
+
+        # ----------------------------------------------------
+        # SUPPORTED PAGES
+        # ----------------------------------------------------
+
+        if current in (
+            self.discover,
+            self.favorites,
+            self.library
+        ):
+
+            if (
+                self.floating_player.current_title
+                and self.floating_player.current_image
+            ):
+
+                self.floating_player.show()
+
+                self.position_floating_player()
+
+                self.floating_player.raise_()
+
+            return
+
+        # ----------------------------------------------------
+        # OTHER PAGES
+        # ----------------------------------------------------
+
+        self.floating_player.hide()
 
     # ========================================================
     # DISCOVER SONG
@@ -1084,34 +1715,17 @@ class AppWindow(QMainWindow):
         artist
     ):
 
-        print(
-            f"Playing from Discover: "
-            f"{title} - {artist}"
-        )
-
-        # ====================================================
-        # START AUDIO
-        # ====================================================
-
         self.home.play_selected_song(
             image_path,
             title,
             artist
         )
 
-        # ====================================================
-        # UPDATE FLOATING PLAYER
-        # ====================================================
-
         self.floating_player.set_song(
             image_path,
             title,
             artist
         )
-
-        # ====================================================
-        # STAY ON DISCOVER
-        # ====================================================
 
         self.pages.setCurrentWidget(
             self.discover
@@ -1138,34 +1752,17 @@ class AppWindow(QMainWindow):
         artist
     ):
 
-        print(
-            f"Playing from Favorites: "
-            f"{title} - {artist}"
-        )
-
-        # ====================================================
-        # START AUDIO
-        # ====================================================
-
         self.home.play_selected_song(
             image_path,
             title,
             artist
         )
 
-        # ====================================================
-        # UPDATE FLOATING PLAYER
-        # ====================================================
-
         self.floating_player.set_song(
             image_path,
             title,
             artist
         )
-
-        # ====================================================
-        # STAY ON FAVORITES
-        # ====================================================
 
         self.pages.setCurrentWidget(
             self.favorites
@@ -1192,35 +1789,17 @@ class AppWindow(QMainWindow):
         artist
     ):
 
-        print(
-            f"Playing from Library: "
-            f"{title} - {artist}"
-        )
-
-        # ====================================================
-        # START ACTUAL AUDIO
-        # ====================================================
-
         self.home.play_selected_song(
             image_path,
             title,
             artist
         )
 
-        # ====================================================
-        # UPDATE FLOATING PLAYER
-        # ====================================================
-        # THIS WAS MISSING BEFORE.
-
         self.floating_player.set_song(
             image_path,
             title,
             artist
         )
-
-        # ====================================================
-        # STAY ON LIBRARY
-        # ====================================================
 
         self.pages.setCurrentWidget(
             self.library
@@ -1229,10 +1808,6 @@ class AppWindow(QMainWindow):
         self.update_sidebar_states(
             "Library"
         )
-
-        # ====================================================
-        # SHOW + POSITION
-        # ====================================================
 
         self.update_floating_visibility()
 
@@ -1254,26 +1829,24 @@ class AppWindow(QMainWindow):
                 .audio_player
             )
 
+            from PySide6.QtMultimedia import (
+                QMediaPlayer
+            )
+
             state = player.playbackState()
 
             if (
                 state
-                == player.PlaybackState.PlayingState
+                == QMediaPlayer
+                .PlaybackState
+                .PlayingState
             ):
 
                 player.pause()
 
-                self.floating_player.set_playing(
-                    False
-                )
-
             else:
 
                 player.play()
-
-                self.floating_player.set_playing(
-                    True
-                )
 
         except Exception as error:
 
@@ -1322,7 +1895,15 @@ class AppWindow(QMainWindow):
 
     def close_floating_player(self):
 
+        # ----------------------------------------------------
+        # Hide floating player
+        # ----------------------------------------------------
+
         self.floating_player.hide()
+
+        # ----------------------------------------------------
+        # Stop audio
+        # ----------------------------------------------------
 
         try:
 
@@ -1336,7 +1917,7 @@ class AppWindow(QMainWindow):
             )
 
     # ========================================================
-    # SYNC FLOATING SONG
+    # SONG SYNC
     # ========================================================
 
     def sync_floating_song(
@@ -1347,11 +1928,6 @@ class AppWindow(QMainWindow):
     ):
 
         try:
-
-            print(
-                f"Floating player song sync: "
-                f"{title} - {artist}"
-            )
 
             self.floating_player.set_song(
                 image_path,
@@ -1373,7 +1949,7 @@ class AppWindow(QMainWindow):
             )
 
     # ========================================================
-    # SYNC FLOATING PROGRESS
+    # PROGRESS SYNC
     # ========================================================
 
     def sync_floating_progress(
@@ -1395,23 +1971,19 @@ class AppWindow(QMainWindow):
                 return
 
             progress = int(
-                (
-                    position / duration
-                ) * 100
-            )
-
-            current_time = self.format_time(
                 position
-            )
-
-            total_time = self.format_time(
-                duration
+                / duration
+                * 100
             )
 
             self.floating_player.set_progress(
                 progress,
-                current_time,
-                total_time
+                self.format_time(
+                    position
+                ),
+                self.format_time(
+                    duration
+                )
             )
 
         except Exception as error:
@@ -1422,7 +1994,7 @@ class AppWindow(QMainWindow):
             )
 
     # ========================================================
-    # SYNC FLOATING DURATION
+    # DURATION SYNC
     # ========================================================
 
     def sync_floating_duration(
@@ -1441,7 +2013,7 @@ class AppWindow(QMainWindow):
         )
 
     # ========================================================
-    # SYNC PLAY STATE
+    # PLAY STATE SYNC
     # ========================================================
 
     def sync_floating_play_state(
@@ -1451,7 +2023,9 @@ class AppWindow(QMainWindow):
 
         try:
 
-            from PySide6.QtMultimedia import QMediaPlayer
+            from PySide6.QtMultimedia import (
+                QMediaPlayer
+            )
 
             playing = (
                 state
@@ -1488,15 +2062,18 @@ class AppWindow(QMainWindow):
             return "0:00"
 
         total_seconds = (
-            milliseconds // 1000
+            milliseconds
+            // 1000
         )
 
         minutes = (
-            total_seconds // 60
+            total_seconds
+            // 60
         )
 
         seconds = (
-            total_seconds % 60
+            total_seconds
+            % 60
         )
 
         return (
@@ -1505,7 +2082,7 @@ class AppWindow(QMainWindow):
         )
 
     # ========================================================
-    # RESIZE EVENT
+    # RESIZE
     # ========================================================
 
     def resizeEvent(
@@ -1540,10 +2117,6 @@ class AppWindow(QMainWindow):
 
         current = self.pages.currentWidget()
 
-        # ====================================================
-        # DISCOVER / FAVORITES / LIBRARY
-        # ====================================================
-
         if current not in (
             self.discover,
             self.favorites,
@@ -1551,10 +2124,6 @@ class AppWindow(QMainWindow):
         ):
 
             return
-
-        # ====================================================
-        # FIND PAGE MAIN CONTENT
-        # ====================================================
 
         page = current
 
@@ -1564,47 +2133,45 @@ class AppWindow(QMainWindow):
             None
         )
 
+        # ----------------------------------------------------
+        # CENTER PLAYER
+        # ----------------------------------------------------
+
         if main is None:
 
-            parent_width = self.width()
-
             x = (
-                parent_width
+                self.width()
                 - player.width()
             ) // 2
 
         else:
 
-            main_top_left = main.mapTo(
+            top_left = main.mapTo(
                 self,
                 main.rect().topLeft()
             )
 
-            main_width = main.width()
-
             x = (
-                main_top_left.x()
+                top_left.x()
                 + (
-                    main_width
+                    main.width()
                     - player.width()
                 ) // 2
             )
 
-        # ====================================================
+        # ----------------------------------------------------
         # BOTTOM POSITION
-        # ====================================================
-
-        margin_bottom = 18
+        # ----------------------------------------------------
 
         y = (
             self.height()
             - player.height()
-            - margin_bottom
+            - 18
         )
 
-        # ====================================================
-        # SAFETY BOUNDARIES
-        # ====================================================
+        # ----------------------------------------------------
+        # KEEP INSIDE WINDOW
+        # ----------------------------------------------------
 
         x = max(
             10,
@@ -1626,10 +2193,6 @@ class AppWindow(QMainWindow):
             )
         )
 
-        # ====================================================
-        # MOVE
-        # ====================================================
-
         player.move(
             int(x),
             int(y)
@@ -1638,7 +2201,7 @@ class AppWindow(QMainWindow):
         player.raise_()
 
     # ========================================================
-    # SHOW EVENT
+    # SHOW
     # ========================================================
 
     def showEvent(

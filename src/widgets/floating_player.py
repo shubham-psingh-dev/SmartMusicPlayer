@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QVBoxLayout,
-    QSizePolicy,
 )
 
 
@@ -18,6 +17,7 @@ class FloatingPlayer(QFrame):
 
     previous_requested = Signal()
     next_requested = Signal()
+    close_requested = Signal()
 
     # ==================================================
     # INIT
@@ -51,6 +51,10 @@ class FloatingPlayer(QFrame):
 
         self.setStyleSheet(
             """
+            /* ==================================================
+               FLOATING PLAYER
+            ================================================== */
+
             QFrame#FloatingPlayer {
 
                 background: #171127;
@@ -60,10 +64,22 @@ class FloatingPlayer(QFrame):
                 border-radius: 20px;
             }
 
+
+            /* ==================================================
+               LABELS
+            ================================================== */
+
             QLabel {
 
                 background: transparent;
+
+                border: none;
             }
+
+
+            /* ==================================================
+               NORMAL BUTTONS
+            ================================================== */
 
             QPushButton {
 
@@ -85,6 +101,16 @@ class FloatingPlayer(QFrame):
                 color: white;
             }
 
+            QPushButton:pressed {
+
+                background: #3B2860;
+            }
+
+
+            /* ==================================================
+               PLAY BUTTON
+            ================================================== */
+
             QPushButton#playButton {
 
                 background: #7C3AED;
@@ -103,10 +129,76 @@ class FloatingPlayer(QFrame):
                 background: #8B5CF6;
             }
 
+            QPushButton#playButton:pressed {
+
+                background: #6D28D9;
+            }
+
+
+            /* ==================================================
+               FAVORITE
+            ================================================== */
+
             QPushButton#favoriteButton {
 
-                font-size: 19px;
+                font-size: 21px;
+
+                color: #B9ADD6;
             }
+
+            QPushButton#favoriteButton:hover {
+
+                color: #F472B6;
+
+                background: #2A1D45;
+            }
+
+
+            /* ==================================================
+               CLOSE BUTTON
+            ================================================== */
+
+            QPushButton#floatingCloseButton {
+
+                background: transparent;
+
+                color: #8F84A8;
+
+                border: 1px solid transparent;
+
+                border-radius: 15px;
+
+                font-family: "Segoe UI";
+
+                font-size: 22px;
+
+                font-weight: 400;
+
+                padding: 0px;
+
+                margin: 0px;
+            }
+
+            QPushButton#floatingCloseButton:hover {
+
+                background: #7F1D3A;
+
+                color: white;
+
+                border: 1px solid #BE123C;
+            }
+
+            QPushButton#floatingCloseButton:pressed {
+
+                background: #BE123C;
+
+                color: white;
+            }
+
+
+            /* ==================================================
+               SONG TITLE
+            ================================================== */
 
             QLabel#songTitle {
 
@@ -116,6 +208,11 @@ class FloatingPlayer(QFrame):
 
                 font-weight: 700;
             }
+
+
+            /* ==================================================
+               ARTIST
+            ================================================== */
 
             QLabel#artistName {
 
@@ -143,12 +240,12 @@ class FloatingPlayer(QFrame):
         layout.setContentsMargins(
             12,
             10,
-            14,
+            10,
             10
         )
 
         layout.setSpacing(
-            12
+            10
         )
 
         # ==================================================
@@ -171,6 +268,8 @@ class FloatingPlayer(QFrame):
             QLabel {
 
                 background: #251A3A;
+
+                border: none;
 
                 border-radius: 12px;
             }
@@ -246,6 +345,10 @@ class FloatingPlayer(QFrame):
             38
         )
 
+        self.favorite_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
         layout.addWidget(
             self.favorite_button
         )
@@ -261,6 +364,10 @@ class FloatingPlayer(QFrame):
         self.previous_button.setFixedSize(
             38,
             38
+        )
+
+        self.previous_button.setCursor(
+            Qt.PointingHandCursor
         )
 
         self.previous_button.clicked.connect(
@@ -288,6 +395,10 @@ class FloatingPlayer(QFrame):
             44
         )
 
+        self.play_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
         self.play_button.clicked.connect(
             self.toggle_play
         )
@@ -309,6 +420,10 @@ class FloatingPlayer(QFrame):
             38
         )
 
+        self.next_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
         self.next_button.clicked.connect(
             self.next_requested.emit
         )
@@ -318,20 +433,36 @@ class FloatingPlayer(QFrame):
         )
 
         # ==================================================
-        # VOLUME
+        # CLOSE BUTTON
         # ==================================================
 
-        self.volume_button = QPushButton(
-            "🔊"
+        self.close_button = QPushButton(
+            "×"
         )
 
-        self.volume_button.setFixedSize(
-            38,
-            38
+        self.close_button.setObjectName(
+            "floatingCloseButton"
+        )
+
+        self.close_button.setFixedSize(
+            32,
+            32
+        )
+
+        self.close_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.close_button.setToolTip(
+            "Close player"
+        )
+
+        self.close_button.clicked.connect(
+            self.close_requested.emit
         )
 
         layout.addWidget(
-            self.volume_button
+            self.close_button
         )
 
     # ==================================================
@@ -349,9 +480,9 @@ class FloatingPlayer(QFrame):
         self.current_title = title
         self.current_artist = artist
 
-        # --------------------------------------------------
-        # Album art
-        # --------------------------------------------------
+        # ==================================================
+        # ALBUM ART
+        # ==================================================
 
         pixmap = QPixmap(
             str(image_path)
@@ -372,9 +503,9 @@ class FloatingPlayer(QFrame):
 
             self.cover.clear()
 
-        # --------------------------------------------------
-        # Text
-        # --------------------------------------------------
+        # ==================================================
+        # TEXT
+        # ==================================================
 
         self.song_title.setText(
             title
@@ -384,15 +515,19 @@ class FloatingPlayer(QFrame):
             artist
         )
 
-        # --------------------------------------------------
-        # Start player
-        # --------------------------------------------------
+        # ==================================================
+        # PLAY STATE
+        # ==================================================
 
         self.is_playing = True
 
         self.play_button.setText(
             "Ⅱ"
         )
+
+        # ==================================================
+        # SHOW
+        # ==================================================
 
         self.show()
 
@@ -417,3 +552,36 @@ class FloatingPlayer(QFrame):
             self.play_button.setText(
                 "▶"
             )
+
+    # ==================================================
+    # SET PLAYING
+    # ==================================================
+
+    def set_playing(
+        self,
+        playing
+    ):
+
+        self.is_playing = playing
+
+        if playing:
+
+            self.play_button.setText(
+                "Ⅱ"
+            )
+
+        else:
+
+            self.play_button.setText(
+                "▶"
+            )
+
+    # ==================================================
+    # CLOSE PLAYER
+    # ==================================================
+
+    def close_player(self):
+
+        self.hide()
+
+        self.close_requested.emit()

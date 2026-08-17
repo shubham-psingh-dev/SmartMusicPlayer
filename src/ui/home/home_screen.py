@@ -85,6 +85,8 @@ class HomeScreen(QWidget):
 
         self.music_cards = []
 
+        self.current_is_dark = True
+
         self.build_ui()
 
     # ==================================================
@@ -1258,6 +1260,88 @@ class HomeScreen(QWidget):
         )
 
     # ==================================================
+    # THEME STATE
+    # ==================================================
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+        self.current_is_dark = bool(
+            is_dark
+        )
+
+        try:
+            if hasattr(
+                self,
+                "now_playing"
+            ) and hasattr(
+                self.now_playing,
+                "set_theme_state"
+            ):
+                self.now_playing.set_theme_state(
+                    self.current_is_dark
+                )
+        except Exception as error:
+            print(
+                "Home player theme error:",
+                error
+            )
+
+        if hasattr(
+            self,
+            "continue_title"
+        ):
+            self.continue_title.setStyleSheet(
+                f"""
+                QLabel {{
+                    color: {
+                        "#FFFFFF"
+                        if self.current_is_dark
+                        else "#302744"
+                    };
+                    font-size: 24px;
+                    font-weight: 700;
+                    background: transparent;
+                }}
+                """
+            )
+
+        if hasattr(
+            self,
+            "more_button"
+        ):
+            self.more_button.setStyleSheet("""
+            QLabel {
+                color: #7C3AED;
+                font-size: 13px;
+                font-weight: 600;
+                background: transparent;
+            }
+            """)
+
+        for card in getattr(
+            self,
+            "music_cards",
+            []
+        ):
+            try:
+                if hasattr(
+                    card,
+                    "set_theme_state"
+                ):
+                    card.set_theme_state(
+                        self.current_is_dark
+                    )
+            except Exception as error:
+                print(
+                    "Music card theme error:",
+                    error
+                )
+
+        self.update()
+
+    # ==================================================
     # PAINT EVENT
     # ==================================================
 
@@ -1287,20 +1371,39 @@ class HomeScreen(QWidget):
             rect.height()
         )
 
-        gradient.setColorAt(
-            0.0,
-            QColor("#0B0913")
-        )
+        if self.current_is_dark:
 
-        gradient.setColorAt(
-            0.45,
-            QColor("#151124")
-        )
+            gradient.setColorAt(
+                0.0,
+                QColor("#0B0913")
+            )
 
-        gradient.setColorAt(
-            1.0,
-            QColor("#09070F")
-        )
+            gradient.setColorAt(
+                0.45,
+                QColor("#151124")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#09070F")
+            )
+
+        else:
+
+            gradient.setColorAt(
+                0.0,
+                QColor("#EEE9F4")
+            )
+
+            gradient.setColorAt(
+                0.45,
+                QColor("#E8E0F0")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#F2EDF6")
+            )
 
         painter.fillRect(
             rect,
@@ -1320,7 +1423,7 @@ class HomeScreen(QWidget):
                 124,
                 58,
                 237,
-                24
+                24 if self.current_is_dark else 12
             )
         )
 
@@ -1340,7 +1443,7 @@ class HomeScreen(QWidget):
                 139,
                 92,
                 246,
-                16
+                16 if self.current_is_dark else 9
             )
         )
 

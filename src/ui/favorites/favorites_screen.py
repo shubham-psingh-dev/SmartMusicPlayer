@@ -42,6 +42,7 @@ class FavoritesScreen(QWidget):
     )
 
     def __init__(self):
+
         super().__init__()
 
         self.setWindowTitle(
@@ -49,6 +50,8 @@ class FavoritesScreen(QWidget):
         )
 
         self.favorite_cards = []
+
+        self.current_is_dark = True
 
         self.build_ui()
 
@@ -123,7 +126,7 @@ class FavoritesScreen(QWidget):
         )
 
         self.main_layout.setSpacing(
-            24
+            18
         )
 
         # ====================================================
@@ -161,6 +164,8 @@ class FavoritesScreen(QWidget):
             font-weight: 800;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
@@ -176,6 +181,8 @@ class FavoritesScreen(QWidget):
             font-size: 14px;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
@@ -209,6 +216,8 @@ class FavoritesScreen(QWidget):
             font-weight: 600;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
@@ -300,6 +309,7 @@ class FavoritesScreen(QWidget):
 
         self.content.setStyleSheet("""
         QWidget {
+
             background: transparent;
         }
         """)
@@ -337,16 +347,9 @@ class FavoritesScreen(QWidget):
             260
         )
 
-        self.empty_state.setStyleSheet("""
-        QFrame {
-
-            background: #151024;
-
-            border: 1px solid #2D2348;
-
-            border-radius: 22px;
-        }
-        """)
+        self.empty_state.setObjectName(
+            "EmptyState"
+        )
 
         empty_layout = QVBoxLayout(
             self.empty_state
@@ -369,9 +372,13 @@ class FavoritesScreen(QWidget):
 
             color: #8B5CF6;
 
+            font-family: "Segoe UI Symbol";
+
             font-size: 52px;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
@@ -393,18 +400,20 @@ class FavoritesScreen(QWidget):
             font-weight: 700;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
-        empty_text = QLabel(
+        self.empty_text = QLabel(
             "Songs you favorite will appear here."
         )
 
-        empty_text.setAlignment(
+        self.empty_text.setAlignment(
             Qt.AlignCenter
         )
 
-        empty_text.setStyleSheet("""
+        self.empty_text.setStyleSheet("""
         QLabel {
 
             color: #8F86AA;
@@ -412,6 +421,8 @@ class FavoritesScreen(QWidget):
             font-size: 13px;
 
             background: transparent;
+
+            border: none;
         }
         """)
 
@@ -432,7 +443,7 @@ class FavoritesScreen(QWidget):
         )
 
         empty_layout.addWidget(
-            empty_text
+            self.empty_text
         )
 
         self.content_layout.addWidget(
@@ -601,13 +612,158 @@ class FavoritesScreen(QWidget):
         is_favorite
     ):
 
-        # If user removed the song
-        # while inside Favorites,
-        # refresh the screen.
-
         if not is_favorite:
 
             self.reload_favorites()
+
+    # ========================================================
+    # THEME
+    # ========================================================
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+
+        self.current_is_dark = bool(
+            is_dark
+        )
+
+        if self.current_is_dark:
+
+            title_color = "#FFFFFF"
+            subtitle_color = "#AFA4C8"
+            count_color = "#9B7AFF"
+
+            empty_bg = "#151024"
+            empty_border = "#2D2348"
+
+            empty_title_color = "#FFFFFF"
+            empty_text_color = "#8F86AA"
+
+        else:
+
+            title_color = "#302744"
+            subtitle_color = "#766783"
+            count_color = "#7C3AED"
+
+            empty_bg = "#F4EEF8"
+            empty_border = "#DCCEF0"
+
+            empty_title_color = "#302744"
+            empty_text_color = "#81728F"
+
+        self.title.setStyleSheet(
+            f"""
+            QLabel {{
+
+                color: {title_color};
+
+                font-size: 32px;
+
+                font-weight: 800;
+
+                background: transparent;
+
+                border: none;
+            }}
+            """
+        )
+
+        self.subtitle.setStyleSheet(
+            f"""
+            QLabel {{
+
+                color: {subtitle_color};
+
+                font-size: 14px;
+
+                background: transparent;
+
+                border: none;
+            }}
+            """
+        )
+
+        self.count_label.setStyleSheet(
+            f"""
+            QLabel {{
+
+                color: {count_color};
+
+                font-size: 13px;
+
+                font-weight: 600;
+
+                background: transparent;
+
+                border: none;
+            }}
+            """
+        )
+
+        self.empty_state.setStyleSheet(
+            f"""
+            QFrame#EmptyState {{
+
+                background: {empty_bg};
+
+                border: 1px solid {empty_border};
+
+                border-radius: 22px;
+            }}
+            """
+        )
+
+        self.empty_title.setStyleSheet(
+            f"""
+            QLabel {{
+
+                color: {empty_title_color};
+
+                font-size: 20px;
+
+                font-weight: 700;
+
+                background: transparent;
+
+                border: none;
+            }}
+            """
+        )
+
+        self.empty_text.setStyleSheet(
+            f"""
+            QLabel {{
+
+                color: {empty_text_color};
+
+                font-size: 13px;
+
+                background: transparent;
+
+                border: none;
+            }}
+            """
+        )
+
+        # Update existing cards
+        for card in self.favorite_cards:
+
+            try:
+
+                card.set_theme_state(
+                    self.current_is_dark
+                )
+
+            except Exception as error:
+
+                print(
+                    "Favorite card theme error:",
+                    error
+                )
+
+        self.update()
 
     # ========================================================
     # PAINT EVENT
@@ -628,6 +784,10 @@ class FavoritesScreen(QWidget):
 
         rect = self.rect()
 
+        # ====================================================
+        # BACKGROUND
+        # ====================================================
+
         gradient = QLinearGradient(
             0,
             0,
@@ -635,38 +795,74 @@ class FavoritesScreen(QWidget):
             rect.height()
         )
 
-        gradient.setColorAt(
-            0.0,
-            QColor("#0B0913")
-        )
+        if self.current_is_dark:
 
-        gradient.setColorAt(
-            0.45,
-            QColor("#151124")
-        )
+            gradient.setColorAt(
+                0.0,
+                QColor("#0B0913")
+            )
 
-        gradient.setColorAt(
-            1.0,
-            QColor("#09070F")
-        )
+            gradient.setColorAt(
+                0.45,
+                QColor("#151124")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#09070F")
+            )
+
+        else:
+
+            gradient.setColorAt(
+                0.0,
+                QColor("#F7F4FB")
+            )
+
+            gradient.setColorAt(
+                0.45,
+                QColor("#F0EAF7")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#E9E1F1")
+            )
 
         painter.fillRect(
             rect,
             gradient
         )
 
+        # ====================================================
+        # TOP PURPLE GLOW
+        # ====================================================
+
         painter.setPen(
             Qt.NoPen
         )
 
-        painter.setBrush(
-            QColor(
-                124,
-                58,
-                237,
-                24
+        if self.current_is_dark:
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    24
+                )
             )
-        )
+
+        else:
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    14
+                )
+            )
 
         painter.drawEllipse(
             -180,
@@ -675,14 +871,31 @@ class FavoritesScreen(QWidget):
             400
         )
 
-        painter.setBrush(
-            QColor(
-                139,
-                92,
-                246,
-                16
+        # ====================================================
+        # RIGHT GLOW
+        # ====================================================
+
+        if self.current_is_dark:
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    16
+                )
             )
-        )
+
+        else:
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    10
+                )
+            )
 
         painter.drawEllipse(
             rect.width() - 420,

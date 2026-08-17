@@ -1,8 +1,5 @@
-from PySide6.QtCore import Qt
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QColor
-from PySide6.QtGui import QLinearGradient
-from PySide6.QtGui import QPainter
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -39,9 +36,51 @@ class DiscoverScreen(QWidget):
 
         super().__init__()
 
+        # --------------------------------------------------
+        # THEME STATE
+        # --------------------------------------------------
+
+        self.is_dark = True
+
+        # --------------------------------------------------
+        # COLLECTIONS
+        # --------------------------------------------------
+
         self.music_cards = []
+        self.mood_cards = []
+        self.mood_icons = []
+        self.mood_names = []
+        self.genre_cards = []
+        self.genre_labels = []
+
+        # --------------------------------------------------
+        # WIDGET REFERENCES
+        # --------------------------------------------------
+
+        self.title_label = None
+        self.subtitle_label = None
+
+        self.banner = None
+        self.banner_title = None
+        self.banner_subtitle = None
+        self.banner_icon = None
+
+        self.section_titles = []
+        self.section_actions = []
+
+        self.bottom_text = None
+
+        # --------------------------------------------------
+        # BUILD
+        # --------------------------------------------------
 
         self.build_ui()
+
+        # --------------------------------------------------
+        # INITIAL THEME
+        # --------------------------------------------------
+
+        self.set_theme_state(True)
 
     # ==================================================
     # BUILD UI
@@ -89,8 +128,8 @@ class DiscoverScreen(QWidget):
             Qt.WA_TranslucentBackground
         )
 
-        self.main.setStyleSheet(
-            "QWidget { background: transparent; }"
+        self.main.setObjectName(
+            "DiscoverMain"
         )
 
         root.addWidget(
@@ -103,6 +142,10 @@ class DiscoverScreen(QWidget):
         # ==================================================
 
         self.scroll = QScrollArea()
+
+        self.scroll.setObjectName(
+            "DiscoverScroll"
+        )
 
         self.scroll.setWidgetResizable(
             True
@@ -120,48 +163,14 @@ class DiscoverScreen(QWidget):
             Qt.ScrollBarAsNeeded
         )
 
-        self.scroll.setStyleSheet(
-            """
-            QScrollArea {
-                background: transparent;
-                border: none;
-            }
-
-            QScrollArea > QWidget > QWidget {
-                background: transparent;
-            }
-
-            QScrollBar:vertical {
-                width: 9px;
-                background: transparent;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical {
-                background: #7C3AED;
-                border-radius: 4px;
-                min-height: 55px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background: #9F67FF;
-            }
-
-            QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-
-            QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {
-                background: transparent;
-            }
-            """
+        root.addWidget(
+            self.main,
+            1,
         )
 
-        # ==================================================
+        # --------------------------------------------------
         # MAIN LAYOUT
-        # ==================================================
+        # --------------------------------------------------
 
         main_layout = QVBoxLayout(
             self.main
@@ -186,12 +195,12 @@ class DiscoverScreen(QWidget):
 
         self.content = QWidget()
 
-        self.content.setAttribute(
-            Qt.WA_TranslucentBackground
+        self.content.setObjectName(
+            "DiscoverContent"
         )
 
-        self.content.setStyleSheet(
-            "QWidget { background: transparent; }"
+        self.content.setAttribute(
+            Qt.WA_TranslucentBackground
         )
 
         self.scroll.setWidget(
@@ -202,11 +211,9 @@ class DiscoverScreen(QWidget):
             self.content
         )
 
-        # IMPORTANT:
-        #
-        # Bottom margin increased so the floating player
-        # never hides the last part of Discover content.
-        #
+        # Bottom space intentionally preserved
+        # for floating player.
+
         self.content_layout.setContentsMargins(
             0,
             0,
@@ -226,69 +233,38 @@ class DiscoverScreen(QWidget):
         # HEADER
         # ==================================================
 
-        title = QLabel(
+        self.title_label = QLabel(
             "Discover"
         )
 
-        title.setStyleSheet(
-            """
-            QLabel {
-                color: white;
-                font-size: 34px;
-                font-weight: 800;
-                background: transparent;
-            }
-            """
+        self.content_layout.addWidget(
+            self.title_label
         )
 
-        subtitle = QLabel(
+        self.subtitle_label = QLabel(
             "Explore new sounds, moods and music."
         )
 
-        subtitle.setStyleSheet(
-            """
-            QLabel {
-                color: #AFA4C8;
-                font-size: 14px;
-                background: transparent;
-            }
-            """
-        )
-
         self.content_layout.addWidget(
-            title
-        )
-
-        self.content_layout.addWidget(
-            subtitle
+            self.subtitle_label
         )
 
         # ==================================================
         # FEATURE BANNER
         # ==================================================
 
-        banner = QFrame()
+        self.banner = QFrame()
 
-        banner.setMinimumHeight(
+        self.banner.setObjectName(
+            "DiscoverBanner"
+        )
+
+        self.banner.setMinimumHeight(
             170
         )
 
-        banner.setStyleSheet(
-            """
-            QFrame {
-                background: #18122A;
-                border: 1px solid #30224B;
-                border-radius: 24px;
-            }
-
-            QFrame:hover {
-                border: 1px solid #53358A;
-            }
-            """
-        )
-
         banner_layout = QHBoxLayout(
-            banner
+            self.banner
         )
 
         banner_layout.setContentsMargins(
@@ -304,37 +280,16 @@ class DiscoverScreen(QWidget):
 
         banner_text = QVBoxLayout()
 
-        banner_title = QLabel(
+        self.banner_title = QLabel(
             "Find Your Next Favorite"
         )
 
-        banner_title.setStyleSheet(
-            """
-            QLabel {
-                color: white;
-                font-size: 25px;
-                font-weight: 800;
-                background: transparent;
-            }
-            """
-        )
-
-        banner_subtitle = QLabel(
+        self.banner_subtitle = QLabel(
             "Discover music made for every mood and moment."
         )
 
-        banner_subtitle.setStyleSheet(
-            """
-            QLabel {
-                color: #AAA0C5;
-                font-size: 14px;
-                background: transparent;
-            }
-            """
-        )
-
         banner_text.addWidget(
-            banner_title
+            self.banner_title
         )
 
         banner_text.addSpacing(
@@ -342,7 +297,7 @@ class DiscoverScreen(QWidget):
         )
 
         banner_text.addWidget(
-            banner_subtitle
+            self.banner_subtitle
         )
 
         banner_text.addStretch()
@@ -357,31 +312,20 @@ class DiscoverScreen(QWidget):
         # BANNER ICON
         # --------------------------------------------------
 
-        banner_icon = QLabel(
+        self.banner_icon = QLabel(
             "♫"
         )
 
-        banner_icon.setAlignment(
+        self.banner_icon.setAlignment(
             Qt.AlignCenter
         )
 
-        banner_icon.setStyleSheet(
-            """
-            QLabel {
-                color: #A970FF;
-                font-size: 72px;
-                font-weight: 800;
-                background: transparent;
-            }
-            """
-        )
-
         banner_layout.addWidget(
-            banner_icon
+            self.banner_icon
         )
 
         self.content_layout.addWidget(
-            banner
+            self.banner
         )
 
         # ==================================================
@@ -402,6 +346,10 @@ class DiscoverScreen(QWidget):
         # ==================================================
 
         trending_container = QWidget()
+
+        trending_container.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
 
         trending_layout = QHBoxLayout(
             trending_container
@@ -474,6 +422,10 @@ class DiscoverScreen(QWidget):
 
         mood_container = QWidget()
 
+        mood_container.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
+
         mood_layout = QHBoxLayout(
             mood_container
         )
@@ -500,6 +452,10 @@ class DiscoverScreen(QWidget):
 
             mood_card = QFrame()
 
+            mood_card.setObjectName(
+                "MoodCard"
+            )
+
             mood_card.setMinimumHeight(
                 105
             )
@@ -507,21 +463,6 @@ class DiscoverScreen(QWidget):
             mood_card.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Fixed,
-            )
-
-            mood_card.setStyleSheet(
-                """
-                QFrame {
-                    background: #181329;
-                    border: 1px solid #30224B;
-                    border-radius: 18px;
-                }
-
-                QFrame:hover {
-                    background: #24183D;
-                    border: 1px solid #7048C7;
-                }
-                """
             )
 
             mood_inner = QVBoxLayout(
@@ -547,18 +488,12 @@ class DiscoverScreen(QWidget):
                 mood_icon
             )
 
-            icon.setAlignment(
-                Qt.AlignCenter
+            icon.setObjectName(
+                "MoodIcon"
             )
 
-            icon.setStyleSheet(
-                """
-                QLabel {
-                    color: white;
-                    font-size: 25px;
-                    background: transparent;
-                }
-                """
+            icon.setAlignment(
+                Qt.AlignCenter
             )
 
             # --------------------------------------------------
@@ -569,19 +504,12 @@ class DiscoverScreen(QWidget):
                 mood_name
             )
 
-            name.setAlignment(
-                Qt.AlignCenter
+            name.setObjectName(
+                "MoodName"
             )
 
-            name.setStyleSheet(
-                """
-                QLabel {
-                    color: #D9D3EA;
-                    font-size: 13px;
-                    font-weight: 600;
-                    background: transparent;
-                }
-                """
+            name.setAlignment(
+                Qt.AlignCenter
             )
 
             mood_inner.addWidget(
@@ -594,6 +522,18 @@ class DiscoverScreen(QWidget):
 
             mood_layout.addWidget(
                 mood_card
+            )
+
+            self.mood_cards.append(
+                mood_card
+            )
+
+            self.mood_icons.append(
+                icon
+            )
+
+            self.mood_names.append(
+                name
             )
 
         self.content_layout.addWidget(
@@ -618,6 +558,10 @@ class DiscoverScreen(QWidget):
         # ==================================================
 
         genre_container = QWidget()
+
+        genre_container.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
 
         genre_layout = QHBoxLayout(
             genre_container
@@ -645,6 +589,15 @@ class DiscoverScreen(QWidget):
 
             genre_card = QFrame()
 
+            genre_card.setObjectName(
+                "GenreCard"
+            )
+
+            genre_card.setProperty(
+                "genre_background",
+                background
+            )
+
             genre_card.setMinimumHeight(
                 90
             )
@@ -652,20 +605,6 @@ class DiscoverScreen(QWidget):
             genre_card.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Fixed,
-            )
-
-            genre_card.setStyleSheet(
-                f"""
-                QFrame {{
-                    background: {background};
-                    border-radius: 18px;
-                    border: 1px solid rgba(255,255,255,20);
-                }}
-
-                QFrame:hover {{
-                    border: 1px solid #A970FF;
-                }}
-                """
             )
 
             genre_layout_inner = QVBoxLayout(
@@ -680,19 +619,12 @@ class DiscoverScreen(QWidget):
                 genre_name
             )
 
-            genre_label.setAlignment(
-                Qt.AlignCenter
+            genre_label.setObjectName(
+                "GenreLabel"
             )
 
-            genre_label.setStyleSheet(
-                """
-                QLabel {
-                    color: white;
-                    font-size: 16px;
-                    font-weight: 700;
-                    background: transparent;
-                }
-                """
+            genre_label.setAlignment(
+                Qt.AlignCenter
             )
 
             genre_layout_inner.addWidget(
@@ -703,6 +635,14 @@ class DiscoverScreen(QWidget):
                 genre_card
             )
 
+            self.genre_cards.append(
+                genre_card
+            )
+
+            self.genre_labels.append(
+                genre_label
+            )
+
         self.content_layout.addWidget(
             genre_container
         )
@@ -711,36 +651,21 @@ class DiscoverScreen(QWidget):
         # BOTTOM MESSAGE
         # ==================================================
 
-        bottom_text = QLabel(
+        self.bottom_text = QLabel(
             "More discoveries are coming soon ✦"
         )
 
-        bottom_text.setAlignment(
+        self.bottom_text.setAlignment(
             Qt.AlignCenter
         )
 
-        bottom_text.setStyleSheet(
-            """
-            QLabel {
-                color: #716889;
-                font-size: 12px;
-                padding: 20px;
-                background: transparent;
-            }
-            """
-        )
-
         self.content_layout.addWidget(
-            bottom_text
+            self.bottom_text
         )
 
         # ==================================================
         # EXTRA BOTTOM SPACE
         # ==================================================
-        #
-        # This is intentionally large enough for the
-        # floating player.
-        #
 
         self.content_layout.addSpacing(
             120
@@ -757,6 +682,10 @@ class DiscoverScreen(QWidget):
     ):
 
         header = QWidget()
+
+        header.setAttribute(
+            Qt.WA_TranslucentBackground
+        )
 
         layout = QHBoxLayout(
             header
@@ -777,35 +706,21 @@ class DiscoverScreen(QWidget):
             title_text
         )
 
-        title.setStyleSheet(
-            """
-            QLabel {
-                color: white;
-                font-size: 23px;
-                font-weight: 700;
-                background: transparent;
-            }
-            """
+        title.setObjectName(
+            "SectionTitle"
         )
 
         action = QLabel(
             action_text
         )
 
+        action.setObjectName(
+            "SectionAction"
+        )
+
         action.setAlignment(
             Qt.AlignRight |
             Qt.AlignVCenter
-        )
-
-        action.setStyleSheet(
-            """
-            QLabel {
-                color: #9B7AFF;
-                font-size: 13px;
-                font-weight: 600;
-                background: transparent;
-            }
-            """
         )
 
         layout.addWidget(
@@ -818,7 +733,581 @@ class DiscoverScreen(QWidget):
             action
         )
 
+        self.section_titles.append(
+            title
+        )
+
+        self.section_actions.append(
+            action
+        )
+
         return header
+
+    # ==================================================
+    # THEME STATE
+    # ==================================================
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+
+        self.is_dark = bool(
+            is_dark
+        )
+
+        # --------------------------------------------------
+        # SIDEBAR
+        # --------------------------------------------------
+
+        try:
+
+            self.sidebar.set_theme_state(
+                self.is_dark
+            )
+
+        except Exception as error:
+
+            print(
+                "Discover sidebar theme error:",
+                error
+            )
+
+        # --------------------------------------------------
+        # MAIN / SCROLL
+        # --------------------------------------------------
+
+        self.apply_scroll_theme()
+
+        # --------------------------------------------------
+        # HEADER
+        # --------------------------------------------------
+
+        if self.is_dark:
+
+            self.title_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #FFFFFF;
+                    font-size: 34px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.subtitle_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #AFA4C8;
+                    font-size: 14px;
+                    background: transparent;
+                }
+                """
+            )
+
+        else:
+
+            self.title_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #241B35;
+                    font-size: 34px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.subtitle_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #766A89;
+                    font-size: 14px;
+                    background: transparent;
+                }
+                """
+            )
+
+        # --------------------------------------------------
+        # BANNER
+        # --------------------------------------------------
+
+        self.apply_banner_theme()
+
+        # --------------------------------------------------
+        # SECTION HEADERS
+        # --------------------------------------------------
+
+        for title in self.section_titles:
+
+            if self.is_dark:
+
+                title.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #FFFFFF;
+                        font-size: 23px;
+                        font-weight: 700;
+                        background: transparent;
+                    }
+                    """
+                )
+
+            else:
+
+                title.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #2A203B;
+                        font-size: 23px;
+                        font-weight: 700;
+                        background: transparent;
+                    }
+                    """
+                )
+
+        for action in self.section_actions:
+
+            if self.is_dark:
+
+                action.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #A78BFA;
+                        font-size: 13px;
+                        font-weight: 600;
+                        background: transparent;
+                    }
+                    """
+                )
+
+            else:
+
+                action.setStyleSheet(
+                    """
+                    QLabel {
+                        color: #7440D9;
+                        font-size: 13px;
+                        font-weight: 600;
+                        background: transparent;
+                    }
+                    """
+                )
+
+        # --------------------------------------------------
+        # MOOD CARDS
+        # --------------------------------------------------
+
+        self.apply_mood_theme()
+
+        # --------------------------------------------------
+        # GENRE CARDS
+        # --------------------------------------------------
+
+        self.apply_genre_theme()
+
+        # --------------------------------------------------
+        # BOTTOM TEXT
+        # --------------------------------------------------
+
+        if self.is_dark:
+
+            self.bottom_text.setStyleSheet(
+                """
+                QLabel {
+                    color: #716889;
+                    font-size: 12px;
+                    padding: 20px;
+                    background: transparent;
+                }
+                """
+            )
+
+        else:
+
+            self.bottom_text.setStyleSheet(
+                """
+                QLabel {
+                    color: #8B7D9E;
+                    font-size: 12px;
+                    padding: 20px;
+                    background: transparent;
+                }
+                """
+            )
+
+        # --------------------------------------------------
+        # MUSIC CARDS
+        # --------------------------------------------------
+
+        for card in self.music_cards:
+
+            try:
+
+                if hasattr(
+                    card,
+                    "set_theme_state"
+                ):
+
+                    card.set_theme_state(
+                        self.is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "Discover MusicCard theme error:",
+                    error
+                )
+
+        # --------------------------------------------------
+        # REPAINT
+        # --------------------------------------------------
+
+        self.update()
+        self.main.update()
+        self.content.update()
+
+        self.scroll.viewport().update()
+
+    # ==================================================
+    # SCROLL THEME
+    # ==================================================
+
+    def apply_scroll_theme(self):
+
+        if self.is_dark:
+
+            self.scroll.setStyleSheet(
+                """
+                QScrollArea {
+                    background: transparent;
+                    border: none;
+                }
+
+                QScrollArea > QWidget > QWidget {
+                    background: transparent;
+                }
+
+                QScrollBar:vertical {
+                    width: 9px;
+                    background: transparent;
+                    margin: 2px;
+                }
+
+                QScrollBar::handle:vertical {
+                    background: #7C3AED;
+                    border-radius: 4px;
+                    min-height: 55px;
+                }
+
+                QScrollBar::handle:vertical:hover {
+                    background: #9F67FF;
+                }
+
+                QScrollBar::add-line:vertical,
+                QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+
+                QScrollBar::add-page:vertical,
+                QScrollBar::sub-page:vertical {
+                    background: transparent;
+                }
+                """
+            )
+
+        else:
+
+            self.scroll.setStyleSheet(
+                """
+                QScrollArea {
+                    background: transparent;
+                    border: none;
+                }
+
+                QScrollArea > QWidget > QWidget {
+                    background: transparent;
+                }
+
+                QScrollBar:vertical {
+                    width: 9px;
+                    background: transparent;
+                    margin: 2px;
+                }
+
+                QScrollBar::handle:vertical {
+                    background: #8B5CF6;
+                    border-radius: 4px;
+                    min-height: 55px;
+                }
+
+                QScrollBar::handle:vertical:hover {
+                    background: #7040D4;
+                }
+
+                QScrollBar::add-line:vertical,
+                QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+
+                QScrollBar::add-page:vertical,
+                QScrollBar::sub-page:vertical {
+                    background: transparent;
+                }
+                """
+            )
+
+    # ==================================================
+    # BANNER THEME
+    # ==================================================
+
+    def apply_banner_theme(self):
+
+        if self.is_dark:
+
+            self.banner.setStyleSheet(
+                """
+                QFrame#DiscoverBanner {
+                    background: #18122A;
+                    border: 1px solid #30224B;
+                    border-radius: 24px;
+                }
+
+                QFrame#DiscoverBanner:hover {
+                    border: 1px solid #53358A;
+                }
+                """
+            )
+
+            self.banner_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #FFFFFF;
+                    font-size: 25px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.banner_subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #AAA0C5;
+                    font-size: 14px;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.banner_icon.setStyleSheet(
+                """
+                QLabel {
+                    color: #A970FF;
+                    font-size: 72px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+        else:
+
+            self.banner.setStyleSheet(
+                """
+                QFrame#DiscoverBanner {
+                    background: #EDE6FA;
+                    border: 1px solid #D3C5EA;
+                    border-radius: 24px;
+                }
+
+                QFrame#DiscoverBanner:hover {
+                    border: 1px solid #B99BEA;
+                }
+                """
+            )
+
+            self.banner_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #281B3B;
+                    font-size: 25px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.banner_subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #756785;
+                    font-size: 14px;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.banner_icon.setStyleSheet(
+                """
+                QLabel {
+                    color: #7C3AED;
+                    font-size: 72px;
+                    font-weight: 800;
+                    background: transparent;
+                }
+                """
+            )
+
+    # ==================================================
+    # MOOD THEME
+    # ==================================================
+
+    def apply_mood_theme(self):
+
+        if self.is_dark:
+
+            card_style = """
+                QFrame#MoodCard {
+                    background: #181329;
+                    border: 1px solid #30224B;
+                    border-radius: 18px;
+                }
+
+                QFrame#MoodCard:hover {
+                    background: #24183D;
+                    border: 1px solid #7048C7;
+                }
+            """
+
+            icon_style = """
+                QLabel#MoodIcon {
+                    color: #FFFFFF;
+                    font-size: 25px;
+                    background: transparent;
+                }
+            """
+
+            name_style = """
+                QLabel#MoodName {
+                    color: #D9D3EA;
+                    font-size: 13px;
+                    font-weight: 600;
+                    background: transparent;
+                }
+            """
+
+        else:
+
+            card_style = """
+                QFrame#MoodCard {
+                    background: #F1EBFA;
+                    border: 1px solid #D7CBE8;
+                    border-radius: 18px;
+                }
+
+                QFrame#MoodCard:hover {
+                    background: #E8DDF7;
+                    border: 1px solid #A98AD7;
+                }
+            """
+
+            icon_style = """
+                QLabel#MoodIcon {
+                    color: #49366A;
+                    font-size: 25px;
+                    background: transparent;
+                }
+            """
+
+            name_style = """
+                QLabel#MoodName {
+                    color: #594B6E;
+                    font-size: 13px;
+                    font-weight: 600;
+                    background: transparent;
+                }
+            """
+
+        for card in self.mood_cards:
+
+            card.setStyleSheet(
+                card_style
+            )
+
+        for icon in self.mood_icons:
+
+            icon.setStyleSheet(
+                icon_style
+            )
+
+        for name in self.mood_names:
+
+            name.setStyleSheet(
+                name_style
+            )
+
+    # ==================================================
+    # GENRE THEME
+    # ==================================================
+
+    def apply_genre_theme(self):
+
+        for card in self.genre_cards:
+
+            original_background = card.property(
+                "genre_background"
+            )
+
+            if original_background is None:
+                original_background = "#30224B"
+
+            if self.is_dark:
+
+                card.setStyleSheet(
+                    f"""
+                    QFrame#GenreCard {{
+                        background: {original_background};
+                        border-radius: 18px;
+                        border: 1px solid rgba(255,255,255,20);
+                    }}
+
+                    QFrame#GenreCard:hover {{
+                        border: 1px solid #A970FF;
+                    }}
+                    """
+                )
+
+            else:
+
+                card.setStyleSheet(
+                    f"""
+                    QFrame#GenreCard {{
+                        background: {original_background};
+                        border-radius: 18px;
+                        border: 1px solid rgba(70,50,100,45);
+                    }}
+
+                    QFrame#GenreCard:hover {{
+                        border: 1px solid #7C3AED;
+                    }}
+                    """
+                )
+
+        for label in self.genre_labels:
+
+            label.setStyleSheet(
+                """
+                QLabel#GenreLabel {
+                    color: #FFFFFF;
+                    font-size: 16px;
+                    font-weight: 700;
+                    background: transparent;
+                }
+                """
+            )
 
     # ==================================================
     # MUSIC PLAY
@@ -861,79 +1350,158 @@ class DiscoverScreen(QWidget):
         rect = self.rect()
 
         # ==================================================
-        # MAIN GRADIENT
+        # DARK MODE
         # ==================================================
 
-        gradient = QLinearGradient(
-            0,
-            0,
-            rect.width(),
-            rect.height(),
-        )
+        if self.is_dark:
 
-        gradient.setColorAt(
-            0.0,
-            QColor("#0B0913"),
-        )
-
-        gradient.setColorAt(
-            0.45,
-            QColor("#151124"),
-        )
-
-        gradient.setColorAt(
-            1.0,
-            QColor("#09070F"),
-        )
-
-        painter.fillRect(
-            rect,
-            gradient,
-        )
-
-        # ==================================================
-        # TOP PURPLE GLOW
-        # ==================================================
-
-        painter.setPen(
-            Qt.NoPen
-        )
-
-        painter.setBrush(
-            QColor(
-                124,
-                58,
-                237,
-                24,
+            gradient = QLinearGradient(
+                0,
+                0,
+                rect.width(),
+                rect.height(),
             )
-        )
 
-        painter.drawEllipse(
-            -180,
-            -180,
-            500,
-            400,
-        )
-
-        # ==================================================
-        # RIGHT AMBIENT GLOW
-        # ==================================================
-
-        painter.setBrush(
-            QColor(
-                139,
-                92,
-                246,
-                16,
+            gradient.setColorAt(
+                0.0,
+                QColor("#0B0913"),
             )
-        )
 
-        painter.drawEllipse(
-            rect.width() - 420,
-            120,
-            500,
-            500,
-        )
+            gradient.setColorAt(
+                0.45,
+                QColor("#151124"),
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#09070F"),
+            )
+
+            painter.fillRect(
+                rect,
+                gradient,
+            )
+
+            # ------------------------------------------------
+            # TOP PURPLE GLOW
+            # ------------------------------------------------
+
+            painter.setPen(
+                Qt.NoPen
+            )
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    24,
+                )
+            )
+
+            painter.drawEllipse(
+                -180,
+                -180,
+                500,
+                400,
+            )
+
+            # ------------------------------------------------
+            # RIGHT AMBIENT GLOW
+            # ------------------------------------------------
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    16,
+                )
+            )
+
+            painter.drawEllipse(
+                rect.width() - 420,
+                120,
+                500,
+                500,
+            )
+
+        # ==================================================
+        # LIGHT MODE
+        # ==================================================
+
+        else:
+
+            gradient = QLinearGradient(
+                0,
+                0,
+                rect.width(),
+                rect.height(),
+            )
+
+            gradient.setColorAt(
+                0.0,
+                QColor("#F4F0FA"),
+            )
+
+            gradient.setColorAt(
+                0.45,
+                QColor("#EDE7F5"),
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#E8E1F1"),
+            )
+
+            painter.fillRect(
+                rect,
+                gradient,
+            )
+
+            # ------------------------------------------------
+            # TOP SOFT PURPLE GLOW
+            # ------------------------------------------------
+
+            painter.setPen(
+                Qt.NoPen
+            )
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    15,
+                )
+            )
+
+            painter.drawEllipse(
+                -180,
+                -180,
+                500,
+                400,
+            )
+
+            # ------------------------------------------------
+            # RIGHT SOFT GLOW
+            # ------------------------------------------------
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    10,
+                )
+            )
+
+            painter.drawEllipse(
+                rect.width() - 420,
+                120,
+                500,
+                500,
+            )
 
         painter.end()
 

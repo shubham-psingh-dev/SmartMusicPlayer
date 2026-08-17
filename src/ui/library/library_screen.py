@@ -47,6 +47,7 @@ class LibraryScreen(QWidget):
     # ========================================================
 
     def __init__(self):
+
         super().__init__()
 
         self.setWindowTitle(
@@ -57,6 +58,12 @@ class LibraryScreen(QWidget):
             1200,
             700
         )
+
+        # ----------------------------------------------------
+        # THEME STATE
+        # ----------------------------------------------------
+
+        self.current_is_dark = True
 
         # ----------------------------------------------------
         # MUSIC DATA
@@ -91,6 +98,14 @@ class LibraryScreen(QWidget):
 
         self.populate_library()
 
+        # ----------------------------------------------------
+        # DEFAULT DARK
+        # ----------------------------------------------------
+
+        self.set_theme_state(
+            True
+        )
+
     # ========================================================
     # BUILD UI
     # ========================================================
@@ -101,7 +116,9 @@ class LibraryScreen(QWidget):
         # ROOT
         # ----------------------------------------------------
 
-        root = QHBoxLayout(self)
+        root = QHBoxLayout(
+            self
+        )
 
         root.setContentsMargins(
             0,
@@ -110,7 +127,9 @@ class LibraryScreen(QWidget):
             0
         )
 
-        root.setSpacing(0)
+        root.setSpacing(
+            0
+        )
 
         # ----------------------------------------------------
         # SIDEBAR
@@ -185,43 +204,6 @@ class LibraryScreen(QWidget):
             Qt.ScrollBarAsNeeded
         )
 
-        self.scroll.setStyleSheet("""
-        QScrollArea {
-            background: transparent;
-            border: none;
-        }
-
-        QScrollArea > QWidget > QWidget {
-            background: transparent;
-        }
-
-        QScrollBar:vertical {
-            width: 8px;
-            background: transparent;
-            margin: 2px;
-        }
-
-        QScrollBar::handle:vertical {
-            background: #6F3CC4;
-            border-radius: 4px;
-            min-height: 50px;
-        }
-
-        QScrollBar::handle:vertical:hover {
-            background: #9B62F0;
-        }
-
-        QScrollBar::add-line:vertical,
-        QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-
-        QScrollBar::add-page:vertical,
-        QScrollBar::sub-page:vertical {
-            background: transparent;
-        }
-        """)
-
         main_layout.addWidget(
             self.scroll
         )
@@ -284,37 +266,20 @@ class LibraryScreen(QWidget):
             4
         )
 
-        title = QLabel(
+        self.title = QLabel(
             "Your Library"
         )
 
-        title.setStyleSheet("""
-        QLabel {
-            color: white;
-            font-size: 34px;
-            font-weight: 800;
-            background: transparent;
-        }
-        """)
+        header_text.addWidget(
+            self.title
+        )
 
-        subtitle = QLabel(
+        self.subtitle = QLabel(
             "Everything you love, all in one place."
         )
 
-        subtitle.setStyleSheet("""
-        QLabel {
-            color: #9D94B8;
-            font-size: 14px;
-            background: transparent;
-        }
-        """)
-
         header_text.addWidget(
-            title
-        )
-
-        header_text.addWidget(
-            subtitle
+            self.subtitle
         )
 
         header.addLayout(
@@ -339,22 +304,6 @@ class LibraryScreen(QWidget):
             90
         )
 
-        self.song_count.setStyleSheet("""
-        QLabel {
-            color: #C9B8F4;
-
-            background: rgba(124,58,237,35);
-
-            border: 1px solid rgba(139,92,246,70);
-            border-radius: 14px;
-
-            padding: 9px 14px;
-
-            font-size: 12px;
-            font-weight: 600;
-        }
-        """)
-
         header.addWidget(
             self.song_count
         )
@@ -367,40 +316,18 @@ class LibraryScreen(QWidget):
         # FEATURE PANEL
         # ====================================================
 
-        feature = QFrame()
+        self.feature = QFrame()
 
-        feature.setMinimumHeight(
+        self.feature.setMinimumHeight(
             130
         )
 
-        feature.setObjectName(
+        self.feature.setObjectName(
             "LibraryFeature"
         )
 
-        feature.setStyleSheet("""
-        QFrame#LibraryFeature {
-            background: qlineargradient(
-                x1: 0,
-                y1: 0,
-                x2: 1,
-                y2: 0,
-
-                stop: 0 #211635,
-                stop: 0.55 #302052,
-                stop: 1 #472A78
-            );
-
-            border: 1px solid rgba(139,92,246,80);
-            border-radius: 22px;
-        }
-
-        QFrame#LibraryFeature:hover {
-            border: 1px solid rgba(180,140,255,150);
-        }
-        """)
-
         feature_layout = QHBoxLayout(
-            feature
+            self.feature
         )
 
         feature_layout.setContentsMargins(
@@ -412,41 +339,24 @@ class LibraryScreen(QWidget):
 
         feature_text = QVBoxLayout()
 
-        feature_title = QLabel(
+        self.feature_title = QLabel(
             "Your music. Your collection."
         )
 
-        feature_title.setStyleSheet("""
-        QLabel {
-            color: white;
-            font-size: 21px;
-            font-weight: 800;
-            background: transparent;
-        }
-        """)
-
-        feature_subtitle = QLabel(
-            "Pick a track and let LYRx take care of the rest."
-        )
-
-        feature_subtitle.setStyleSheet("""
-        QLabel {
-            color: #B8ACD2;
-            font-size: 13px;
-            background: transparent;
-        }
-        """)
-
         feature_text.addWidget(
-            feature_title
+            self.feature_title
         )
 
         feature_text.addSpacing(
             4
         )
 
+        self.feature_subtitle = QLabel(
+            "Pick a track and let LYRx take care of the rest."
+        )
+
         feature_text.addWidget(
-            feature_subtitle
+            self.feature_subtitle
         )
 
         feature_text.addStretch()
@@ -457,29 +367,20 @@ class LibraryScreen(QWidget):
 
         feature_layout.addStretch()
 
-        music_icon = QLabel(
+        self.music_icon = QLabel(
             "♫"
         )
 
-        music_icon.setAlignment(
+        self.music_icon.setAlignment(
             Qt.AlignCenter
         )
 
-        music_icon.setStyleSheet("""
-        QLabel {
-            color: #B77AFF;
-            font-size: 58px;
-            font-weight: 800;
-            background: transparent;
-        }
-        """)
-
         feature_layout.addWidget(
-            music_icon
+            self.music_icon
         )
 
         self.content_layout.addWidget(
-            feature
+            self.feature
         )
 
         # ====================================================
@@ -510,31 +411,6 @@ class LibraryScreen(QWidget):
             42
         )
 
-        self.search.setStyleSheet("""
-        QLineEdit {
-            color: white;
-
-            background: #171126;
-
-            border: 1px solid #342553;
-            border-radius: 13px;
-
-            padding-left: 14px;
-            padding-right: 14px;
-
-            font-size: 13px;
-        }
-
-        QLineEdit:hover {
-            border: 1px solid #5C3B8D;
-        }
-
-        QLineEdit:focus {
-            border: 1px solid #8B5CF6;
-            background: #1C1430;
-        }
-        """)
-
         self.search.textChanged.connect(
             self.filter_library
         )
@@ -560,31 +436,6 @@ class LibraryScreen(QWidget):
             42
         )
 
-        self.all_button.setStyleSheet("""
-        QPushButton {
-            color: white;
-
-            background: #7C3AED;
-
-            border: 1px solid #9B67F3;
-            border-radius: 13px;
-
-            padding: 0 16px;
-
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        QPushButton:hover {
-            background: #9555F5;
-            border: 1px solid #C6A5FF;
-        }
-
-        QPushButton:pressed {
-            background: #6325B5;
-        }
-        """)
-
         self.all_button.clicked.connect(
             self.clear_search
         )
@@ -603,21 +454,12 @@ class LibraryScreen(QWidget):
 
         section_header = QHBoxLayout()
 
-        section_title = QLabel(
+        self.section_title = QLabel(
             "All Songs"
         )
 
-        section_title.setStyleSheet("""
-        QLabel {
-            color: white;
-            font-size: 23px;
-            font-weight: 700;
-            background: transparent;
-        }
-        """)
-
         section_header.addWidget(
-            section_title
+            self.section_title
         )
 
         section_header.addStretch()
@@ -625,14 +467,6 @@ class LibraryScreen(QWidget):
         self.result_label = QLabel(
             "4 tracks"
         )
-
-        self.result_label.setStyleSheet("""
-        QLabel {
-            color: #756A91;
-            font-size: 11px;
-            background: transparent;
-        }
-        """)
 
         section_header.addWidget(
             self.result_label
@@ -643,7 +477,7 @@ class LibraryScreen(QWidget):
         )
 
         # ====================================================
-        # CARD GRID CONTAINER
+        # CARD GRID
         # ====================================================
 
         self.grid_container = QWidget()
@@ -693,24 +527,540 @@ class LibraryScreen(QWidget):
             180
         )
 
-        self.empty_state.setStyleSheet("""
-        QLabel {
-            color: #716889;
-
-            background: rgba(255,255,255,4);
-
-            border: 1px dashed rgba(139,92,246,55);
-            border-radius: 18px;
-
-            font-size: 13px;
-        }
-        """)
-
         self.empty_state.hide()
 
         self.content_layout.addWidget(
             self.empty_state
         )
+
+    # ========================================================
+    # THEME
+    # ========================================================
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+
+        self.current_is_dark = bool(
+            is_dark
+        )
+
+        if self.current_is_dark:
+
+            self.apply_dark_theme()
+
+        else:
+
+            self.apply_light_theme()
+
+        # ----------------------------------------------------
+        # UPDATE MUSIC CARDS
+        # ----------------------------------------------------
+
+        for card in self.music_cards:
+
+            try:
+
+                if hasattr(
+                    card,
+                    "set_theme_state"
+                ):
+
+                    card.set_theme_state(
+                        self.current_is_dark
+                    )
+
+                elif hasattr(
+                    card,
+                    "apply_theme"
+                ):
+
+                    card.apply_theme(
+                        self.current_is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "Library MusicCard theme error:",
+                    error
+                )
+
+        # ----------------------------------------------------
+        # SIDEBAR
+        # ----------------------------------------------------
+
+        try:
+
+            self.sidebar.set_theme_state(
+                self.current_is_dark
+            )
+
+        except Exception as error:
+
+            print(
+                "Library sidebar theme error:",
+                error
+            )
+
+        self.update()
+
+    # ========================================================
+    # DARK THEME
+    # ========================================================
+
+    def apply_dark_theme(
+        self
+    ):
+
+        # ----------------------------------------------------
+        # MAIN TEXT
+        # ----------------------------------------------------
+
+        self.title.setStyleSheet("""
+        QLabel {
+            color: #FFFFFF;
+            font-size: 34px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        self.subtitle.setStyleSheet("""
+        QLabel {
+            color: #9D94B8;
+            font-size: 14px;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SONG COUNT
+        # ----------------------------------------------------
+
+        self.song_count.setStyleSheet("""
+        QLabel {
+            color: #C9B8F4;
+            background: rgba(124,58,237,35);
+            border: 1px solid rgba(139,92,246,70);
+            border-radius: 14px;
+            padding: 9px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # FEATURE
+        # ----------------------------------------------------
+
+        self.feature.setStyleSheet("""
+        QFrame#LibraryFeature {
+            background: qlineargradient(
+                x1: 0,
+                y1: 0,
+                x2: 1,
+                y2: 0,
+                stop: 0 #211635,
+                stop: 0.55 #302052,
+                stop: 1 #472A78
+            );
+
+            border: 1px solid rgba(139,92,246,80);
+            border-radius: 22px;
+        }
+
+        QFrame#LibraryFeature:hover {
+            border: 1px solid rgba(180,140,255,150);
+        }
+        """)
+
+        self.feature_title.setStyleSheet("""
+        QLabel {
+            color: #FFFFFF;
+            font-size: 21px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        self.feature_subtitle.setStyleSheet("""
+        QLabel {
+            color: #B8ACD2;
+            font-size: 13px;
+            background: transparent;
+        }
+        """)
+
+        self.music_icon.setStyleSheet("""
+        QLabel {
+            color: #B77AFF;
+            font-size: 58px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SEARCH
+        # ----------------------------------------------------
+
+        self.search.setStyleSheet("""
+        QLineEdit {
+            color: #FFFFFF;
+            background: #171126;
+            border: 1px solid #342553;
+            border-radius: 13px;
+            padding-left: 14px;
+            padding-right: 14px;
+            font-size: 13px;
+            selection-background-color: #7C3AED;
+        }
+
+        QLineEdit:hover {
+            border: 1px solid #5C3B8D;
+        }
+
+        QLineEdit:focus {
+            border: 1px solid #8B5CF6;
+            background: #1C1430;
+        }
+
+        QLineEdit::placeholder {
+            color: #756A91;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # ALL SONGS
+        # ----------------------------------------------------
+
+        self.all_button.setStyleSheet("""
+        QPushButton {
+            color: #FFFFFF;
+            background: #7C3AED;
+            border: 1px solid #9B67F3;
+            border-radius: 13px;
+            padding: 0 16px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        QPushButton:hover {
+            background: #9555F5;
+            border: 1px solid #C6A5FF;
+        }
+
+        QPushButton:pressed {
+            background: #6325B5;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SECTION
+        # ----------------------------------------------------
+
+        self.section_title.setStyleSheet("""
+        QLabel {
+            color: #FFFFFF;
+            font-size: 23px;
+            font-weight: 700;
+            background: transparent;
+        }
+        """)
+
+        self.result_label.setStyleSheet("""
+        QLabel {
+            color: #756A91;
+            font-size: 11px;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # EMPTY
+        # ----------------------------------------------------
+
+        self.empty_state.setStyleSheet("""
+        QLabel {
+            color: #716889;
+            background: rgba(255,255,255,4);
+            border: 1px dashed rgba(139,92,246,55);
+            border-radius: 18px;
+            font-size: 13px;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SCROLLBAR
+        # ----------------------------------------------------
+
+        self.scroll.setStyleSheet("""
+        QScrollArea {
+            background: transparent;
+            border: none;
+        }
+
+        QScrollArea > QWidget > QWidget {
+            background: transparent;
+        }
+
+        QScrollBar:vertical {
+            width: 8px;
+            background: transparent;
+            margin: 2px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: #6F3CC4;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: #9B62F0;
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+
+        QScrollBar::add-page:vertical,
+        QScrollBar::sub-page:vertical {
+            background: transparent;
+        }
+        """)
+
+    # ========================================================
+    # LIGHT THEME
+    # ========================================================
+
+    def apply_light_theme(
+        self
+    ):
+
+        # ----------------------------------------------------
+        # MAIN TEXT
+        # ----------------------------------------------------
+
+        self.title.setStyleSheet("""
+        QLabel {
+            color: #2B2140;
+            font-size: 34px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        self.subtitle.setStyleSheet("""
+        QLabel {
+            color: #78698D;
+            font-size: 14px;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SONG COUNT
+        # ----------------------------------------------------
+
+        self.song_count.setStyleSheet("""
+        QLabel {
+            color: #68429A;
+            background: rgba(124,58,237,12);
+            border: 1px solid rgba(124,58,237,42);
+            border-radius: 14px;
+            padding: 9px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # FEATURE
+        # ----------------------------------------------------
+
+        self.feature.setStyleSheet("""
+        QFrame#LibraryFeature {
+            background: qlineargradient(
+                x1: 0,
+                y1: 0,
+                x2: 1,
+                y2: 0,
+                stop: 0 #EAE0F8,
+                stop: 0.55 #DDD0F2,
+                stop: 1 #D3C0EC
+            );
+
+            border: 1px solid rgba(124,58,237,48);
+            border-radius: 22px;
+        }
+
+        QFrame#LibraryFeature:hover {
+            border: 1px solid rgba(124,58,237,95);
+        }
+        """)
+
+        self.feature_title.setStyleSheet("""
+        QLabel {
+            color: #35254E;
+            font-size: 21px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        self.feature_subtitle.setStyleSheet("""
+        QLabel {
+            color: #756489;
+            font-size: 13px;
+            background: transparent;
+        }
+        """)
+
+        self.music_icon.setStyleSheet("""
+        QLabel {
+            color: #8050C6;
+            font-size: 58px;
+            font-weight: 800;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SEARCH
+        # ----------------------------------------------------
+
+        self.search.setStyleSheet("""
+        QLineEdit {
+            color: #352A45;
+            background: #F0EBF7;
+            border: 1px solid #D5C9E2;
+            border-radius: 13px;
+            padding-left: 14px;
+            padding-right: 14px;
+            font-size: 13px;
+            selection-background-color: #8B5CF6;
+            selection-color: white;
+        }
+
+        QLineEdit:hover {
+            background: #F4EFF9;
+            border: 1px solid #B9A5D2;
+        }
+
+        QLineEdit:focus {
+            background: #F7F2FB;
+            border: 1px solid #8B5CF6;
+        }
+
+        QLineEdit::placeholder {
+            color: #9A8CA9;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # ALL SONGS
+        # ----------------------------------------------------
+
+        self.all_button.setStyleSheet("""
+        QPushButton {
+            color: #FFFFFF;
+            background: #7C3AED;
+            border: 1px solid #9460E8;
+            border-radius: 13px;
+            padding: 0 16px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        QPushButton:hover {
+            background: #8B4AF0;
+            border: 1px solid #A97CF4;
+        }
+
+        QPushButton:pressed {
+            background: #6828C5;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SECTION
+        # ----------------------------------------------------
+
+        self.section_title.setStyleSheet("""
+        QLabel {
+            color: #352A45;
+            font-size: 23px;
+            font-weight: 700;
+            background: transparent;
+        }
+        """)
+
+        self.result_label.setStyleSheet("""
+        QLabel {
+            color: #8A779C;
+            font-size: 11px;
+            background: transparent;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # EMPTY
+        # ----------------------------------------------------
+
+        self.empty_state.setStyleSheet("""
+        QLabel {
+            color: #897A9A;
+            background: rgba(255,255,255,70);
+            border: 1px dashed rgba(124,58,237,65);
+            border-radius: 18px;
+            font-size: 13px;
+        }
+        """)
+
+        # ----------------------------------------------------
+        # SCROLLBAR
+        # ----------------------------------------------------
+
+        self.scroll.setStyleSheet("""
+        QScrollArea {
+            background: transparent;
+            border: none;
+        }
+
+        QScrollArea > QWidget > QWidget {
+            background: transparent;
+        }
+
+        QScrollBar:vertical {
+            width: 8px;
+            background: transparent;
+            margin: 2px;
+        }
+
+        QScrollBar::handle:vertical {
+            background: #9B7ACC;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: #7C3AED;
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+
+        QScrollBar::add-page:vertical,
+        QScrollBar::sub-page:vertical {
+            background: transparent;
+        }
+        """)
 
     # ========================================================
     # POPULATE LIBRARY
@@ -722,6 +1072,7 @@ class LibraryScreen(QWidget):
     ):
 
         if songs is None:
+
             songs = self.library_songs
 
         # ----------------------------------------------------
@@ -730,11 +1081,14 @@ class LibraryScreen(QWidget):
 
         while self.grid.count():
 
-            item = self.grid.takeAt(0)
+            item = self.grid.takeAt(
+                0
+            )
 
             widget = item.widget()
 
             if widget is not None:
+
                 widget.deleteLater()
 
         self.music_cards.clear()
@@ -782,7 +1136,39 @@ class LibraryScreen(QWidget):
                 self.handle_song_request
             )
 
+            # ------------------------------------------------
+            # APPLY CURRENT THEME TO NEW CARD
+            # ------------------------------------------------
+
+            try:
+
+                if hasattr(
+                    card,
+                    "set_theme_state"
+                ):
+
+                    card.set_theme_state(
+                        self.current_is_dark
+                    )
+
+                elif hasattr(
+                    card,
+                    "apply_theme"
+                ):
+
+                    card.apply_theme(
+                        self.current_is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "New MusicCard theme error:",
+                    error
+                )
+
             row = index // columns
+
             column = index % columns
 
             self.grid.addWidget(
@@ -810,11 +1196,18 @@ class LibraryScreen(QWidget):
         # COUNT
         # ----------------------------------------------------
 
-        count = len(songs)
+        count = len(
+            songs
+        )
 
         self.result_label.setText(
             f"{count} "
             f"{'track' if count == 1 else 'tracks'}"
+        )
+
+        self.song_count.setText(
+            f"{count} "
+            f"{'song' if count == 1 else 'songs'}"
         )
 
     # ========================================================
@@ -858,7 +1251,9 @@ class LibraryScreen(QWidget):
     # CLEAR SEARCH
     # ========================================================
 
-    def clear_search(self):
+    def clear_search(
+        self
+    ):
 
         self.search.clear()
 
@@ -905,76 +1300,159 @@ class LibraryScreen(QWidget):
 
         rect = self.rect()
 
-        gradient = QLinearGradient(
-            0,
-            0,
-            rect.width(),
-            rect.height()
-        )
+        # ====================================================
+        # DARK BACKGROUND
+        # ====================================================
 
-        gradient.setColorAt(
-            0.0,
-            QColor("#0B0913")
-        )
+        if self.current_is_dark:
 
-        gradient.setColorAt(
-            0.45,
-            QColor("#151124")
-        )
-
-        gradient.setColorAt(
-            1.0,
-            QColor("#09070F")
-        )
-
-        painter.fillRect(
-            rect,
-            gradient
-        )
-
-        # ----------------------------------------------------
-        # TOP PURPLE GLOW
-        # ----------------------------------------------------
-
-        painter.setPen(
-            Qt.NoPen
-        )
-
-        painter.setBrush(
-            QColor(
-                124,
-                58,
-                237,
-                22
+            gradient = QLinearGradient(
+                0,
+                0,
+                rect.width(),
+                rect.height()
             )
-        )
 
-        painter.drawEllipse(
-            -170,
-            -170,
-            430,
-            360
-        )
-
-        # ----------------------------------------------------
-        # RIGHT AMBIENT GLOW
-        # ----------------------------------------------------
-
-        painter.setBrush(
-            QColor(
-                139,
-                92,
-                246,
-                14
+            gradient.setColorAt(
+                0.0,
+                QColor("#0B0913")
             )
-        )
 
-        painter.drawEllipse(
-            rect.width() - 380,
-            100,
-            500,
-            500
-        )
+            gradient.setColorAt(
+                0.45,
+                QColor("#151124")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#09070F")
+            )
+
+            painter.fillRect(
+                rect,
+                gradient
+            )
+
+            # -----------------------------------------------
+            # TOP PURPLE GLOW
+            # -----------------------------------------------
+
+            painter.setPen(
+                Qt.NoPen
+            )
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    22
+                )
+            )
+
+            painter.drawEllipse(
+                -170,
+                -170,
+                430,
+                360
+            )
+
+            # -----------------------------------------------
+            # RIGHT AMBIENT GLOW
+            # -----------------------------------------------
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    14
+                )
+            )
+
+            painter.drawEllipse(
+                rect.width() - 380,
+                100,
+                500,
+                500
+            )
+
+        # ====================================================
+        # LIGHT BACKGROUND
+        # ====================================================
+
+        else:
+
+            gradient = QLinearGradient(
+                0,
+                0,
+                rect.width(),
+                rect.height()
+            )
+
+            gradient.setColorAt(
+                0.0,
+                QColor("#F5F1FA")
+            )
+
+            gradient.setColorAt(
+                0.45,
+                QColor("#EEE8F5")
+            )
+
+            gradient.setColorAt(
+                1.0,
+                QColor("#E9E2F1")
+            )
+
+            painter.fillRect(
+                rect,
+                gradient
+            )
+
+            # -----------------------------------------------
+            # SOFT PURPLE GLOW
+            # -----------------------------------------------
+
+            painter.setPen(
+                Qt.NoPen
+            )
+
+            painter.setBrush(
+                QColor(
+                    139,
+                    92,
+                    246,
+                    12
+                )
+            )
+
+            painter.drawEllipse(
+                -170,
+                -170,
+                430,
+                360
+            )
+
+            # -----------------------------------------------
+            # RIGHT SOFT GLOW
+            # -----------------------------------------------
+
+            painter.setBrush(
+                QColor(
+                    124,
+                    58,
+                    237,
+                    8
+                )
+            )
+
+            painter.drawEllipse(
+                rect.width() - 380,
+                100,
+                500,
+                500
+            )
 
         painter.end()
 

@@ -109,7 +109,9 @@ class Header(QWidget):
         # NOTIFICATION
         # ==================================
 
-        self.notification = QPushButton("♧")
+        self.notification = QPushButton(
+            "♧"
+        )
 
         self.notification.setFixedSize(
             42,
@@ -133,6 +135,7 @@ class Header(QWidget):
 
             font-size: 17px;
 
+            padding: 0px;
         }
 
         QPushButton:hover {
@@ -147,6 +150,8 @@ class Header(QWidget):
         QPushButton:pressed {
 
             background: #7C3AED;
+
+            color: white;
         }
         """)
 
@@ -162,7 +167,9 @@ class Header(QWidget):
             "•  Duggu"
         )
 
-        self.profile.setFixedHeight(42)
+        self.profile.setFixedHeight(
+            42
+        )
 
         self.profile.setCursor(
             Qt.PointingHandCursor
@@ -208,9 +215,21 @@ class Header(QWidget):
         # WINDOW BUTTONS
         # ==================================
 
-        self.btn_minimize = QPushButton("—")
-        self.btn_maximize = QPushButton("□")
-        self.btn_close = QPushButton("✕")
+        # IMPORTANT:
+        # Using Segoe UI Symbol + proper glyphs
+        # prevents the tiny/dot-like appearance.
+
+        self.btn_minimize = QPushButton(
+            "−"
+        )
+
+        self.btn_maximize = QPushButton(
+            "□"
+        )
+
+        self.btn_close = QPushButton(
+            "×"
+        )
 
         buttons = [
             self.btn_minimize,
@@ -240,9 +259,15 @@ class Header(QWidget):
 
                 border-radius: 18px;
 
-                font-size: 14px;
+                font-family: "Segoe UI Symbol";
 
-                font-weight: bold;
+                font-size: 18px;
+
+                font-weight: 400;
+
+                padding: 0px;
+
+                margin: 0px;
             }
 
             QPushButton:hover {
@@ -253,9 +278,20 @@ class Header(QWidget):
 
                 border: 1px solid #7C3AED;
             }
+
+            QPushButton:pressed {
+
+                background: #7C3AED;
+
+                color: white;
+
+                border: 1px solid #8B5CF6;
+            }
             """)
 
-            root.addWidget(btn)
+            root.addWidget(
+                btn
+            )
 
         # ==================================
         # CLOSE BUTTON SPECIAL STYLE
@@ -272,18 +308,33 @@ class Header(QWidget):
 
             border-radius: 18px;
 
-            font-size: 14px;
+            font-family: "Segoe UI Symbol";
 
-            font-weight: bold;
+            font-size: 21px;
+
+            font-weight: 400;
+
+            padding: 0px;
+
+            margin: 0px;
         }
 
         QPushButton:hover {
 
-            background: #7F1D3A;
+            background: #BE123C;
 
             color: white;
 
-            border: 1px solid #BE123C;
+            border: 1px solid #FB7185;
+        }
+
+        QPushButton:pressed {
+
+            background: #9F1239;
+
+            color: white;
+
+            border: 1px solid #FB7185;
         }
         """)
 
@@ -315,6 +366,14 @@ class Header(QWidget):
 
             window.showNormal()
 
+            self.btn_maximize.setText(
+                "□"
+            )
+
         else:
 
             window.showMaximized()
+
+            self.btn_maximize.setText(
+                "❐"
+            )

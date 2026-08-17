@@ -1,20 +1,37 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QSize
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QSize,
+    QVariantAnimation,
+    QEasingCurve,
+)
+
+from PySide6.QtGui import (
+    QPixmap,
+    QIcon,
+    QPainter,
+    QColor,
+)
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
+    QHBoxLayout,
+    QCheckBox,
 )
 
 
-# ============================================================
-# PATHS
-# ============================================================
-
 BASE_DIR = Path(__file__).resolve().parents[2]
+
+
+# ============================================================
+# ASSETS
+# ============================================================
 
 SYMBOL_PATH = (
     BASE_DIR
@@ -41,6 +58,289 @@ NAV_ICON_PATH = (
 
 
 # ============================================================
+# SWIFT STYLE TOGGLE SWITCH
+# ============================================================
+
+class ToggleSwitch(QCheckBox):
+
+    def __init__(
+        self,
+        parent=None,
+    ):
+
+        super().__init__(parent)
+
+        # ----------------------------------------------------
+        # SIZE
+        # ----------------------------------------------------
+
+        self.setFixedSize(
+            46,
+            24,
+        )
+
+        self.setCursor(
+            Qt.PointingHandCursor,
+        )
+
+        self.setStyleSheet(
+            """
+            QCheckBox {
+                background: transparent;
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+            """
+        )
+
+        # ----------------------------------------------------
+        # ANIMATION
+        # ----------------------------------------------------
+
+        self._position = 25.0
+
+        self.animation = QVariantAnimation(
+            self,
+        )
+
+        self.animation.setDuration(
+            180,
+        )
+
+        self.animation.setEasingCurve(
+            QEasingCurve.OutCubic,
+        )
+
+        self.animation.valueChanged.connect(
+            self._animation_value_changed,
+        )
+
+        # ----------------------------------------------------
+        # STATE
+        # ----------------------------------------------------
+
+        self.stateChanged.connect(
+            self._state_changed,
+        )
+
+    # ========================================================
+    # STATE CHANGED
+    # ========================================================
+
+    def _state_changed(
+        self,
+        state,
+    ):
+
+        checked = (
+            state == Qt.Checked
+        )
+
+        start_position = self._position
+
+        end_position = (
+            25.0
+            if checked
+            else 3.0
+        )
+
+        self.animation.stop()
+
+        self.animation.setStartValue(
+            start_position,
+        )
+
+        self.animation.setEndValue(
+            end_position,
+        )
+
+        self.animation.start()
+
+        self.update()
+
+    # ========================================================
+    # ANIMATION
+    # ========================================================
+
+    def _animation_value_changed(
+        self,
+        value,
+    ):
+
+        self._position = float(
+            value,
+        )
+
+        self.update()
+
+    # ========================================================
+    # SET CHECKED
+    # ========================================================
+
+    def setChecked(
+        self,
+        checked,
+    ):
+
+        super().setChecked(
+            checked,
+        )
+
+        if self.signalsBlocked():
+
+            self._position = (
+                25.0
+                if checked
+                else 3.0
+            )
+
+            self.update()
+
+    # ========================================================
+    # MOUSE
+    # ========================================================
+
+    def mousePressEvent(
+        self,
+        event,
+    ):
+
+        if event.button() == Qt.LeftButton:
+
+            self.setChecked(
+                not self.isChecked(),
+            )
+
+            event.accept()
+
+            return
+
+        super().mousePressEvent(
+            event,
+        )
+
+    # ========================================================
+    # PAINT
+    # ========================================================
+
+    def paintEvent(
+        self,
+        event,
+    ):
+
+        painter = QPainter(
+            self,
+        )
+
+        painter.setRenderHint(
+            QPainter.Antialiasing,
+        )
+
+        # ----------------------------------------------------
+        # TRACK
+        # ----------------------------------------------------
+
+        if self.isChecked():
+
+            track_color = QColor(
+                "#7C3AED",
+            )
+
+            track_border = QColor(
+                "#A06BFF",
+            )
+
+        else:
+
+            track_color = QColor(
+                "#302A3F",
+            )
+
+            track_border = QColor(
+                "#514765",
+            )
+
+        painter.setBrush(
+            track_color,
+        )
+
+        painter.setPen(
+            track_border,
+        )
+
+        painter.drawRoundedRect(
+            1,
+            1,
+            44,
+            22,
+            11,
+            11,
+        )
+
+        # ----------------------------------------------------
+        # KNOB SHADOW
+        # ----------------------------------------------------
+
+        painter.setBrush(
+            QColor(
+                0,
+                0,
+                0,
+                65,
+            )
+        )
+
+        painter.setPen(
+            Qt.NoPen,
+        )
+
+        painter.drawEllipse(
+            int(self._position + 1),
+            4,
+            17,
+            17,
+        )
+
+        # ----------------------------------------------------
+        # KNOB
+        # ----------------------------------------------------
+
+        painter.setBrush(
+            QColor("#FFFFFF"),
+        )
+
+        painter.drawEllipse(
+            int(self._position),
+            3,
+            18,
+            18,
+        )
+
+        # ----------------------------------------------------
+        # HIGHLIGHT
+        # ----------------------------------------------------
+
+        painter.setBrush(
+            QColor(
+                255,
+                255,
+                255,
+                45,
+            )
+        )
+
+        painter.drawEllipse(
+            int(self._position + 3),
+            6,
+            6,
+            6,
+        )
+
+        painter.end()
+
+
+# ============================================================
 # NAV BUTTON
 # ============================================================
 
@@ -48,8 +348,15 @@ class NavButton(QPushButton):
 
     clicked_name = Signal(str)
 
-    def __init__(self, text: str, icon_name: str):
-        super().__init__(text)
+    def __init__(
+        self,
+        text: str,
+        icon_name: str,
+    ):
+
+        super().__init__(
+            text,
+        )
 
         self.page_name = text
 
@@ -57,127 +364,191 @@ class NavButton(QPushButton):
         # ICON
         # ----------------------------------------------------
 
-        icon_file = NAV_ICON_PATH / icon_name
+        icon_file = (
+            NAV_ICON_PATH
+            / icon_name
+        )
 
         if icon_file.exists():
-            self.setIcon(QIcon(str(icon_file)))
-            self.setIconSize(QSize(19, 19))
+
+            self.setIcon(
+                QIcon(
+                    str(icon_file),
+                )
+            )
+
+            self.setIconSize(
+                QSize(
+                    20,
+                    20,
+                )
+            )
 
         # ----------------------------------------------------
-        # BASIC BUTTON SETTINGS
+        # BASIC
         # ----------------------------------------------------
 
-        self.setCursor(Qt.PointingHandCursor)
-        self.setCheckable(True)
+        self.setCursor(
+            Qt.PointingHandCursor,
+        )
 
-        self.setMinimumHeight(46)
-        self.setMaximumHeight(48)
+        self.setCheckable(
+            True,
+        )
 
-        # ----------------------------------------------------
-        # BUTTON STYLE
-        # ----------------------------------------------------
+        self.setMinimumHeight(
+            46,
+        )
 
-        self.setStyleSheet("""
-        QPushButton {
-            color: #BEB7D8;
-
-            background: transparent;
-
-            border: 1px solid transparent;
-            border-radius: 13px;
-
-            text-align: left;
-
-            padding-left: 15px;
-            padding-right: 14px;
-
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        /* ==================================================
-           HOVER
-        ================================================== */
-
-        QPushButton:hover {
-            color: #FFFFFF;
-
-            background: qlineargradient(
-                x1: 0,
-                y1: 0,
-                x2: 1,
-                y2: 0,
-
-                stop: 0 #34245A,
-                stop: 0.45 #432A70,
-                stop: 1 #32214F
-            );
-
-            border: 1px solid rgba(168, 85, 247, 80);
-        }
-
-        /* ==================================================
-           ACTIVE
-        ================================================== */
-
-        QPushButton:checked {
-            color: #FFFFFF;
-
-            background: qlineargradient(
-                x1: 0,
-                y1: 0,
-                x2: 1,
-                y2: 0,
-
-                stop: 0 #7138D8,
-                stop: 0.45 #8748EA,
-                stop: 1 #6935C4
-            );
-
-            border: 1px solid rgba(201, 170, 255, 110);
-        }
-
-        /* ==================================================
-           ACTIVE + HOVER
-        ================================================== */
-
-        QPushButton:checked:hover {
-            color: #FFFFFF;
-
-            background: qlineargradient(
-                x1: 0,
-                y1: 0,
-                x2: 1,
-                y2: 0,
-
-                stop: 0 #8246E8,
-                stop: 0.5 #9655F5,
-                stop: 1 #7440D1
-            );
-
-            border: 1px solid rgba(225, 210, 255, 150);
-        }
-
-        /* ==================================================
-           PRESSED
-        ================================================== */
-
-        QPushButton:pressed {
-            color: #FFFFFF;
-
-            background: #5F2DAF;
-
-            border: 1px solid rgba(210, 190, 255, 130);
-        }
-        """)
-
-        # ----------------------------------------------------
-        # SIGNAL
-        # ----------------------------------------------------
+        self.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
 
         self.clicked.connect(
-            lambda: self.clicked_name.emit(self.page_name)
+            self._emit_page,
         )
+
+        self.set_theme_style(
+            True,
+        )
+
+    # ========================================================
+    # PAGE SIGNAL
+    # ========================================================
+
+    def _emit_page(
+        self,
+    ):
+
+        self.clicked_name.emit(
+            self.page_name,
+        )
+
+    # ========================================================
+    # THEME
+    # ========================================================
+
+    def set_theme_style(
+        self,
+        is_dark,
+    ):
+
+        if is_dark:
+
+            self.setStyleSheet(
+                """
+                QPushButton {
+
+                    color: #CFC8E5;
+
+                    background: transparent;
+
+                    border: none;
+
+                    border-radius: 13px;
+
+                    text-align: left;
+
+                    padding-left: 16px;
+
+                    padding-right: 14px;
+
+                    font-size: 15px;
+
+                    font-weight: 600;
+
+                }
+
+                QPushButton:hover {
+
+                    background: rgba(
+                        139,
+                        92,
+                        246,
+                        30
+                    );
+
+                    color: #FFFFFF;
+
+                }
+
+                QPushButton:checked {
+
+                    background: #7C3AED;
+
+                    color: #FFFFFF;
+
+                }
+
+                QPushButton:pressed {
+
+                    background: #6D28D9;
+
+                    color: #FFFFFF;
+
+                }
+
+                """
+            )
+
+        else:
+
+            self.setStyleSheet(
+                """
+                QPushButton {
+
+                    color: #4A3D60;
+
+                    background: transparent;
+
+                    border: none;
+
+                    border-radius: 13px;
+
+                    text-align: left;
+
+                    padding-left: 16px;
+
+                    padding-right: 14px;
+
+                    font-size: 15px;
+
+                    font-weight: 600;
+
+                }
+
+                QPushButton:hover {
+
+                    background: rgba(
+                        124,
+                        58,
+                        237,
+                        18
+                    );
+
+                    color: #382650;
+
+                }
+
+                QPushButton:checked {
+
+                    background: #7C3AED;
+
+                    color: #FFFFFF;
+
+                }
+
+                QPushButton:pressed {
+
+                    background: #6D28D9;
+
+                    color: #FFFFFF;
+
+                }
+
+                """
+            )
 
 
 # ============================================================
@@ -186,55 +557,61 @@ class NavButton(QPushButton):
 
 class Sidebar(QWidget):
 
+    # --------------------------------------------------------
+    # NAVIGATION
+    # --------------------------------------------------------
+
     page_changed = Signal(str)
 
-    def __init__(self):
+    # Existing architecture — KEEP
+    theme_toggle_requested = Signal()
+
+    # New clean theme signal
+    theme_changed = Signal(bool)
+
+    def __init__(
+        self,
+        initial_dark=True,
+    ):
+
         super().__init__()
 
-        # ====================================================
-        # OBJECT
-        # ====================================================
-
-        self.setObjectName("Sidebar")
-
-        # ====================================================
+        # ----------------------------------------------------
         # SIZE
-        # ====================================================
+        # ----------------------------------------------------
 
-        self.setFixedWidth(240)
+        self.setFixedWidth(
+            240,
+        )
 
-        # ====================================================
-        # SIDEBAR BACKGROUND
-        # ====================================================
+        self.setObjectName(
+            "LYRxSidebar",
+        )
 
-        self.setStyleSheet("""
-        QWidget#Sidebar {
-            background: qlineargradient(
-                x1: 0,
-                y1: 0,
-                x2: 1,
-                y2: 1,
+        self.setAttribute(
+            Qt.WA_StyledBackground,
+            True,
+        )
 
-                stop: 0 #171027,
-                stop: 0.55 #120D20,
-                stop: 1 #0F0B18
-            );
-
-            border-right: 1px solid rgba(139, 92, 246, 35);
-        }
-        """)
-
-        # ====================================================
+        # ----------------------------------------------------
         # STATE
-        # ====================================================
+        # ----------------------------------------------------
 
         self.buttons = []
 
-        # ====================================================
+        self.current_is_dark = (
+            bool(initial_dark)
+        )
+
+        # ----------------------------------------------------
         # BUILD
-        # ====================================================
+        # ----------------------------------------------------
 
         self.build_ui()
+
+        self.update_theme_ui(
+            self.current_is_dark,
+        )
 
     # ========================================================
     # BUILD UI
@@ -242,251 +619,837 @@ class Sidebar(QWidget):
 
     def build_ui(self):
 
-        layout = QVBoxLayout(self)
-
-        layout.setContentsMargins(
-            16,
-            18,
-            16,
-            16
+        layout = QVBoxLayout(
+            self,
         )
 
-        layout.setSpacing(0)
+        layout.setContentsMargins(
+            18,
+            18,
+            18,
+            18,
+        )
+
+        layout.setSpacing(
+            10,
+        )
 
         # ====================================================
         # BRANDING
         # ====================================================
 
-        symbol = QLabel()
-        symbol.setAlignment(Qt.AlignCenter)
-        symbol.setFixedHeight(48)
+        self.symbol = QLabel()
+
+        self.symbol.setAlignment(
+            Qt.AlignCenter,
+        )
 
         if SYMBOL_PATH.exists():
 
-            pix = QPixmap(str(SYMBOL_PATH))
+            pix = QPixmap(
+                str(SYMBOL_PATH),
+            )
 
             if not pix.isNull():
 
-                symbol.setPixmap(
+                self.symbol.setPixmap(
                     pix.scaled(
-                        48,
-                        48,
+                        88,
+                        88,
                         Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
+                        Qt.SmoothTransformation,
                     )
                 )
 
-        symbol.setStyleSheet("""
-        QLabel {
-            background: transparent;
-            border: none;
-        }
-        """)
+        self.symbol.setStyleSheet(
+            """
+            QLabel {
+                background: transparent;
+            }
+            """
+        )
 
-        layout.addWidget(symbol)
+        layout.addWidget(
+            self.symbol,
+        )
 
-        layout.addSpacing(5)
+        layout.addSpacing(
+            0,
+        )
 
         # ====================================================
         # WORDMARK
         # ====================================================
 
-        wordmark = QLabel()
-        wordmark.setAlignment(Qt.AlignCenter)
-        wordmark.setFixedHeight(34)
+        self.wordmark = QLabel()
+
+        self.wordmark.setAlignment(
+            Qt.AlignCenter,
+        )
 
         if WORDMARK_PATH.exists():
 
-            pix = QPixmap(str(WORDMARK_PATH))
+            pix = QPixmap(
+                str(WORDMARK_PATH),
+            )
 
             if not pix.isNull():
 
-                wordmark.setPixmap(
+                self.wordmark.setPixmap(
                     pix.scaled(
-                        118,
-                        32,
+                        142,
+                        40,
                         Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
+                        Qt.SmoothTransformation,
                     )
                 )
 
-        wordmark.setStyleSheet("""
-        QLabel {
-            background: transparent;
-            border: none;
-        }
-        """)
+        self.wordmark.setStyleSheet(
+            """
+            QLabel {
+                background: transparent;
+            }
+            """
+        )
 
-        layout.addWidget(wordmark)
+        layout.addWidget(
+            self.wordmark,
+        )
 
-        layout.addSpacing(2)
+        layout.addSpacing(
+            0,
+        )
 
         # ====================================================
         # SUBTITLE
         # ====================================================
 
-        subtitle = QLabel(
-            "Lose Yourself in Sound"
+        self.subtitle = QLabel(
+            "Lose Yourself in Sound",
         )
 
-        subtitle.setAlignment(Qt.AlignCenter)
+        self.subtitle.setAlignment(
+            Qt.AlignCenter,
+        )
 
-        subtitle.setStyleSheet("""
-        QLabel {
-            color: #81779F;
+        layout.addWidget(
+            self.subtitle,
+        )
 
-            font-size: 10px;
-            font-weight: 500;
-
-            background: transparent;
-            border: none;
-
-            letter-spacing: 0.4px;
-        }
-        """)
-
-        layout.addWidget(subtitle)
-
-        layout.addSpacing(25)
+        layout.addSpacing(
+            16,
+        )
 
         # ====================================================
         # MENU LABEL
         # ====================================================
 
-        menu_header = QLabel("MENU")
+        self.menu_label = QLabel(
+            "MENU",
+        )
 
-        menu_header.setStyleSheet("""
-        QLabel {
-            color: #6F658C;
+        layout.addWidget(
+            self.menu_label,
+        )
 
-            font-size: 10px;
-            font-weight: 700;
-
-            letter-spacing: 1.6px;
-
-            padding-left: 14px;
-            padding-bottom: 8px;
-
-            background: transparent;
-            border: none;
-        }
-        """)
-
-        layout.addWidget(menu_header)
+        layout.addSpacing(
+            4,
+        )
 
         # ====================================================
-        # NAVIGATION MENU
+        # NAVIGATION
         # ====================================================
 
         menu = [
-            ("Home", "home.svg"),
-            ("Discover", "discover.svg"),
-            ("Library", "library.svg"),
-            ("Favorites", "favorites.svg"),
-            ("Playlists", "playlist.svg"),
-            ("AI Assistant", "sparkles.svg"),
-            ("Settings", "settings.svg"),
+
+            (
+                "Home",
+                "home.svg",
+            ),
+
+            (
+                "Discover",
+                "discover.svg",
+            ),
+
+            (
+                "Library",
+                "library.svg",
+            ),
+
+            (
+                "Favorites",
+                "favorites.svg",
+            ),
+
+            (
+                "Playlists",
+                "playlist.svg",
+            ),
+
+            (
+                "AI Assistant",
+                "sparkles.svg",
+            ),
+
+            (
+                "Settings",
+                "settings.svg",
+            ),
+
         ]
 
         for text, icon in menu:
 
             button = NavButton(
                 text,
-                icon
+                icon,
             )
 
             button.clicked_name.connect(
-                self.change_page
+                self.change_page,
             )
 
-            layout.addWidget(button)
+            layout.addWidget(
+                button,
+            )
 
-            self.buttons.append(button)
+            self.buttons.append(
+                button,
+            )
 
-            # Small separation before Settings
-            if text == "AI Assistant":
-                layout.addSpacing(4)
-
-        # ====================================================
-        # DEFAULT ACTIVE PAGE
-        # ====================================================
+        # ----------------------------------------------------
+        # DEFAULT HOME
+        # ----------------------------------------------------
 
         if self.buttons:
-            self.buttons[0].setChecked(True)
+
+            self.buttons[0].setChecked(
+                True,
+            )
 
         # ====================================================
         # FLEXIBLE SPACE
         # ====================================================
 
-        layout.addStretch(1)
+        layout.addStretch()
 
         # ====================================================
-        # FOOTER DIVIDER
+        # APPEARANCE LABEL
         # ====================================================
 
-        divider = QWidget()
-        divider.setFixedHeight(1)
-
-        divider.setStyleSheet("""
-        QWidget {
-            background: rgba(255, 255, 255, 12);
-        }
-        """)
-
-        layout.addWidget(divider)
-
-        layout.addSpacing(10)
-
-        # ====================================================
-        # VERSION
-        # ====================================================
-
-        version = QLabel(
-            "LYRx  •  v0.1"
+        self.appearance_title = QLabel(
+            "APPEARANCE",
         )
 
-        version.setAlignment(Qt.AlignCenter)
+        layout.addWidget(
+            self.appearance_title,
+        )
 
-        version.setStyleSheet("""
-        QLabel {
-            color: #625A79;
+        # ====================================================
+        # THEME ROW
+        # ====================================================
 
-            font-size: 10px;
-            font-weight: 500;
+        self.theme_row = QWidget()
 
-            background: transparent;
-            border: none;
-        }
-        """)
+        self.theme_row.setObjectName(
+            "ThemeRow",
+        )
 
-        layout.addWidget(version)
+        theme_layout = QHBoxLayout(
+            self.theme_row,
+        )
+
+        theme_layout.setContentsMargins(
+            12,
+            8,
+            10,
+            8,
+        )
+
+        theme_layout.setSpacing(
+            8,
+        )
+
+        # ====================================================
+        # THEME ICON
+        # ====================================================
+
+        self.theme_icon = QLabel(
+            "☾",
+        )
+
+        self.theme_icon.setFixedWidth(
+            22,
+        )
+
+        self.theme_icon.setAlignment(
+            Qt.AlignCenter,
+        )
+
+        theme_layout.addWidget(
+            self.theme_icon,
+        )
+
+        # ====================================================
+        # THEME TEXT
+        # ====================================================
+
+        theme_text = QVBoxLayout()
+
+        theme_text.setSpacing(
+            1,
+        )
+
+        self.theme_title = QLabel(
+            "Dark Mode",
+        )
+
+        self.theme_status = QLabel(
+            "On",
+        )
+
+        theme_text.addWidget(
+            self.theme_title,
+        )
+
+        theme_text.addWidget(
+            self.theme_status,
+        )
+
+        theme_layout.addLayout(
+            theme_text,
+            1,
+        )
+
+        # ====================================================
+        # TOGGLE
+        # ====================================================
+
+        self.theme_toggle = ToggleSwitch()
+
+        self.theme_toggle.setChecked(
+            True,
+        )
+
+        theme_layout.addWidget(
+            self.theme_toggle,
+        )
+
+        self.theme_toggle.stateChanged.connect(
+            self.on_theme_toggle,
+        )
+
+        layout.addWidget(
+            self.theme_row,
+        )
+
+        # ====================================================
+        # FOOTER
+        # ====================================================
+
+        self.version_label = QLabel(
+            "LYRx v0.1",
+        )
+
+        self.version_label.setAlignment(
+            Qt.AlignCenter,
+        )
+
+        layout.addWidget(
+            self.version_label,
+        )
 
     # ========================================================
-    # NAVIGATION LOGIC
+    # DARK STYLE
     # ========================================================
 
-    def change_page(self, page_name: str):
+    def apply_dark_style(self):
+
+        self.setStyleSheet(
+            """
+            QWidget#LYRxSidebar {
+
+                background: #171126;
+
+                border: none;
+
+            }
+
+            QWidget#ThemeRow {
+
+                background: rgba(
+                    139,
+                    92,
+                    246,
+                    16
+                );
+
+                border: 1px solid rgba(
+                    139,
+                    92,
+                    246,
+                    30
+                );
+
+                border-radius: 13px;
+
+            }
+
+            QWidget#ThemeRow:hover {
+
+                background: rgba(
+                    139,
+                    92,
+                    246,
+                    25
+                );
+
+                border: 1px solid rgba(
+                    167,
+                    139,
+                    250,
+                    65
+                );
+
+            }
+
+            """
+        )
+
+    # ========================================================
+    # LIGHT STYLE
+    # ========================================================
+
+    def apply_light_style(self):
+
+        self.setStyleSheet(
+            """
+            QWidget#LYRxSidebar {
+
+                background: #E8E0F2;
+
+                border: none;
+
+            }
+
+            QWidget#ThemeRow {
+
+                background: rgba(
+                    255,
+                    255,
+                    255,
+                    85
+                );
+
+                border: 1px solid rgba(
+                    124,
+                    58,
+                    237,
+                    30
+                );
+
+                border-radius: 13px;
+
+            }
+
+            QWidget#ThemeRow:hover {
+
+                background: rgba(
+                    255,
+                    255,
+                    255,
+                    125
+                );
+
+                border: 1px solid rgba(
+                    124,
+                    58,
+                    237,
+                    55
+                );
+
+            }
+
+            """
+        )
+
+    # ========================================================
+    # THEME TOGGLE
+    # ========================================================
+
+    def on_theme_toggle(
+        self,
+        state,
+    ):
+
+        is_dark = (
+            state == Qt.Checked
+        )
+
+        self.current_is_dark = (
+            is_dark
+        )
+
+        # Update sidebar immediately
+        self.update_theme_ui(
+            is_dark,
+        )
+
+        # Existing signal
+        self.theme_toggle_requested.emit()
+
+        # New proper signal
+        self.theme_changed.emit(
+            is_dark,
+        )
+
+    # ========================================================
+    # UPDATE THEME UI
+    # ========================================================
+
+    def update_theme_ui(
+        self,
+        is_dark,
+    ):
+
+        self.current_is_dark = (
+            bool(is_dark)
+        )
+
+        # ====================================================
+        # DARK MODE
+        # ====================================================
+
+        if is_dark:
+
+            self.theme_title.setText(
+                "Dark Mode",
+            )
+
+            self.theme_status.setText(
+                "On",
+            )
+
+            self.theme_icon.setText(
+                "☾",
+            )
+
+            self.apply_dark_style()
+
+            # ------------------------------------------------
+            # SUBTITLE
+            # ------------------------------------------------
+
+            self.subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #A79FD2;
+                    font-size: 11px;
+                    font-weight: 500;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # MENU LABEL
+            # ------------------------------------------------
+
+            self.menu_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #746B91;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.2px;
+                    padding-left: 8px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # APPEARANCE
+            # ------------------------------------------------
+
+            self.appearance_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #746B91;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.2px;
+                    padding-left: 8px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # THEME ICON
+            # ------------------------------------------------
+
+            self.theme_icon.setStyleSheet(
+                """
+                QLabel {
+                    color: #C0A8F4;
+                    font-size: 17px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # TITLE
+            # ------------------------------------------------
+
+            self.theme_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #E7DFF6;
+                    font-size: 12px;
+                    font-weight: 600;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # STATUS
+            # ------------------------------------------------
+
+            self.theme_status.setStyleSheet(
+                """
+                QLabel {
+                    color: #857A9F;
+                    font-size: 10px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # FOOTER
+            # ------------------------------------------------
+
+            self.version_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #655D7D;
+                    font-size: 10px;
+                    padding-top: 10px;
+                    background: transparent;
+                }
+                """
+            )
+
+        # ====================================================
+        # LIGHT MODE
+        # ====================================================
+
+        else:
+
+            self.theme_title.setText(
+                "Light Mode",
+            )
+
+            self.theme_status.setText(
+                "On",
+            )
+
+            self.theme_icon.setText(
+                "☀",
+            )
+
+            self.apply_light_style()
+
+            # ------------------------------------------------
+            # SUBTITLE
+            # ------------------------------------------------
+
+            self.subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #756481;
+                    font-size: 11px;
+                    font-weight: 500;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # MENU LABEL
+            # ------------------------------------------------
+
+            self.menu_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #877692;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.2px;
+                    padding-left: 8px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # APPEARANCE
+            # ------------------------------------------------
+
+            self.appearance_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #877692;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.2px;
+                    padding-left: 8px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # THEME ICON
+            # ------------------------------------------------
+
+            self.theme_icon.setStyleSheet(
+                """
+                QLabel {
+                    color: #8054B8;
+                    font-size: 17px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # TITLE
+            # ------------------------------------------------
+
+            self.theme_title.setStyleSheet(
+                """
+                QLabel {
+                    color: #433457;
+                    font-size: 12px;
+                    font-weight: 600;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # STATUS
+            # ------------------------------------------------
+
+            self.theme_status.setStyleSheet(
+                """
+                QLabel {
+                    color: #88799B;
+                    font-size: 10px;
+                    background: transparent;
+                }
+                """
+            )
+
+            # ------------------------------------------------
+            # FOOTER
+            # ------------------------------------------------
+
+            self.version_label.setStyleSheet(
+                """
+                QLabel {
+                    color: #8E7BA3;
+                    font-size: 10px;
+                    padding-top: 10px;
+                    background: transparent;
+                }
+                """
+            )
+
+        # ====================================================
+        # NAV BUTTONS
+        # ====================================================
+
+        for button in self.buttons:
+
+            button.set_theme_style(
+                is_dark,
+            )
+
+        # Force repaint
+        self.update()
+
+    # ========================================================
+    # EXTERNAL THEME CONTROL
+    # ========================================================
+
+    def set_theme_state(
+        self,
+        is_dark,
+    ):
+
+        self.theme_toggle.blockSignals(
+            True,
+        )
+
+        self.theme_toggle.setChecked(
+            is_dark,
+        )
+
+        self.theme_toggle.blockSignals(
+            False,
+        )
+
+        self.theme_toggle._position = (
+            25.0
+            if is_dark
+            else 3.0
+        )
+
+        self.update_theme_ui(
+            is_dark,
+        )
+
+    # ========================================================
+    # ALIAS
+    # ========================================================
+
+    def set_theme(
+        self,
+        is_dark,
+    ):
+
+        self.set_theme_state(
+            is_dark,
+        )
+
+    # ========================================================
+    # NAVIGATION
+    # ========================================================
+
+    def change_page(
+        self,
+        page_name: str,
+    ):
 
         sender = self.sender()
-
-        # ----------------------------------------------------
-        # Update active button
-        # ----------------------------------------------------
 
         for button in self.buttons:
 
             if button != sender:
-                button.setChecked(False)
 
-        # ----------------------------------------------------
-        # Notify AppWindow / parent
-        # ----------------------------------------------------
+                button.setChecked(
+                    False,
+                )
 
-        self.page_changed.emit(page_name)
-
-        # ----------------------------------------------------
-        # Debug
-        # ----------------------------------------------------
+        self.page_changed.emit(
+            page_name,
+        )
 
         print(
             f"Navigate to: {page_name}"

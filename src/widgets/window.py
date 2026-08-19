@@ -18,6 +18,7 @@ from ui.discover.discover_screen import DiscoverScreen
 from ui.basic_page import BasicPage
 from ui.library.library_screen import LibraryScreen
 from core.theme_manager import ThemeManager
+from ui.playlists.playlist_screen import PlaylistScreen
 
 
 # ============================================================
@@ -1252,11 +1253,7 @@ class AppWindow(QMainWindow):
         # OTHER PAGES
         # ====================================================
 
-        self.playlists = BasicPage(
-            "Playlists",
-            "Create and manage your playlists.",
-            "☷"
-        )
+        self.playlists = PlaylistScreen()
 
         self.settings = BasicPage(
             "Settings",

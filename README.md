@@ -67,5 +67,6 @@ Unlike traditional music players, LYRx focuses on a premium user experience with
 - [x] Day 14 - Navigation & Floating Player Integration
 - [x] Day 15 - Refine sidebar and make Library playable
 - [x] Day 16 - Enabled Dark Mode Toggle Theme
+- [x] Day 17 - Added Playlists feature into Sidebar Panel
 
 Version: LYRx Alpha 1.0

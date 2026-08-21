@@ -1,5 +1,4 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -17,8 +16,11 @@ from ui.favorites.favorites_screen import FavoritesScreen
 from ui.discover.discover_screen import DiscoverScreen
 from ui.basic_page import BasicPage
 from ui.library.library_screen import LibraryScreen
-from core.theme_manager import ThemeManager
 from ui.playlists.playlist_screen import PlaylistScreen
+from ui.assistant.assistant_screen import AssistantScreen
+from data.playlist_store import playlist_store
+
+from core.theme_manager import ThemeManager
 
 
 # ============================================================
@@ -247,9 +249,7 @@ class FloatingPlayer(QFrame):
             0
         )
 
-        progress_layout.setSpacing(
-            2
-        )
+        progress_layout.setSpacing(2)
 
         self.progress = QSlider(
             Qt.Horizontal
@@ -264,9 +264,7 @@ class FloatingPlayer(QFrame):
             100
         )
 
-        self.progress.setValue(
-            0
-        )
+        self.progress.setValue(0)
 
         self.progress.setCursor(
             Qt.PointingHandCursor
@@ -327,15 +325,6 @@ class FloatingPlayer(QFrame):
         # ====================================================
         # CLOSE BUTTON
         # ====================================================
-        #
-        # IMPORTANT:
-        # Do NOT use Unicode "×" here.
-        # On some Windows/font combinations it can render
-        # incorrectly like a tiny dot.
-        #
-        # Using normal ASCII "X" with Segoe UI makes it
-        # reliably visible.
-        #
 
         self.close_button = QPushButton(
             "X"
@@ -378,270 +367,133 @@ class FloatingPlayer(QFrame):
         if is_dark:
 
             self.setStyleSheet("""
-            /* =================================================
-               FLOATING PLAYER
-               ================================================= */
-
             QFrame#FloatingPlayer {
-
                 background: rgba(18, 14, 32, 248);
-
                 border: 1px solid rgba(139, 92, 246, 110);
-
                 border-radius: 20px;
             }
 
-
-            /* =================================================
-               GENERAL LABEL
-               ================================================= */
-
             QLabel {
-
                 background: transparent;
-
                 border: none;
             }
 
-
-            /* =================================================
-               NORMAL BUTTONS
-               ================================================= */
-
             QPushButton {
-
                 background: transparent;
-
                 color: #AAA0C5;
-
                 border: none;
-
                 border-radius: 18px;
-
                 font-family: "Segoe UI";
-
                 outline: none;
             }
 
-
             QPushButton:hover {
-
                 background: rgba(139, 92, 246, 45);
-
                 color: white;
             }
 
-
             QPushButton:pressed {
-
                 background: rgba(139, 92, 246, 75);
             }
 
-
-            /* =================================================
-               PREVIOUS / NEXT
-               ================================================= */
-
             QPushButton#previousButton,
             QPushButton#nextButton {
-
                 font-family: "Segoe UI Symbol";
-
                 font-size: 15px;
-
                 font-weight: 600;
             }
 
-
-            /* =================================================
-               PLAY BUTTON
-               ================================================= */
-
             QPushButton#floatingPlayButton {
-
                 background: #8B5CF6;
-
                 color: white;
-
                 border: none;
-
                 border-radius: 22px;
-
                 font-family: "Segoe UI";
-
                 font-size: 17px;
-
                 font-weight: 700;
             }
 
-
             QPushButton#floatingPlayButton:hover {
-
                 background: #A78BFA;
-
                 color: white;
             }
 
-
             QPushButton#floatingPlayButton:pressed {
-
                 background: #7C3AED;
             }
 
-
-            /* =================================================
-               CLOSE BUTTON
-               ================================================= */
-
             QPushButton#floatingCloseButton {
-
                 background: transparent;
-
                 color: #8D83A3;
-
                 border: none;
-
                 border-radius: 16px;
-
                 font-family: "Segoe UI";
-
                 font-size: 14px;
-
                 font-weight: 700;
-
                 padding: 0px;
-
                 margin: 0px;
             }
 
-
             QPushButton#floatingCloseButton:hover {
-
                 background: rgba(239, 68, 68, 45);
-
                 color: #FFFFFF;
             }
-
 
             QPushButton#floatingCloseButton:pressed {
-
                 background: rgba(239, 68, 68, 80);
-
                 color: #FFFFFF;
             }
 
-
-            /* =================================================
-               SONG TITLE
-               ================================================= */
-
             QLabel#FloatingSongTitle {
-
                 color: white;
-
                 font-family: "Segoe UI";
-
                 font-size: 13px;
-
                 font-weight: 700;
             }
 
-
-            /* =================================================
-               ARTIST
-               ================================================= */
-
             QLabel#FloatingArtist {
-
                 color: #9185AA;
-
                 font-family: "Segoe UI";
-
                 font-size: 11px;
-
                 font-weight: 400;
             }
 
-
-            /* =================================================
-               CURRENT TIME
-               ================================================= */
-
-            QLabel#floatingCurrentTime {
-
-                color: #756A91;
-
-                font-family: "Segoe UI";
-
-                font-size: 9px;
-            }
-
-
-            /* =================================================
-               TOTAL TIME
-               ================================================= */
-
+            QLabel#floatingCurrentTime,
             QLabel#floatingTotalTime {
-
                 color: #756A91;
-
                 font-family: "Segoe UI";
-
                 font-size: 9px;
             }
-
-
-            /* =================================================
-               SLIDER
-               ================================================= */
 
             QSlider#floatingProgress::groove:horizontal {
-
                 height: 3px;
-
                 background: #332A48;
-
                 border-radius: 2px;
             }
-
 
             QSlider#floatingProgress::sub-page:horizontal {
-
                 background: #8B5CF6;
-
                 border-radius: 2px;
             }
-
 
             QSlider#floatingProgress::add-page:horizontal {
-
                 background: #332A48;
-
                 border-radius: 2px;
             }
 
-
             QSlider#floatingProgress::handle:horizontal {
-
                 width: 9px;
-
                 height: 9px;
-
                 margin: -3px 0px;
-
                 border-radius: 5px;
-
                 background: white;
             }
             """)
 
             self.album.setStyleSheet("""
             QLabel {
-
                 background: #211936;
-
                 border: none;
-
                 border-radius: 11px;
             }
             """)
@@ -649,270 +501,133 @@ class FloatingPlayer(QFrame):
         else:
 
             self.setStyleSheet("""
-            /* =================================================
-               FLOATING PLAYER
-               ================================================= */
-
             QFrame#FloatingPlayer {
-
                 background: rgba(255, 255, 255, 245);
-
                 border: 1px solid rgba(124, 58, 237, 65);
-
                 border-radius: 20px;
             }
 
-
-            /* =================================================
-               GENERAL LABEL
-               ================================================= */
-
             QLabel {
-
                 background: transparent;
-
                 border: none;
             }
 
-
-            /* =================================================
-               NORMAL BUTTONS
-               ================================================= */
-
             QPushButton {
-
                 background: transparent;
-
                 color: #67567D;
-
                 border: none;
-
                 border-radius: 18px;
-
                 font-family: "Segoe UI";
-
                 outline: none;
             }
 
-
             QPushButton:hover {
-
                 background: rgba(124, 58, 237, 25);
-
                 color: #4B2875;
             }
 
-
             QPushButton:pressed {
-
                 background: rgba(124, 58, 237, 45);
             }
-
-
-            /* =================================================
-               PREVIOUS / NEXT
-               ================================================= */
 
             QPushButton#previousButton,
             QPushButton#nextButton {
-
                 font-family: "Segoe UI Symbol";
-
                 font-size: 15px;
-
                 font-weight: 600;
             }
 
-
-            /* =================================================
-               PLAY BUTTON
-               ================================================= */
-
             QPushButton#floatingPlayButton {
-
                 background: #7C3AED;
-
                 color: white;
-
                 border: none;
-
                 border-radius: 22px;
-
                 font-family: "Segoe UI";
-
                 font-size: 17px;
-
                 font-weight: 700;
             }
 
-
             QPushButton#floatingPlayButton:hover {
-
                 background: #8B5CF6;
-
                 color: white;
             }
 
-
             QPushButton#floatingPlayButton:pressed {
-
                 background: #6D28D9;
             }
 
-
-            /* =================================================
-               CLOSE BUTTON
-               ================================================= */
-
             QPushButton#floatingCloseButton {
-
                 background: transparent;
-
                 color: #8A779C;
-
                 border: none;
-
                 border-radius: 16px;
-
                 font-family: "Segoe UI";
-
                 font-size: 14px;
-
                 font-weight: 700;
-
                 padding: 0px;
-
                 margin: 0px;
             }
 
-
             QPushButton#floatingCloseButton:hover {
-
                 background: rgba(124, 58, 237, 25);
-
                 color: #4B2875;
             }
 
-
             QPushButton#floatingCloseButton:pressed {
-
                 background: rgba(124, 58, 237, 45);
-
                 color: #3B1E62;
             }
 
-
-            /* =================================================
-               SONG TITLE
-               ================================================= */
-
             QLabel#FloatingSongTitle {
-
                 color: #2B2140;
-
                 font-family: "Segoe UI";
-
                 font-size: 13px;
-
                 font-weight: 700;
             }
 
-
-            /* =================================================
-               ARTIST
-               ================================================= */
-
             QLabel#FloatingArtist {
-
                 color: #806D95;
-
                 font-family: "Segoe UI";
-
                 font-size: 11px;
-
                 font-weight: 400;
             }
 
-
-            /* =================================================
-               CURRENT TIME
-               ================================================= */
-
-            QLabel#floatingCurrentTime {
-
-                color: #8A779C;
-
-                font-family: "Segoe UI";
-
-                font-size: 9px;
-            }
-
-
-            /* =================================================
-               TOTAL TIME
-               ================================================= */
-
+            QLabel#floatingCurrentTime,
             QLabel#floatingTotalTime {
-
                 color: #8A779C;
-
                 font-family: "Segoe UI";
-
                 font-size: 9px;
             }
-
-
-            /* =================================================
-               SLIDER
-               ================================================= */
 
             QSlider#floatingProgress::groove:horizontal {
-
                 height: 3px;
-
                 background: #DDD4E7;
-
                 border-radius: 2px;
             }
-
 
             QSlider#floatingProgress::sub-page:horizontal {
-
                 background: #7C3AED;
-
                 border-radius: 2px;
             }
-
 
             QSlider#floatingProgress::add-page:horizontal {
-
                 background: #DDD4E7;
-
                 border-radius: 2px;
             }
 
-
             QSlider#floatingProgress::handle:horizontal {
-
                 width: 9px;
-
                 height: 9px;
-
                 margin: -3px 0px;
-
                 border-radius: 5px;
-
                 background: #7C3AED;
             }
             """)
 
             self.album.setStyleSheet("""
             QLabel {
-
                 background: #EDE7F4;
-
                 border: none;
-
                 border-radius: 11px;
             }
             """)
@@ -932,27 +647,12 @@ class FloatingPlayer(QFrame):
         self.current_title = title
         self.current_artist = artist
 
-        # ====================================================
-        # TEXT
-        # ====================================================
-
-        self.song_label.setText(
-            title
-        )
-
-        self.artist_label.setText(
-            artist
-        )
-
-        # ====================================================
-        # FIND IMAGE
-        # ====================================================
+        self.song_label.setText(title)
+        self.artist_label.setText(artist)
 
         from pathlib import Path
 
-        file_dir = Path(
-            __file__
-        ).resolve()
+        file_dir = Path(__file__).resolve()
 
         project_dir = file_dir.parents[2]
 
@@ -969,21 +669,13 @@ class FloatingPlayer(QFrame):
 
             try:
 
-                if (
-                    path.exists()
-                    and path.is_file()
-                ):
+                if path.exists() and path.is_file():
 
                     image_file = path
-
                     break
 
             except Exception:
                 pass
-
-        # ====================================================
-        # ALBUM ART
-        # ====================================================
 
         if image_file:
 
@@ -1012,46 +704,20 @@ class FloatingPlayer(QFrame):
 
             self.album.clear()
 
-        # ====================================================
-        # RESET PROGRESS
-        # ====================================================
+        self.progress.blockSignals(True)
 
-        self.progress.blockSignals(
-            True
-        )
+        self.progress.setValue(0)
 
-        self.progress.setValue(
-            0
-        )
+        self.progress.blockSignals(False)
 
-        self.progress.blockSignals(
-            False
-        )
-
-        self.current_time.setText(
-            "0:00"
-        )
-
-        self.total_time.setText(
-            "0:00"
-        )
-
-        # ====================================================
-        # PLAY STATE
-        # ====================================================
+        self.current_time.setText("0:00")
+        self.total_time.setText("0:00")
 
         self.is_playing = True
 
-        self.play_button.setText(
-            "Ⅱ"
-        )
-
-        # ====================================================
-        # SHOW
-        # ====================================================
+        self.play_button.setText("Ⅱ")
 
         self.show()
-
         self.raise_()
 
     # ========================================================
@@ -1082,17 +748,11 @@ class FloatingPlayer(QFrame):
         total_time=None
     ):
 
-        self.progress.blockSignals(
-            True
-        )
+        self.progress.blockSignals(True)
 
-        self.progress.setValue(
-            value
-        )
+        self.progress.setValue(value)
 
-        self.progress.blockSignals(
-            False
-        )
+        self.progress.blockSignals(False)
 
         if current_time is not None:
 
@@ -1131,9 +791,7 @@ class AppWindow(QMainWindow):
         # WINDOW
         # ====================================================
 
-        self.setWindowTitle(
-            "🎵 LYRx"
-        )
+        self.setWindowTitle("🎵 LYRx")
 
         self.setWindowFlags(
             Qt.FramelessWindowHint
@@ -1250,19 +908,38 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # OTHER PAGES
+        # PLAYLISTS
         # ====================================================
 
         self.playlists = PlaylistScreen()
+
+        self.pages.addWidget(
+            self.playlists
+        )
+
+        # ====================================================
+        # AI ASSISTANT
+        # ====================================================
+        #
+        # DAY 18
+        #
+        # This was missing before.
+        #
+
+        self.assistant = AssistantScreen()
+
+        self.pages.addWidget(
+            self.assistant
+        )
+
+        # ====================================================
+        # SETTINGS
+        # ====================================================
 
         self.settings = BasicPage(
             "Settings",
             "Customize your LYRx experience.",
             "⚙"
-        )
-
-        self.pages.addWidget(
-            self.playlists
         )
 
         self.pages.addWidget(
@@ -1279,8 +956,13 @@ class AppWindow(QMainWindow):
             self.favorites.sidebar,
             self.library.sidebar,
             self.playlists.sidebar,
+            self.assistant.sidebar,
             self.settings.sidebar
         ]
+
+        # ====================================================
+        # SIDEBAR SIGNALS
+        # ====================================================
 
         for sidebar in self.sidebars:
 
@@ -1306,6 +988,63 @@ class AppWindow(QMainWindow):
 
         self.favorites.play_requested.connect(
             self.play_favorite_song
+        )
+
+        # ====================================================
+        # AI ASSISTANT PLAYER CONTROL
+        # ====================================================
+        #
+        # DAY 18 - PHASE 2
+        #
+        # AssistantScreen understands commands like:
+        #
+        # "Play Faded"
+        # "Play Believer"
+        # "Play Arcade"
+        # "Play Let Her Go"
+        #
+        # It emits:
+        #
+        # play_song_requested(
+        #     image_path,
+        #     title,
+        #     artist
+        # )
+        #
+        # AppWindow receives that signal here and sends it
+        # to the existing HomeScreen / NowPlaying engine.
+        #
+
+        self.assistant.play_song_requested.connect(
+            self.play_assistant_song
+        )
+
+        # ====================================================
+        # AI ASSISTANT PLAYER CONTROLS
+        # ====================================================
+
+        self.assistant.pause_requested.connect(
+            self.pause_assistant_song
+        )
+
+        self.assistant.resume_requested.connect(
+            self.resume_assistant_song
+        )
+
+        self.assistant.stop_requested.connect(
+            self.stop_assistant_song
+        )
+
+        self.assistant.next_requested.connect(
+            self.next_assistant_song
+        )
+
+        self.assistant.previous_requested.connect(
+            self.previous_assistant_song
+        )
+
+        self.assistant.create_playlist_requested.connect(
+            self.create_assistant_playlist
         )
 
         # ====================================================
@@ -1398,6 +1137,7 @@ class AppWindow(QMainWindow):
             self.favorites,
             self.library,
             self.playlists,
+            self.assistant,
             self.settings
         ]
 
@@ -1487,23 +1227,6 @@ class AppWindow(QMainWindow):
                 )
 
         # ====================================================
-        # HOME
-        # ====================================================
-
-        try:
-
-            self.home.set_theme_state(
-                is_dark
-            )
-
-        except Exception as error:
-
-            print(
-                "Home theme error:",
-                error
-            )
-
-        # ====================================================
         # FLOATING PLAYER
         # ====================================================
 
@@ -1529,16 +1252,10 @@ class AppWindow(QMainWindow):
         # REFRESH
         # ====================================================
 
-        self.setUpdatesEnabled(
-            False
-        )
-
-        self.setUpdatesEnabled(
-            True
-        )
+        self.setUpdatesEnabled(False)
+        self.setUpdatesEnabled(True)
 
         self.update()
-
         self.pages.update()
 
         for page in (
@@ -1547,6 +1264,7 @@ class AppWindow(QMainWindow):
             self.favorites,
             self.library,
             self.playlists,
+            self.assistant,
             self.settings
         ):
 
@@ -1580,6 +1298,8 @@ class AppWindow(QMainWindow):
 
             "Playlists": self.playlists,
 
+            "AI Assistant": self.assistant,
+
             "Settings": self.settings
         }
 
@@ -1612,6 +1332,24 @@ class AppWindow(QMainWindow):
                     error
                 )
 
+        # ====================================================
+        # ASSISTANT PAGE
+        # ====================================================
+
+        if page_name == "AI Assistant":
+
+            try:
+
+                self.assistant.input_box.setFocus()
+
+            except Exception:
+
+                pass
+
+        # ====================================================
+        # CHANGE PAGE
+        # ====================================================
+
         self.pages.setCurrentWidget(
             target_page
         )
@@ -1641,18 +1379,14 @@ class AppWindow(QMainWindow):
 
             for button in sidebar.buttons:
 
-                button.blockSignals(
-                    True
-                )
+                button.blockSignals(True)
 
                 button.setChecked(
                     button.page_name
                     == page_name
                 )
 
-                button.blockSignals(
-                    False
-                )
+                button.blockSignals(False)
 
     # ========================================================
     # FLOATING PLAYER VISIBILITY
@@ -1813,6 +1547,592 @@ class AppWindow(QMainWindow):
         self.floating_player.raise_()
 
     # ========================================================
+    # AI ASSISTANT - PLAY SONG
+    # ========================================================
+
+    def play_assistant_song(
+        self,
+        image_path,
+        title,
+        artist
+    ):
+
+        try:
+
+            print(
+                "LYRx AI requested:",
+                title,
+                "-",
+                artist
+            )
+
+            # ====================================================
+            # FIND SONG IN HOME MASTER QUEUE
+            # ====================================================
+
+            song_index = None
+
+            for index, song in enumerate(
+                self.home.player_queue
+            ):
+
+                if (
+                    song[0] == image_path
+                    and
+                    song[1] == title
+                    and
+                    song[2] == artist
+                ):
+
+                    song_index = index
+
+                    break
+
+            if song_index is None:
+
+                print(
+                    "AI song not found:",
+                    title
+                )
+
+                return
+
+            # ====================================================
+            # SYNC HOME
+            # ====================================================
+
+            self.home.current_index = (
+                song_index
+            )
+
+            self.home.now_playing.set_queue(
+                self.home.player_queue
+            )
+
+            self.home.now_playing.set_current_index(
+                song_index
+            )
+
+            # ====================================================
+            # ACTUAL PLAY
+            # ====================================================
+
+            self.home.now_playing.update_song(
+                image_path,
+                title,
+                artist
+            )
+
+            print(
+                "LYRx AI playing:",
+                title,
+                "-",
+                artist
+            )
+
+        except Exception as error:
+
+            print(
+                "AI play error:",
+                error
+            )
+
+
+    # ========================================================
+    # AI ASSISTANT - PAUSE
+    # ========================================================
+
+    def pause_assistant_song(self):
+
+        try:
+
+            player_widget = (
+                self.home.now_playing
+            )
+
+            audio_player = (
+                player_widget.audio_player
+            )
+
+            from PySide6.QtMultimedia import (
+                QMediaPlayer
+            )
+
+            state = (
+                audio_player
+                .playbackState()
+            )
+
+            if (
+                state
+                ==
+                QMediaPlayer
+                .PlaybackState
+                .PlayingState
+            ):
+
+                audio_player.pause()
+
+                player_widget.is_playing = False
+
+                player_widget.play_btn.setText(
+                    "▶"
+                )
+
+                player_widget.play_state_changed.emit(
+                    False
+                )
+
+                print(
+                    "LYRx AI: playback paused"
+                )
+
+            else:
+
+                print(
+                    "LYRx AI: nothing currently playing"
+                )
+
+        except Exception as error:
+
+            print(
+                "AI pause error:",
+                error
+            )
+
+
+    # ========================================================
+    # AI ASSISTANT - RESUME
+    # ========================================================
+
+    def resume_assistant_song(self):
+
+        try:
+
+            player_widget = (
+                self.home.now_playing
+            )
+
+            audio_player = (
+                player_widget.audio_player
+            )
+
+            if not (
+                player_widget.current_title
+            ):
+
+                print(
+                    "AI resume: no song selected"
+                )
+
+                return
+
+            audio_player.play()
+
+            player_widget.is_playing = True
+
+            player_widget.play_btn.setText(
+                "Ⅱ"
+            )
+
+            player_widget.play_state_changed.emit(
+                True
+            )
+
+            print(
+                "LYRx AI: playback resumed"
+            )
+
+        except Exception as error:
+
+            print(
+                "AI resume error:",
+                error
+            )
+
+
+    # ========================================================
+    # AI ASSISTANT - STOP
+    # ========================================================
+
+    def stop_assistant_song(self):
+
+        try:
+
+            player_widget = (
+                self.home.now_playing
+            )
+
+            audio_player = (
+                player_widget.audio_player
+            )
+
+            # ====================================================
+            # STOP AUDIO
+            # ====================================================
+
+            audio_player.stop()
+
+            # ====================================================
+            # RESET STATE
+            # ====================================================
+
+            player_widget.is_playing = False
+
+            player_widget.play_btn.setText(
+                "▶"
+            )
+
+            # ====================================================
+            # RESET PROGRESS
+            # ====================================================
+
+            player_widget.slider.blockSignals(
+                True
+            )
+
+            player_widget.slider.setValue(
+                0
+            )
+
+            player_widget.slider.blockSignals(
+                False
+            )
+
+            player_widget.current_time.setText(
+                "0:00"
+            )
+
+            # ====================================================
+            # STATE SIGNAL
+            # ====================================================
+
+            player_widget.play_state_changed.emit(
+                False
+            )
+
+            # ====================================================
+            # FLOATING PLAYER
+            # ====================================================
+
+            if hasattr(
+                self,
+                "floating_player"
+            ):
+
+                self.floating_player.set_playing(
+                    False
+                )
+
+                self.floating_player.progress.setValue(
+                    0
+                )
+
+                self.floating_player.current_time.setText(
+                    "0:00"
+                )
+
+            print(
+                "LYRx AI: playback stopped"
+            )
+
+        except Exception as error:
+
+            print(
+                "AI stop error:",
+                error
+            )
+
+
+    # ========================================================
+    # AI ASSISTANT - NEXT SONG
+    # ========================================================
+
+    def next_assistant_song(self):
+
+        try:
+
+            # Use the SAME queue logic already used by Home.
+            self.home.play_next()
+
+            print(
+                "LYRx AI: next song"
+            )
+
+        except Exception as error:
+
+            print(
+                "AI next error:",
+                error
+            )
+
+
+    # ========================================================
+    # AI ASSISTANT - PREVIOUS SONG
+    # ========================================================
+
+    def previous_assistant_song(self):
+
+        try:
+
+            self.home.play_previous()
+
+            print(
+                "LYRx AI: previous song"
+            )
+
+        except Exception as error:
+
+            print(
+                "AI previous error:",
+                error
+            )
+
+    # ========================================================
+    # AI ASSISTANT - CREATE PLAYLIST
+    # ========================================================
+
+    def create_assistant_playlist(
+        self,
+        playlist_name,
+        description,
+        songs
+    ):
+
+        try:
+
+            # ====================================================
+            # CREATE PLAYLIST
+            # ====================================================
+
+            playlist = (
+                playlist_store.create_playlist(
+                    playlist_name,
+                    description
+                )
+            )
+
+            # ====================================================
+            # DUPLICATE PLAYLIST
+            # ====================================================
+
+            if playlist is None:
+
+                existing_playlist = None
+
+                for item in (
+                    playlist_store.get_playlists()
+                ):
+
+                    if (
+                        item.get(
+                            "name",
+                            ""
+                        ).strip().lower()
+                        ==
+                        playlist_name
+                        .strip()
+                        .lower()
+                    ):
+
+                        existing_playlist = item
+
+                        break
+
+                if existing_playlist is None:
+
+                    self.assistant.add_ai_message(
+                        "I couldn't create the playlist. "
+                        "Please try again."
+                    )
+
+                    return
+
+                playlist = existing_playlist
+
+            # ====================================================
+            # PLAYLIST ID
+            # ====================================================
+
+            playlist_id = playlist.get(
+                "id"
+            )
+
+            if not playlist_id:
+
+                self.assistant.add_ai_message(
+                    "I couldn't access the playlist."
+                )
+
+                return
+
+            # ====================================================
+            # ADD SONGS
+            # ====================================================
+
+            added_titles = []
+
+            for song in songs:
+
+                image_path = song.get(
+                    "image",
+                    ""
+                )
+
+                title = song.get(
+                    "title",
+                    ""
+                )
+
+                artist = song.get(
+                    "artist",
+                    ""
+                )
+
+                success, message = (
+                    playlist_store.add_song(
+                        playlist_id,
+                        image_path,
+                        title,
+                        artist
+                    )
+                )
+
+                # ------------------------------------------------
+                # SUCCESS
+                # ------------------------------------------------
+
+                if success:
+
+                    added_titles.append(
+                        title
+                    )
+
+                # ------------------------------------------------
+                # ALREADY EXISTS
+                # ------------------------------------------------
+
+                else:
+
+                    existing_songs = (
+                        playlist.get(
+                            "songs",
+                            []
+                        )
+                    )
+
+                    already_exists = any(
+
+                        existing.get(
+                            "title",
+                            ""
+                        ).strip().lower()
+                        ==
+                        title.strip().lower()
+
+                        and
+
+                        existing.get(
+                            "artist",
+                            ""
+                        ).strip().lower()
+                        ==
+                        artist.strip().lower()
+
+                        for existing in existing_songs
+                    )
+
+                    if already_exists:
+
+                        added_titles.append(
+                            title
+                        )
+
+            # ====================================================
+            # REFRESH PLAYLIST PAGE
+            # ====================================================
+
+            try:
+
+                self.playlists.playlists = (
+                    playlist_store.get_playlists()
+                )
+
+                self.playlists.rebuild_playlist_cards()
+
+            except Exception as error:
+
+                print(
+                    "AI playlist page refresh error:",
+                    error
+                )
+
+            # ====================================================
+            # REFRESH HOME PLAYLIST PREVIEW
+            # ====================================================
+
+            try:
+
+                self.home.refresh_playlist_preview()
+
+            except Exception as error:
+
+                print(
+                    "AI home playlist refresh error:",
+                    error
+                )
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
+
+            if added_titles:
+
+                song_lines = "\n".join(
+                    f"• {title}"
+                    for title
+                    in added_titles
+                )
+
+                self.assistant.add_ai_message(
+                    "Playlist created. 💜\n\n"
+                    f"{playlist_name}\n\n"
+                    f"{song_lines}\n\n"
+                    "You can open it from the "
+                    "Playlists section."
+                )
+
+            else:
+
+                self.assistant.add_ai_message(
+                    f'"{playlist_name}" is ready, '
+                    "but no new tracks needed to be added."
+                )
+
+            print(
+                "LYRx AI playlist ready:",
+                playlist_name
+            )
+
+        except Exception as error:
+
+            print(
+                "AI playlist creation error:",
+                error
+            )
+
+            try:
+
+                self.assistant.add_ai_message(
+                    "Something went wrong while "
+                "creating the playlist."
+                )
+
+            except Exception:
+
+                pass
+
+    # ========================================================
     # FLOATING PLAY / PAUSE
     # ========================================================
 
@@ -1826,9 +2146,7 @@ class AppWindow(QMainWindow):
                 .audio_player
             )
 
-            from PySide6.QtMultimedia import (
-                QMediaPlayer
-            )
+            from PySide6.QtMultimedia import QMediaPlayer
 
             state = player.playbackState()
 
@@ -1892,15 +2210,7 @@ class AppWindow(QMainWindow):
 
     def close_floating_player(self):
 
-        # ----------------------------------------------------
-        # Hide floating player
-        # ----------------------------------------------------
-
         self.floating_player.hide()
-
-        # ----------------------------------------------------
-        # Stop audio
-        # ----------------------------------------------------
 
         try:
 
@@ -1964,7 +2274,6 @@ class AppWindow(QMainWindow):
             )
 
             if duration <= 0:
-
                 return
 
             progress = int(
@@ -1975,12 +2284,8 @@ class AppWindow(QMainWindow):
 
             self.floating_player.set_progress(
                 progress,
-                self.format_time(
-                    position
-                ),
-                self.format_time(
-                    duration
-                )
+                self.format_time(position),
+                self.format_time(duration)
             )
 
         except Exception as error:
@@ -2000,13 +2305,10 @@ class AppWindow(QMainWindow):
     ):
 
         if duration <= 0:
-
             return
 
         self.floating_player.total_time.setText(
-            self.format_time(
-                duration
-            )
+            self.format_time(duration)
         )
 
     # ========================================================
@@ -2020,9 +2322,7 @@ class AppWindow(QMainWindow):
 
         try:
 
-            from PySide6.QtMultimedia import (
-                QMediaPlayer
-            )
+            from PySide6.QtMultimedia import QMediaPlayer
 
             playing = (
                 state
@@ -2059,18 +2359,15 @@ class AppWindow(QMainWindow):
             return "0:00"
 
         total_seconds = (
-            milliseconds
-            // 1000
+            milliseconds // 1000
         )
 
         minutes = (
-            total_seconds
-            // 60
+            total_seconds // 60
         )
 
         seconds = (
-            total_seconds
-            % 60
+            total_seconds % 60
         )
 
         return (
@@ -2109,7 +2406,6 @@ class AppWindow(QMainWindow):
         player = self.floating_player
 
         if not player.isVisible():
-
             return
 
         current = self.pages.currentWidget()
@@ -2157,7 +2453,7 @@ class AppWindow(QMainWindow):
             )
 
         # ----------------------------------------------------
-        # BOTTOM POSITION
+        # BOTTOM
         # ----------------------------------------------------
 
         y = (

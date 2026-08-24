@@ -101,4 +101,24 @@ LYRx AI can now understand player commands such as:
 
 These commands are connected to the actual LYRx audio player.
 
+- [x] Day 19 — Online Music Streaming Integration
+
+### Completed
+
+- Added unified `Song` model for online tracks
+- Added `MusicService`
+- Integrated Jamendo online music catalog
+- Added asynchronous online music loading in Discover
+- Added online album artwork
+- Added real online audio streaming
+- Added online queue support
+- Added online Next / Previous controls
+- Added online Next Up queue
+- Added online Next Up thumbnails
+- Synced online songs with Now Playing
+- Synced online songs with Floating Player
+- Added floating player online artwork support
+- Preserved local music playback compatibility
+- Added online stream error handling and retry support
+
 Version: LYRx Alpha 1.0

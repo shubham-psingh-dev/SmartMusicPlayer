@@ -1,7 +1,12 @@
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QUrl,
+)
+
 from PySide6.QtGui import (
     QColor,
     QPainter,
@@ -10,6 +15,13 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
+
+from PySide6.QtNetwork import (
+    QNetworkAccessManager,
+    QNetworkRequest,
+    QNetworkReply,
+)
+
 from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
@@ -31,8 +43,11 @@ PROJECT_DIR = FILE_DIR.parents[3]
 # music_player_desktop/src/
 SRC_DIR = FILE_DIR.parents[2]
 
-# Persistent favorites file
-FAVORITES_FILE = PROJECT_DIR / "favorites.json"
+# Existing persistent favorites file
+FAVORITES_FILE = (
+    PROJECT_DIR
+    / "favorites.json"
+)
 
 
 # ============================================================
@@ -54,23 +69,42 @@ class CoverLabel(QLabel):
             Qt.AlignCenter
         )
 
-        self.setStyleSheet("""
-        QLabel {
-            background: #211633;
-            border: none;
-            border-radius: 18px;
-        }
-        """)
+        self.setStyleSheet(
+            """
+            QLabel {
+                background: #211633;
+                border: none;
+                border-radius: 18px;
+            }
+            """
+        )
 
-    def paintEvent(self, event):
+    # ========================================================
+    # PAINT
+    # ========================================================
 
-        if self.pixmap() is None:
+    def paintEvent(
+        self,
+        event
+    ):
 
-            super().paintEvent(event)
+        pixmap = self.pixmap()
+
+        if (
+            pixmap is None
+            or
+            pixmap.isNull()
+        ):
+
+            super().paintEvent(
+                event
+            )
 
             return
 
-        painter = QPainter(self)
+        painter = QPainter(
+            self
+        )
 
         painter.setRenderHint(
             QPainter.Antialiasing
@@ -94,7 +128,7 @@ class CoverLabel(QLabel):
 
         painter.drawPixmap(
             self.rect(),
-            self.pixmap()
+            pixmap
         )
 
         painter.end()
@@ -106,11 +140,27 @@ class CoverLabel(QLabel):
 
 class MusicCard(QFrame):
 
+    # ========================================================
+    # EXISTING LOCAL SIGNAL
+    # ========================================================
+
     play_requested = Signal(
         str,
         str,
         str
     )
+
+    # ========================================================
+    # DAY 19 ONLINE SIGNAL
+    # ========================================================
+
+    online_play_requested = Signal(
+        object
+    )
+
+    # ========================================================
+    # FAVORITE SIGNAL
+    # ========================================================
 
     favorite_changed = Signal(
         str,
@@ -118,35 +168,96 @@ class MusicCard(QFrame):
         bool
     )
 
+    # ========================================================
+    # INIT
+    # ========================================================
+
     def __init__(
         self,
         image_path,
         title,
-        artist
+        artist,
+        duration_text="3:45",
+        song_data=None,
+        favorite_enabled=True,
     ):
 
         super().__init__()
 
-        self.image_path = image_path
-        self.title_text = title
-        self.artist_text = artist
+        # ====================================================
+        # SONG DATA
+        # ====================================================
 
-        self.is_hovered = False
-        self.current_is_dark = True
+        self.image_path = str(
+            image_path or ""
+        )
 
-        # ----------------------------------------------------
-        # FAVORITE STATE
-        # ----------------------------------------------------
+        self.title_text = str(
+            title or "Unknown Track"
+        )
+
+        self.artist_text = str(
+            artist or "Unknown Artist"
+        )
+
+        self.duration_text = str(
+            duration_text or "0:00"
+        )
+
+        # None for old/local cards.
+        # Song object for online cards.
+        self.song_data = song_data
+
+        # ====================================================
+        # SOURCE
+        # ====================================================
+
+        self.is_online = (
+            self.image_path.startswith(
+                "http://"
+            )
+            or
+            self.image_path.startswith(
+                "https://"
+            )
+            or
+            self.song_data is not None
+        )
+
+        # ====================================================
+        # FAVORITES
+        # ====================================================
+
+        self.favorite_enabled = bool(
+            favorite_enabled
+        )
 
         self.is_favorite = False
 
-        # ----------------------------------------------------
-        # CARD SIZE
-        # ----------------------------------------------------
+        # ====================================================
+        # STATE
+        # ====================================================
 
-        # IMPORTANT:
-        # 150 cover + 10 left + 10 right = 170
-        # So 168 was too small.
+        self.is_hovered = False
+
+        self.current_is_dark = True
+
+        # ====================================================
+        # NETWORK
+        # ====================================================
+
+        self.network_manager = (
+            QNetworkAccessManager(
+                self
+            )
+        )
+
+        self.cover_reply = None
+
+        # ====================================================
+        # CARD SIZE
+        # ====================================================
+
         self.setFixedWidth(
             176
         )
@@ -163,13 +274,27 @@ class MusicCard(QFrame):
             "MusicCard"
         )
 
+        # ====================================================
+        # BUILD
+        # ====================================================
+
         self.build_ui()
 
         self.load_cover()
 
-        self.load_favorite_state()
+        if self.favorite_enabled:
+
+            self.load_favorite_state()
+
+        else:
+
+            self.favorite_btn.hide()
 
         self.setup_shadow()
+
+        self.set_theme_state(
+            True
+        )
 
     # ========================================================
     # UI
@@ -206,17 +331,6 @@ class MusicCard(QFrame):
         self.cover_frame.setObjectName(
             "CoverFrame"
         )
-
-        self.cover_frame.setStyleSheet("""
-        QFrame#CoverFrame {
-
-            background: #211633;
-
-            border: 1px solid rgba(139, 92, 246, 45);
-
-            border-radius: 20px;
-        }
-        """)
 
         cover_layout = QVBoxLayout(
             self.cover_frame
@@ -268,47 +382,6 @@ class MusicCard(QFrame):
             Qt.NoFocus
         )
 
-        self.play_btn.setStyleSheet("""
-        QPushButton#PlayButton {
-
-            background: #8B5CF6;
-
-            color: white;
-
-            border: 2px solid rgba(255,255,255,80);
-
-            border-radius: 25px;
-
-            font-family: "Segoe UI Symbol";
-
-            font-size: 18px;
-
-            font-weight: 700;
-
-            padding: 0px;
-
-            margin: 0px;
-        }
-
-        QPushButton#PlayButton:hover {
-
-            background: #A970FF;
-
-            border: 2px solid rgba(255,255,255,140);
-        }
-
-        QPushButton#PlayButton:pressed {
-
-            background: #6D28D9;
-
-            padding-top: 1px;
-        }
-        """)
-
-        self.play_btn.hide()
-
-        # IMPORTANT:
-        # Direct child of cover_frame.
         self.play_btn.setParent(
             self.cover_frame
         )
@@ -316,6 +389,8 @@ class MusicCard(QFrame):
         self.play_btn.clicked.connect(
             self.request_play
         )
+
+        self.play_btn.hide()
 
         # ====================================================
         # FAVORITE BUTTON
@@ -342,45 +417,6 @@ class MusicCard(QFrame):
             Qt.NoFocus
         )
 
-        self.favorite_btn.setStyleSheet("""
-        QPushButton#FavoriteButton {
-
-            background: rgba(15, 10, 25, 210);
-
-            color: white;
-
-            border: 1px solid rgba(255,255,255,70);
-
-            border-radius: 17px;
-
-            font-family: "Segoe UI Symbol";
-
-            font-size: 21px;
-
-            font-weight: 400;
-
-            padding: 0px;
-
-            margin: 0px;
-        }
-
-        QPushButton#FavoriteButton:hover {
-
-            background: rgba(124, 58, 237, 230);
-
-            color: white;
-
-            border: 1px solid rgba(255,255,255,130);
-        }
-
-        QPushButton#FavoriteButton:pressed {
-
-            background: rgba(109, 40, 217, 240);
-        }
-        """)
-
-        self.favorite_btn.hide()
-
         self.favorite_btn.setParent(
             self.cover_frame
         )
@@ -388,6 +424,8 @@ class MusicCard(QFrame):
         self.favorite_btn.clicked.connect(
             self.toggle_favorite
         )
+
+        self.favorite_btn.hide()
 
         # ====================================================
         # TITLE
@@ -405,23 +443,6 @@ class MusicCard(QFrame):
             Qt.NoTextInteraction
         )
 
-        self.title.setStyleSheet("""
-        QLabel {
-
-            color: #FFFFFF;
-
-            font-size: 15px;
-
-            font-weight: 700;
-
-            background: transparent;
-
-            border: none;
-
-            padding: 0px;
-        }
-        """)
-
         # ====================================================
         # ARTIST
         # ====================================================
@@ -434,46 +455,16 @@ class MusicCard(QFrame):
             False
         )
 
-        self.artist.setStyleSheet("""
-        QLabel {
-
-            color: #AFA4C8;
-
-            font-size: 13px;
-
-            background: transparent;
-
-            border: none;
-
-            padding: 0px;
-        }
-        """)
-
         # ====================================================
         # DURATION
         # ====================================================
 
         self.duration = QLabel(
-            "3:45"
+            self.duration_text
         )
 
-        self.duration.setStyleSheet("""
-        QLabel {
-
-            color: #756A91;
-
-            font-size: 11px;
-
-            background: transparent;
-
-            border: none;
-
-            padding: 0px;
-        }
-        """)
-
         # ====================================================
-        # ADD TO LAYOUT
+        # ADD
         # ====================================================
 
         root.addWidget(
@@ -499,8 +490,8 @@ class MusicCard(QFrame):
 
         root.addStretch()
 
-        # Make sure overlay buttons stay above cover.
         self.play_btn.raise_()
+
         self.favorite_btn.raise_()
 
     # ========================================================
@@ -509,15 +500,52 @@ class MusicCard(QFrame):
 
     def load_cover(self):
 
+        # ====================================================
+        # REMOTE IMAGE
+        # ====================================================
+
+        if (
+            self.image_path.startswith(
+                "http://"
+            )
+            or
+            self.image_path.startswith(
+                "https://"
+            )
+        ):
+
+            self.load_remote_cover(
+                self.image_path
+            )
+
+            return
+
+        # ====================================================
+        # LOCAL IMAGE
+        # ====================================================
+
+        self.load_local_cover()
+
+    # ========================================================
+    # LOCAL COVER
+    # ========================================================
+
+    def load_local_cover(self):
+
         possible_paths = [
 
-            PROJECT_DIR / self.image_path,
+            PROJECT_DIR
+            / self.image_path,
 
-            SRC_DIR / self.image_path,
+            SRC_DIR
+            / self.image_path,
 
-            Path.cwd() / self.image_path,
+            Path.cwd()
+            / self.image_path,
 
-            Path(self.image_path),
+            Path(
+                self.image_path
+            ),
         ]
 
         image_file = None
@@ -526,7 +554,11 @@ class MusicCard(QFrame):
 
             try:
 
-                if path.exists() and path.is_file():
+                if (
+                    path.exists()
+                    and
+                    path.is_file()
+                ):
 
                     image_file = path
 
@@ -536,10 +568,6 @@ class MusicCard(QFrame):
 
                 continue
 
-        # ----------------------------------------------------
-        # IMAGE FOUND
-        # ----------------------------------------------------
-
         if image_file:
 
             pixmap = QPixmap(
@@ -548,22 +576,176 @@ class MusicCard(QFrame):
 
             if not pixmap.isNull():
 
-                scaled = pixmap.scaled(
-                    146,
-                    146,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation
-                )
-
-                self.cover.setPixmap(
-                    scaled
+                self.set_cover_pixmap(
+                    pixmap
                 )
 
                 return
 
-        # ----------------------------------------------------
-        # IMAGE NOT FOUND
-        # ----------------------------------------------------
+        self.show_cover_placeholder()
+
+    # ========================================================
+    # REMOTE COVER
+    # ========================================================
+
+    def load_remote_cover(
+        self,
+        image_url
+    ):
+
+        self.show_loading_placeholder()
+
+        try:
+
+            request = QNetworkRequest(
+                QUrl(
+                    image_url
+                )
+            )
+
+            request.setRawHeader(
+                b"User-Agent",
+                b"LYRx-Music-Player/0.2"
+            )
+
+            self.cover_reply = (
+                self.network_manager.get(
+                    request
+                )
+            )
+
+            self.cover_reply.finished.connect(
+                self.remote_cover_finished
+            )
+
+        except Exception as error:
+
+            print(
+                "Remote cover request error:",
+                error
+            )
+
+            self.show_cover_placeholder()
+
+    # ========================================================
+    # REMOTE COVER FINISHED
+    # ========================================================
+
+    def remote_cover_finished(self):
+
+        reply = self.cover_reply
+
+        self.cover_reply = None
+
+        if reply is None:
+
+            self.show_cover_placeholder()
+
+            return
+
+        try:
+
+            if (
+                reply.error()
+                !=
+                QNetworkReply.NetworkError.NoError
+            ):
+
+                print(
+                    "Remote cover error:",
+                    reply.errorString()
+                )
+
+                self.show_cover_placeholder()
+
+                reply.deleteLater()
+
+                return
+
+            data = reply.readAll()
+
+            pixmap = QPixmap()
+
+            success = pixmap.loadFromData(
+                bytes(data)
+            )
+
+            if (
+                success
+                and
+                not pixmap.isNull()
+            ):
+
+                self.set_cover_pixmap(
+                    pixmap
+                )
+
+            else:
+
+                self.show_cover_placeholder()
+
+        except Exception as error:
+
+            print(
+                "Remote cover decode error:",
+                error
+            )
+
+            self.show_cover_placeholder()
+
+        finally:
+
+            try:
+
+                reply.deleteLater()
+
+            except Exception:
+
+                pass
+
+    # ========================================================
+    # SET COVER PIXMAP
+    # ========================================================
+
+    def set_cover_pixmap(
+        self,
+        pixmap
+    ):
+
+        scaled = pixmap.scaled(
+            146,
+            146,
+            Qt.KeepAspectRatioByExpanding,
+            Qt.SmoothTransformation
+        )
+
+        self.cover.setText(
+            ""
+        )
+
+        self.cover.setPixmap(
+            scaled
+        )
+
+    # ========================================================
+    # LOADING PLACEHOLDER
+    # ========================================================
+
+    def show_loading_placeholder(self):
+
+        self.cover.setPixmap(
+            QPixmap()
+        )
+
+        self.cover.setText(
+            "♫"
+        )
+
+    # ========================================================
+    # PLACEHOLDER
+    # ========================================================
+
+    def show_cover_placeholder(self):
 
         self.cover.setPixmap(
             QPixmap()
@@ -573,38 +755,41 @@ class MusicCard(QFrame):
             "♪"
         )
 
-        self.cover.setStyleSheet("""
-        QLabel {
-
-            background: #211633;
-
-            color: #8B5CF6;
-
-            font-family: "Segoe UI Symbol";
-
-            font-size: 42px;
-
-            border-radius: 18px;
-        }
-        """)
-
     # ========================================================
     # FAVORITES
     # ========================================================
 
     def load_favorite_state(self):
 
+        if not self.favorite_enabled:
+
+            self.is_favorite = False
+
+            return
+
         favorites = self.read_favorites()
 
         self.is_favorite = any(
-            item.get("image_path") == self.image_path
+
+            item.get(
+                "image_path"
+            )
+            ==
+            self.image_path
+
             for item in favorites
-            if isinstance(item, dict)
+
+            if isinstance(
+                item,
+                dict
+            )
         )
 
         self.update_favorite_button()
 
-    # --------------------------------------------------------
+    # ========================================================
+    # READ FAVORITES
+    # ========================================================
 
     def read_favorites(self):
 
@@ -620,9 +805,14 @@ class MusicCard(QFrame):
                 encoding="utf-8"
             ) as file:
 
-                data = json.load(file)
+                data = json.load(
+                    file
+                )
 
-                if isinstance(data, list):
+                if isinstance(
+                    data,
+                    list
+                ):
 
                     return data
 
@@ -636,7 +826,9 @@ class MusicCard(QFrame):
 
         return []
 
-    # --------------------------------------------------------
+    # ========================================================
+    # WRITE FAVORITES
+    # ========================================================
 
     def write_favorites(
         self,
@@ -665,9 +857,19 @@ class MusicCard(QFrame):
                 error
             )
 
-    # --------------------------------------------------------
+    # ========================================================
+    # TOGGLE FAVORITE
+    # ========================================================
 
     def toggle_favorite(self):
+
+        # Day 19:
+        # Online favorites will be upgraded later
+        # together with the unified library architecture.
+
+        if not self.favorite_enabled:
+
+            return
 
         favorites = self.read_favorites()
 
@@ -678,20 +880,33 @@ class MusicCard(QFrame):
         if self.is_favorite:
 
             favorites = [
+
                 item
+
                 for item in favorites
+
                 if not (
-                    isinstance(item, dict)
-                    and item.get("image_path")
-                    == self.image_path
+
+                    isinstance(
+                        item,
+                        dict
+                    )
+
+                    and
+
+                    item.get(
+                        "image_path"
+                    )
+                    ==
+                    self.image_path
                 )
             ]
 
             self.is_favorite = False
 
             print(
-                f"Removed from favorites: "
-                f"{self.title_text}"
+                "Removed from favorites:",
+                self.title_text
             )
 
         # ====================================================
@@ -701,15 +916,32 @@ class MusicCard(QFrame):
         else:
 
             favorite_item = {
-                "image_path": self.image_path,
-                "title": self.title_text,
-                "artist": self.artist_text,
+
+                "image_path":
+                    self.image_path,
+
+                "title":
+                    self.title_text,
+
+                "artist":
+                    self.artist_text,
             }
 
             already_exists = any(
-                isinstance(item, dict)
-                and item.get("image_path")
-                == self.image_path
+
+                isinstance(
+                    item,
+                    dict
+                )
+
+                and
+
+                item.get(
+                    "image_path"
+                )
+                ==
+                self.image_path
+
                 for item in favorites
             )
 
@@ -722,8 +954,8 @@ class MusicCard(QFrame):
             self.is_favorite = True
 
             print(
-                f"Added to favorites: "
-                f"{self.title_text}"
+                "Added to favorites:",
+                self.title_text
             )
 
         self.write_favorites(
@@ -738,9 +970,17 @@ class MusicCard(QFrame):
             self.is_favorite
         )
 
-    # --------------------------------------------------------
+    # ========================================================
+    # FAVORITE BUTTON STYLE
+    # ========================================================
 
     def update_favorite_button(self):
+
+        if not self.favorite_enabled:
+
+            self.favorite_btn.hide()
+
+            return
 
         if self.is_favorite:
 
@@ -750,79 +990,50 @@ class MusicCard(QFrame):
 
             if self.current_is_dark:
 
-                self.favorite_btn.setStyleSheet("""
+                style = """
                 QPushButton#FavoriteButton {
-
                     background: rgba(124, 58, 237, 225);
-
                     color: #FF7AC8;
-
                     border: 1px solid rgba(255,255,255,110);
-
                     border-radius: 17px;
-
                     font-family: "Segoe UI Symbol";
-
                     font-size: 21px;
-
                     font-weight: 700;
-
                     padding: 0px;
-
                     margin: 0px;
                 }
 
                 QPushButton#FavoriteButton:hover {
-
-                    background: rgba(139, 92, 246, 245);
-
+                    background: rgba(139,92,246,245);
                     color: #FF9AD8;
-
                     border: 1px solid rgba(255,255,255,150);
                 }
 
                 QPushButton#FavoriteButton:pressed {
-
-                    background: rgba(109, 40, 217, 250);
+                    background: rgba(109,40,217,250);
                 }
-                """)
+                """
 
             else:
 
-                self.favorite_btn.setStyleSheet("""
+                style = """
                 QPushButton#FavoriteButton {
-
-                    background: rgba(124, 58, 237, 220);
-
+                    background: rgba(124,58,237,220);
                     color: #FF4FA3;
-
                     border: 1px solid rgba(124,58,237,100);
-
                     border-radius: 17px;
-
                     font-family: "Segoe UI Symbol";
-
                     font-size: 21px;
-
                     font-weight: 700;
-
                     padding: 0px;
-
                     margin: 0px;
                 }
 
                 QPushButton#FavoriteButton:hover {
-
                     background: rgba(139,92,246,235);
-
                     color: #FF78B8;
                 }
-
-                QPushButton#FavoriteButton:pressed {
-
-                    background: rgba(109,40,217,245);
-                }
-                """)
+                """
 
         else:
 
@@ -832,81 +1043,51 @@ class MusicCard(QFrame):
 
             if self.current_is_dark:
 
-                self.favorite_btn.setStyleSheet("""
+                style = """
                 QPushButton#FavoriteButton {
-
                     background: rgba(15,10,25,210);
-
                     color: white;
-
                     border: 1px solid rgba(255,255,255,70);
-
                     border-radius: 17px;
-
                     font-family: "Segoe UI Symbol";
-
                     font-size: 21px;
-
                     font-weight: 400;
-
                     padding: 0px;
-
                     margin: 0px;
                 }
 
                 QPushButton#FavoriteButton:hover {
-
                     background: rgba(124,58,237,230);
-
                     color: white;
-
                     border: 1px solid rgba(255,255,255,130);
                 }
-
-                QPushButton#FavoriteButton:pressed {
-
-                    background: rgba(109,40,217,240);
-                }
-                """)
+                """
 
             else:
 
-                self.favorite_btn.setStyleSheet("""
+                style = """
                 QPushButton#FavoriteButton {
-
                     background: rgba(255,255,255,220);
-
                     color: #67567D;
-
                     border: 1px solid rgba(124,58,237,55);
-
                     border-radius: 17px;
-
                     font-family: "Segoe UI Symbol";
-
                     font-size: 21px;
-
                     font-weight: 400;
-
                     padding: 0px;
-
                     margin: 0px;
                 }
 
                 QPushButton#FavoriteButton:hover {
-
                     background: rgba(124,58,237,225);
-
                     color: white;
-
                     border: 1px solid rgba(124,58,237,120);
                 }
+                """
 
-                QPushButton#FavoriteButton:pressed {
-
-                    background: rgba(109,40,217,240);
-                }
-                """)
+        self.favorite_btn.setStyleSheet(
+            style
+        )
 
     # ========================================================
     # THEME
@@ -935,67 +1116,64 @@ class MusicCard(QFrame):
             duration_color = "#8A7899"
             cover_bg = "#E5DCEB"
 
+        # ====================================================
+        # TITLE
+        # ====================================================
+
         self.title.setStyleSheet(
             f"""
             QLabel {{
-
                 color: {title_color};
-
                 font-size: 15px;
-
                 font-weight: 700;
-
                 background: transparent;
-
                 border: none;
-
                 padding: 0px;
             }}
             """
         )
+
+        # ====================================================
+        # ARTIST
+        # ====================================================
 
         self.artist.setStyleSheet(
             f"""
             QLabel {{
-
                 color: {artist_color};
-
                 font-size: 13px;
-
                 background: transparent;
-
                 border: none;
-
                 padding: 0px;
             }}
             """
         )
+
+        # ====================================================
+        # DURATION
+        # ====================================================
 
         self.duration.setStyleSheet(
             f"""
             QLabel {{
-
                 color: {duration_color};
-
                 font-size: 11px;
-
                 background: transparent;
-
                 border: none;
-
                 padding: 0px;
             }}
             """
         )
 
+        # ====================================================
+        # COVER
+        # ====================================================
+
         self.cover_frame.setStyleSheet(
             f"""
             QFrame#CoverFrame {{
-
                 background: {cover_bg};
-
                 border: 1px solid rgba(139,92,246,45);
-
                 border-radius: 20px;
             }}
             """
@@ -1004,13 +1182,43 @@ class MusicCard(QFrame):
         self.cover.setStyleSheet(
             f"""
             QLabel {{
-
                 background: {cover_bg};
-
+                color: #8B5CF6;
                 border: none;
-
                 border-radius: 18px;
+                font-family: "Segoe UI Symbol";
+                font-size: 42px;
             }}
+            """
+        )
+
+        # ====================================================
+        # PLAY
+        # ====================================================
+
+        self.play_btn.setStyleSheet(
+            """
+            QPushButton#PlayButton {
+                background: #8B5CF6;
+                color: white;
+                border: 2px solid rgba(255,255,255,80);
+                border-radius: 25px;
+                font-family: "Segoe UI Symbol";
+                font-size: 18px;
+                font-weight: 700;
+                padding: 0px;
+                margin: 0px;
+            }
+
+            QPushButton#PlayButton:hover {
+                background: #A970FF;
+                border: 2px solid rgba(255,255,255,140);
+            }
+
+            QPushButton#PlayButton:pressed {
+                background: #6D28D9;
+                padding-top: 1px;
+            }
             """
         )
 
@@ -1024,8 +1232,10 @@ class MusicCard(QFrame):
 
     def setup_shadow(self):
 
-        self.shadow = QGraphicsDropShadowEffect(
-            self
+        self.shadow = (
+            QGraphicsDropShadowEffect(
+                self
+            )
         )
 
         self.shadow.setBlurRadius(
@@ -1040,7 +1250,7 @@ class MusicCard(QFrame):
         self.shadow.setColor(
             QColor(
                 124,
-                               58,
+                58,
                 237,
                 55
             )
@@ -1051,19 +1261,21 @@ class MusicCard(QFrame):
         )
 
     # ========================================================
-    # POSITION PLAY BUTTON
+    # POSITION PLAY
     # ========================================================
 
     def position_play_button(self):
 
         x = (
             self.cover_frame.width()
-            - self.play_btn.width()
+            -
+            self.play_btn.width()
         ) // 2
 
         y = (
             self.cover_frame.height()
-            - self.play_btn.height()
+            -
+            self.play_btn.height()
         ) // 2
 
         self.play_btn.move(
@@ -1074,7 +1286,7 @@ class MusicCard(QFrame):
         self.play_btn.raise_()
 
     # ========================================================
-    # POSITION FAVORITE BUTTON
+    # POSITION FAVORITE
     # ========================================================
 
     def position_favorite_button(self):
@@ -1083,8 +1295,10 @@ class MusicCard(QFrame):
 
         x = (
             self.cover_frame.width()
-            - self.favorite_btn.width()
-            - margin
+            -
+            self.favorite_btn.width()
+            -
+            margin
         )
 
         y = margin
@@ -1097,7 +1311,7 @@ class MusicCard(QFrame):
         self.favorite_btn.raise_()
 
     # ========================================================
-    # RESIZE EVENT
+    # RESIZE
     # ========================================================
 
     def resizeEvent(
@@ -1126,22 +1340,23 @@ class MusicCard(QFrame):
 
         self.play_btn.show()
 
-        self.favorite_btn.show()
+        if self.favorite_enabled:
+
+            self.favorite_btn.show()
 
         self.position_play_button()
 
         self.position_favorite_button()
 
-        self.cover_frame.setStyleSheet("""
-        QFrame#CoverFrame {
-
-            background: #24163E;
-
-            border: 2px solid #8B5CF6;
-
-            border-radius: 20px;
-        }
-        """)
+        self.cover_frame.setStyleSheet(
+            """
+            QFrame#CoverFrame {
+                background: #24163E;
+                border: 2px solid #8B5CF6;
+                border-radius: 20px;
+            }
+            """
+        )
 
         self.shadow.setBlurRadius(
             34
@@ -1191,11 +1406,8 @@ class MusicCard(QFrame):
         self.cover_frame.setStyleSheet(
             f"""
             QFrame#CoverFrame {{
-
                 background: {bg};
-
                 border: 1px solid rgba(139,92,246,45);
-
                 border-radius: 20px;
             }}
             """
@@ -1229,6 +1441,29 @@ class MusicCard(QFrame):
 
     def request_play(self):
 
+        # ====================================================
+        # ONLINE
+        # ====================================================
+
+        if self.song_data is not None:
+
+            print(
+                "Online card play requested:",
+                self.title_text,
+                "-",
+                self.artist_text
+            )
+
+            self.online_play_requested.emit(
+                self.song_data
+            )
+
+            return
+
+        # ====================================================
+        # OLD LOCAL SYSTEM
+        # ====================================================
+
         self.play_requested.emit(
             self.image_path,
             self.title_text,
@@ -1254,9 +1489,9 @@ class MusicCard(QFrame):
 
         rect = self.rect()
 
-        # ----------------------------------------------------
-        # CARD SHAPE
-        # ----------------------------------------------------
+        # ====================================================
+        # CARD
+        # ====================================================
 
         path = QPainterPath()
 
@@ -1271,9 +1506,9 @@ class MusicCard(QFrame):
             20
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # GRADIENT
-        # ----------------------------------------------------
+        # ====================================================
 
         gradient = QLinearGradient(
             0,
@@ -1321,15 +1556,15 @@ class MusicCard(QFrame):
             gradient
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # BORDER
-        # ----------------------------------------------------
+        # ====================================================
 
         if self.is_hovered:
 
             border_color = QColor(
                 139,
-                               92,
+                92,
                 246,
                 150
             )
@@ -1340,7 +1575,9 @@ class MusicCard(QFrame):
                 124,
                 58,
                 237,
-                42 if self.current_is_dark else 35
+                42
+                if self.current_is_dark
+                else 35
             )
 
         pen = QPen(
@@ -1359,9 +1596,9 @@ class MusicCard(QFrame):
             path
         )
 
-        # ----------------------------------------------------
-        # TOP GLOW
-        # ----------------------------------------------------
+        # ====================================================
+        # GLOWS
+        # ====================================================
 
         painter.setPen(
             Qt.NoPen
@@ -1372,7 +1609,9 @@ class MusicCard(QFrame):
                 139,
                 92,
                 246,
-                15 if self.current_is_dark else 9
+                15
+                if self.current_is_dark
+                else 9
             )
         )
 
@@ -1383,16 +1622,14 @@ class MusicCard(QFrame):
             100
         )
 
-        # ----------------------------------------------------
-        # BOTTOM GLOW
-        # ----------------------------------------------------
-
         painter.setBrush(
             QColor(
                 168,
                 85,
                 247,
-                10 if self.current_is_dark else 7
+                10
+                if self.current_is_dark
+                else 7
             )
         )
 

@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtCore import Qt, Signal, QUrl, QTimer
+
+from PySide6.QtNetwork import (
+    QNetworkAccessManager,
+    QNetworkRequest,
+)
+
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
@@ -121,6 +127,9 @@ class NowPlaying(QWidget):
     play_state_changed = Signal(bool)
     progress_changed = Signal(int, str, str)
 
+    # DAY 19 - sends the already-decoded album cover to other UI players.
+    cover_pixmap_changed = Signal(object)
+
     def __init__(self):
         super().__init__()
 
@@ -145,6 +154,31 @@ class NowPlaying(QWidget):
         self.queue_index = 0
 
         # ========================================================
+        # DAY 19 - ONLINE QUEUE STATE
+        # ========================================================
+
+        self.online_queue = []
+
+        self.online_queue_index = 0
+
+        self.playback_source = "local"
+
+        self.current_online_song = None
+
+        # ========================================================
+        # DAY 19 - ONLINE STREAM SAFETY
+        # ========================================================
+
+        # Some remote Jamendo streams can take a moment before the
+        # Qt multimedia backend is ready. Keep enough state to retry
+        # the same stream once without breaking the queue/UI.
+        self.online_stream_url = ""
+        self.online_autoplay_pending = False
+        self.online_retry_count = 0
+        self.online_retry_limit = 1
+        self.current_online_duration_seconds = 0
+
+        # ========================================================
         # AUDIO PLAYER
         # ========================================================
 
@@ -152,6 +186,19 @@ class NowPlaying(QWidget):
         self.audio_output = QAudioOutput(self)
         self.audio_player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(0.75)
+
+        # ========================================================
+        # ONLINE COVER ART NETWORK MANAGER
+        # ========================================================
+
+        self.cover_network = QNetworkAccessManager(
+            self
+        )
+
+        self.cover_reply = None
+
+        # Multiple remote Next Up thumbnails can load at the same time.
+        self.thumbnail_replies = []
 
         # ========================================================
         # DURATION PROBE
@@ -166,6 +213,12 @@ class NowPlaying(QWidget):
         self.audio_player.positionChanged.connect(self.update_progress)
         self.audio_player.durationChanged.connect(self.update_duration)
         self.audio_player.mediaStatusChanged.connect(self.handle_media_status)
+        self.audio_player.playbackStateChanged.connect(
+            self.handle_playback_state
+        )
+        self.audio_player.errorOccurred.connect(
+            self.handle_player_error
+        )
 
         self.build_ui()
 
@@ -246,12 +299,19 @@ class NowPlaying(QWidget):
         if default_art:
             pix = QPixmap(str(default_art))
             if not pix.isNull():
+                scaled_local_cover = pix.scaled(
+                    232,
+                    232,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation
+                )
+
                 self.album.setPixmap(
-                    pix.scaled(
-                        232, 232,
-                        Qt.KeepAspectRatioByExpanding,
-                        Qt.SmoothTransformation
-                    )
+                    scaled_local_cover
+                )
+
+                self.cover_pixmap_changed.emit(
+                    scaled_local_cover
                 )
 
         album_layout.addWidget(self.album)
@@ -514,6 +574,201 @@ class NowPlaying(QWidget):
         self.refresh_next_up()
 
     # ========================================================
+    # SET ONLINE QUEUE
+    # ========================================================
+
+    def set_online_queue(
+        self,
+        songs,
+        current_song=None
+    ):
+
+        self.online_queue = list(
+            songs or []
+        )
+
+        # ----------------------------------------------------
+        # EMPTY
+        # ----------------------------------------------------
+
+        if not self.online_queue:
+
+            self.online_queue_index = 0
+
+            return
+
+        # ----------------------------------------------------
+        # FIND CURRENT SONG
+        # ----------------------------------------------------
+
+        if current_song is not None:
+
+            current_id = str(
+                getattr(
+                    current_song,
+                    "id",
+                    ""
+                )
+            )
+
+            found_index = None
+
+            for index, song in enumerate(
+                self.online_queue
+            ):
+
+                song_id = str(
+                    getattr(
+                        song,
+                        "id",
+                        ""
+                    )
+                )
+
+                if (
+                    current_id
+                    and song_id
+                    and current_id == song_id
+                ):
+
+                    found_index = index
+
+                    break
+
+            if found_index is not None:
+
+                self.online_queue_index = (
+                    found_index
+                )
+
+        self.playback_source = "online"
+
+        self.refresh_next_up()
+
+
+    # ========================================================
+    # SET ONLINE INDEX
+    # ========================================================
+
+    def set_online_index(
+        self,
+        index
+    ):
+
+        if not self.online_queue:
+
+            self.online_queue_index = 0
+
+            return
+
+        index = max(
+            0,
+            min(
+                int(index),
+                len(self.online_queue) - 1
+            )
+        )
+
+        self.online_queue_index = index
+
+        self.refresh_next_up()
+
+
+    # ========================================================
+    # ONLINE NEXT
+    # ========================================================
+
+    def play_online_next(self):
+
+        if not self.online_queue:
+
+            return
+
+        total = len(
+            self.online_queue
+        )
+
+        # ----------------------------------------------------
+        # SHUFFLE
+        # ----------------------------------------------------
+
+        if self.is_shuffle:
+
+            if total == 1:
+
+                new_index = (
+                    self.online_queue_index
+                )
+
+            else:
+
+                import random
+
+                indexes = [
+
+                    index
+
+                    for index in range(total)
+
+                    if index
+                    != self.online_queue_index
+                ]
+
+                new_index = random.choice(
+                    indexes
+                )
+
+        # ----------------------------------------------------
+        # NORMAL
+        # ----------------------------------------------------
+
+        else:
+
+            new_index = (
+                self.online_queue_index + 1
+            ) % total
+
+        self.online_queue_index = (
+            new_index
+        )
+
+        song = self.online_queue[
+            self.online_queue_index
+        ]
+
+        self.update_online_song(
+            song,
+            preserve_queue=True
+        )
+
+    # ========================================================
+    # ONLINE PREVIOUS
+    # ========================================================
+
+    def play_online_previous(self):
+
+        if not self.online_queue:
+
+            return
+
+        self.online_queue_index -= 1
+
+        if self.online_queue_index < 0:
+
+            self.online_queue_index = (
+                len(self.online_queue) - 1
+            )
+
+        song = self.online_queue[
+            self.online_queue_index
+        ]
+
+        self.update_online_song(
+            song,
+            preserve_queue=True
+        )
+
+    # ========================================================
     # SET CURRENT QUEUE INDEX
     # ========================================================
 
@@ -531,33 +786,101 @@ class NowPlaying(QWidget):
     # ========================================================
 
     def refresh_next_up(self):
-        if not hasattr(self, "next_scroll"):
+
+        if not hasattr(
+            self,
+            "next_scroll"
+        ):
+
             return
 
         content = QWidget()
-        content.setStyleSheet("QWidget { background: transparent; }")
 
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(0, 0, 4, 4)
-        layout.setSpacing(7)
+        content.setStyleSheet(
+            "QWidget { background: transparent; }"
+        )
 
-        if not self.queue:
-            empty = QLabel("No songs in queue")
-            empty.setStyleSheet("""
-            QLabel {
-                color: #756A91;
-                font-size: 11px;
-                background: transparent;
-                padding: 12px;
-            }
-            """)
-            layout.addWidget(empty)
-        else:
-            total = len(self.queue)
+        layout = QVBoxLayout(
+            content
+        )
 
-            for offset in range(1, total):
-                index = (self.queue_index + offset) % total
-                image_path, title, artist = self.queue[index]
+        layout.setContentsMargins(
+            0,
+            0,
+            4,
+            4
+        )
+
+        layout.setSpacing(
+            7
+        )
+
+        # ====================================================
+        # ONLINE QUEUE
+        # ====================================================
+
+        if (
+            self.playback_source == "online"
+            and self.online_queue
+        ):
+
+            total = len(
+                self.online_queue
+            )
+
+            for offset in range(
+                1,
+                total
+            ):
+
+                index = (
+                    self.online_queue_index
+                    + offset
+                ) % total
+
+                song = self.online_queue[
+                    index
+                ]
+
+                layout.addWidget(
+                    self.create_online_next_song(
+                        song
+                    )
+                )
+
+            remaining = max(
+                0,
+                total - 1
+            )
+
+        # ====================================================
+        # LOCAL QUEUE
+        # ====================================================
+
+        elif self.queue:
+
+            total = len(
+                self.queue
+            )
+
+            for offset in range(
+                1,
+                total
+            ):
+
+                index = (
+                    self.queue_index
+                    + offset
+                ) % total
+
+                (
+                    image_path,
+                    title,
+                    artist
+                ) = self.queue[
+                    index
+                ]
+
                 layout.addWidget(
                     self.create_next_song(
                         image_path,
@@ -566,13 +889,44 @@ class NowPlaying(QWidget):
                     )
                 )
 
+            remaining = max(
+                0,
+                total - 1
+            )
+
+        # ====================================================
+        # EMPTY
+        # ====================================================
+
+        else:
+
+            empty = QLabel(
+                "No songs in queue"
+            )
+
+            empty.setStyleSheet(
+                """
+                QLabel {
+                    color: #756A91;
+                    font-size: 11px;
+                    background: transparent;
+                    padding: 12px;
+                }
+                """
+            )
+
+            layout.addWidget(
+                empty
+            )
+
+            remaining = 0
+
         layout.addStretch()
 
-        # IMPORTANT: do not call old_widget.deleteLater() here.
-        # QScrollArea.setWidget() manages/replaces the previous widget.
-        self.next_scroll.setWidget(content)
+        self.next_scroll.setWidget(
+            content
+        )
 
-        remaining = max(0, len(self.queue) - 1)
         self.queue_count.setText(
             f"{remaining} "
             f"{'song' if remaining == 1 else 'songs'}"
@@ -772,10 +1126,867 @@ class NowPlaying(QWidget):
         return item
 
     # ========================================================
+    # ONLINE NEXT SONG ITEM
+    # ========================================================
+
+    def create_online_next_song(
+        self,
+        song
+    ):
+
+        item = QFrame()
+        item.setFixedHeight(58)
+        item.setObjectName("NextSong")
+        item.setStyleSheet("""
+        QFrame#NextSong {
+            background: rgba(255,255,255,5);
+            border: 1px solid transparent;
+            border-radius: 12px;
+        }
+        QFrame#NextSong:hover {
+            background: rgba(139,58,246,20);
+            border: 1px solid rgba(139,92,246,55);
+        }
+        """)
+
+        layout = QHBoxLayout(item)
+        layout.setContentsMargins(7, 6, 8, 6)
+        layout.setSpacing(9)
+
+        # ONLINE THUMBNAIL
+        thumb = QLabel("♫")
+        thumb.setFixedSize(46, 46)
+        thumb.setAlignment(Qt.AlignCenter)
+        thumb.setScaledContents(False)
+        thumb.setStyleSheet("""
+        QLabel {
+            background: #24183D;
+            color: #A970FF;
+            border-radius: 9px;
+            font-size: 19px;
+        }
+        """)
+        layout.addWidget(thumb)
+
+        image_url = str(getattr(song, "image_url", "") or "").strip()
+        if image_url:
+            self.load_online_thumbnail(image_url, thumb)
+
+        # TEXT
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(1)
+
+        title = QLabel(song.display_title())
+        title.setStyleSheet("""
+        QLabel {
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            background: transparent;
+        }
+        """)
+
+        artist = QLabel(song.display_artist())
+        artist.setStyleSheet("""
+        QLabel {
+            color: #81779B;
+            font-size: 10px;
+            background: transparent;
+        }
+        """)
+
+        text_layout.addWidget(title)
+        text_layout.addWidget(artist)
+        layout.addLayout(text_layout, 1)
+
+        duration = QLabel(song.duration_text())
+        duration.setStyleSheet("""
+        QLabel {
+            color: #756A91;
+            font-size: 9px;
+            background: transparent;
+        }
+        """)
+        layout.addWidget(duration)
+
+        item.mousePressEvent = (
+            lambda event, selected_song=song:
+            self.update_online_song(selected_song, preserve_queue=True)
+        )
+
+        return item
+
+    # ========================================================
+    # LOAD ONLINE NEXT-UP THUMBNAIL
+    # ========================================================
+
+    def load_online_thumbnail(self, image_url, label):
+
+        image_url = str(image_url or "").strip()
+        if not image_url:
+            return
+
+        url = QUrl(image_url)
+        if not url.isValid():
+            print("Invalid Next Up cover URL:", image_url)
+            return
+
+        request = QNetworkRequest(url)
+        request.setRawHeader(b"User-Agent", b"LYRx-Music-Player/0.2")
+
+        reply = self.cover_network.get(request)
+        self.thumbnail_replies.append(reply)
+
+        reply.finished.connect(
+            lambda r=reply, target=label:
+            self.online_thumbnail_loaded(r, target)
+        )
+
+    # ========================================================
+    # ONLINE NEXT-UP THUMBNAIL LOADED
+    # ========================================================
+
+    def online_thumbnail_loaded(self, reply, label):
+
+        try:
+            raw_data = bytes(reply.readAll())
+            pixmap = QPixmap()
+
+            if not pixmap.loadFromData(raw_data):
+                return
+
+            scaled = pixmap.scaled(
+                46, 46,
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation
+            )
+
+            label.clear()
+            label.setPixmap(scaled)
+
+        except RuntimeError:
+            pass
+        except Exception as error:
+            print("Next Up online cover error:", error)
+        finally:
+            try:
+                self.thumbnail_replies.remove(reply)
+            except (ValueError, RuntimeError):
+                pass
+            try:
+                reply.deleteLater()
+            except RuntimeError:
+                pass
+
+    # ========================================================
+    # LOAD ONLINE COVER
+    # ========================================================
+
+    def load_online_cover(
+        self,
+        image_url
+    ):
+
+        image_url = str(
+            image_url or ""
+        ).strip()
+
+        if not image_url:
+
+            self.album.clear()
+
+            self.album.setText(
+                "♫"
+            )
+
+            return
+
+        # ----------------------------------------------------
+        # CANCEL OLD REQUEST
+        # ----------------------------------------------------
+
+        try:
+
+            if (
+                self.cover_reply is not None
+                and
+                self.cover_reply.isRunning()
+            ):
+
+                self.cover_reply.abort()
+
+        except Exception:
+
+            pass
+
+        # ----------------------------------------------------
+        # REQUEST
+        # ----------------------------------------------------
+
+        request = QNetworkRequest(
+            QUrl(
+                image_url
+            )
+        )
+
+        request.setRawHeader(
+            b"User-Agent",
+            b"LYRx-Music-Player/0.2"
+        )
+
+        self.cover_reply = (
+            self.cover_network.get(
+                request
+            )
+        )
+
+        self.cover_reply.finished.connect(
+            self.online_cover_loaded
+        )
+
+
+    # ========================================================
+    # ONLINE COVER LOADED
+    # ========================================================
+
+    def online_cover_loaded(self):
+
+        reply = self.sender()
+
+        if reply is None:
+
+            return
+
+        try:
+
+            data = reply.readAll()
+
+            pixmap = QPixmap()
+
+            loaded = pixmap.loadFromData(
+                bytes(data)
+            )
+
+            if loaded:
+
+                scaled = pixmap.scaled(
+                    232,
+                    232,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation
+                )
+
+                self.album.setText("")
+
+                self.album.setPixmap(
+                    scaled
+                )
+
+                self.cover_pixmap_changed.emit(
+                    scaled
+                )
+
+            else:
+
+                self.album.clear()
+
+                self.album.setText(
+                    "♫"
+                )
+
+        except Exception as error:
+
+            print(
+                "Online cover load error:",
+                error
+            )
+
+        finally:
+
+            try:
+
+                reply.deleteLater()
+
+            except Exception:
+
+                pass
+
+            if reply is self.cover_reply:
+
+                self.cover_reply = None
+
+    # ========================================================
+    # UPDATE ONLINE SONG
+    # ========================================================
+
+    def update_online_song(
+        self,
+        song,
+        preserve_queue=False
+    ):
+
+        if song is None:
+
+            return
+
+        # ====================================================
+        # ONLINE MODE
+        # ====================================================
+
+        self.playback_source = "online"
+
+        self.current_online_song = song
+
+        # ====================================================
+        # BASIC DATA
+        # ====================================================
+
+        title = str(
+            getattr(
+                song,
+                "title",
+                ""
+            )
+            or "Unknown Track"
+        )
+
+        artist = str(
+            getattr(
+                song,
+                "artist",
+                ""
+            )
+            or "Unknown Artist"
+        )
+
+        image_url = str(
+            getattr(
+                song,
+                "image_url",
+                ""
+            )
+            or ""
+        )
+
+        audio_url = str(
+            getattr(
+                song,
+                "audio_url",
+                ""
+            )
+            or ""
+        )
+
+        duration_seconds = int(
+            getattr(
+                song,
+                "duration",
+                0
+            )
+            or 0
+        )
+
+        self.current_online_duration_seconds = (
+            duration_seconds
+        )
+
+        # A newly selected track gets a fresh retry budget.
+        self.online_retry_count = 0
+
+        # ====================================================
+        # SYNC ONLINE QUEUE INDEX
+        # ====================================================
+
+        if self.online_queue:
+
+            song_id = str(
+                getattr(
+                    song,
+                    "id",
+                    ""
+                )
+            )
+
+            for index, queue_song in enumerate(
+                self.online_queue
+            ):
+
+                queue_id = str(
+                    getattr(
+                        queue_song,
+                        "id",
+                        ""
+                    )
+                )
+
+                if (
+                    song_id
+                    and queue_id
+                    and song_id == queue_id
+                ):
+
+                    self.online_queue_index = index
+
+                    break
+
+        # ====================================================
+        # VALIDATE AUDIO
+        # ====================================================
+
+        if not audio_url:
+
+            print(
+                "Online song has no audio URL:",
+                title
+            )
+
+            return
+
+        print()
+        print("=" * 60)
+
+        print(
+            "LYRx ONLINE PLAY"
+        )
+
+        print(
+            "Title:",
+            title
+        )
+
+        print(
+            "Artist:",
+            artist
+        )
+
+        print(
+            "Audio:",
+            audio_url
+        )
+
+        print("=" * 60)
+        print()
+
+        # ====================================================
+        # STOP CURRENT SONG
+        # ====================================================
+
+        self.audio_player.stop()
+
+        # ====================================================
+        # CURRENT STATE
+        # ====================================================
+
+        self.current_image_path = (
+            image_url
+        )
+
+        self.current_title = (
+            title
+        )
+
+        self.current_artist = (
+            artist
+        )
+
+        # ====================================================
+        # UI
+        # ====================================================
+
+        self.song.setText(
+            title
+        )
+
+        self.artist.setText(
+            artist
+        )
+
+        # ====================================================
+        # COVER
+        # ====================================================
+
+        self.album.clear()
+
+        self.album.setText(
+            "♫"
+        )
+
+        self.load_online_cover(
+            image_url
+        )
+
+        # ====================================================
+        # RESET PROGRESS
+        # ====================================================
+
+        self.slider.blockSignals(
+            True
+        )
+
+        self.slider.setValue(
+            0
+        )
+
+        self.slider.blockSignals(
+            False
+        )
+
+        self.current_time.setText(
+            "0:00"
+        )
+
+        # ----------------------------------------------------
+        # API duration can be shown immediately
+        # ----------------------------------------------------
+
+        if duration_seconds > 0:
+
+            minutes = (
+                duration_seconds
+                // 60
+            )
+
+            seconds = (
+                duration_seconds
+                % 60
+            )
+
+            self.total_time.setText(
+                f"{minutes}:"
+                f"{seconds:02d}"
+            )
+
+        else:
+
+            self.total_time.setText(
+                "0:00"
+            )
+
+        # ====================================================
+        # FLOATING PLAYER SYNC
+        # ====================================================
+
+        self.song_changed.emit(
+            image_url,
+            title,
+            artist
+        )
+
+        # ====================================================
+        # ONLINE STREAM
+        # ====================================================
+
+        media_url = QUrl(
+            audio_url
+        )
+
+        if not media_url.isValid():
+
+            print(
+                "Invalid online audio URL:",
+                audio_url
+            )
+
+            return
+
+        # ====================================================
+        # SAFE ONLINE START
+        # ====================================================
+
+        self.start_online_stream(
+            audio_url
+        )
+
+        self.refresh_next_up()
+
+        print(
+            "LYRx streaming request:",
+            title,
+            "-",
+            artist
+        )
+
+    # ========================================================
+    # START ONLINE STREAM
+    # ========================================================
+
+    def start_online_stream(
+        self,
+        audio_url
+    ):
+
+        audio_url = str(
+            audio_url or ""
+        ).strip()
+
+        if not audio_url:
+
+            return
+
+        media_url = QUrl(
+            audio_url
+        )
+
+        if not media_url.isValid():
+
+            print(
+                "Invalid online audio URL:",
+                audio_url
+            )
+
+            return
+
+        self.online_stream_url = (
+            audio_url
+        )
+
+        self.online_autoplay_pending = (
+            True
+        )
+
+        # Clear the previous source first. This helps Windows/Qt release
+        # the previous remote decoder before opening another HTTP stream.
+        self.audio_player.stop()
+
+        self.audio_player.setSource(
+            QUrl()
+        )
+
+        QTimer.singleShot(
+            80,
+            lambda url=media_url:
+            self._set_online_source(
+                url
+            )
+        )
+
+    # ========================================================
+    # SET ONLINE SOURCE
+    # ========================================================
+
+    def _set_online_source(
+        self,
+        media_url
+    ):
+
+        if (
+            self.playback_source
+            != "online"
+        ):
+
+            return
+
+        self.audio_player.setSource(
+            media_url
+        )
+
+        # Do not rely only on immediate play(). Some Windows multimedia
+        # backends need a short event-loop cycle after setSource().
+        QTimer.singleShot(
+            140,
+            self._play_online_source
+        )
+
+    # ========================================================
+    # PLAY ONLINE SOURCE
+    # ========================================================
+
+    def _play_online_source(self):
+
+        if (
+            self.playback_source
+            != "online"
+        ):
+
+            return
+
+        if not self.online_autoplay_pending:
+
+            return
+
+        if self.audio_player.source().isEmpty():
+
+            return
+
+        self.audio_player.play()
+
+    # ========================================================
+    # RETRY ONLINE STREAM
+    # ========================================================
+
+    def retry_online_stream(self):
+
+        if (
+            self.playback_source
+            != "online"
+        ):
+
+            return
+
+        if not self.online_stream_url:
+
+            return
+
+        print(
+            "Retrying online stream:",
+            self.current_title
+        )
+
+        self.online_autoplay_pending = (
+            True
+        )
+
+        media_url = QUrl(
+            self.online_stream_url
+        )
+
+        self.audio_player.stop()
+
+        self.audio_player.setSource(
+            QUrl()
+        )
+
+        QTimer.singleShot(
+            300,
+            lambda url=media_url:
+            self._set_online_source(
+                url
+            )
+        )
+
+    # ========================================================
+    # PLAYER ERROR
+    # ========================================================
+
+    def handle_player_error(
+        self,
+        error,
+        error_string=""
+    ):
+
+        # NoError can also be emitted while the backend resets.
+        if (
+            error
+            == QMediaPlayer.Error.NoError
+        ):
+
+            return
+
+        message = str(
+            error_string or ""
+        ).strip()
+
+        print()
+        print("=" * 60)
+        print("LYRx PLAYER ERROR")
+        print(
+            "Source:",
+            self.playback_source
+        )
+        print(
+            "Song:",
+            self.current_title
+        )
+        print(
+            "Error:",
+            error
+        )
+        print(
+            "Message:",
+            message
+            if message
+            else "No backend message"
+        )
+        print("=" * 60)
+        print()
+
+        if (
+            self.playback_source == "online"
+            and self.online_stream_url
+            and self.online_retry_count
+            < self.online_retry_limit
+        ):
+
+            self.online_retry_count += 1
+
+            QTimer.singleShot(
+                250,
+                self.retry_online_stream
+            )
+
+            return
+
+        self.online_autoplay_pending = (
+            False
+        )
+
+        self.is_playing = False
+
+        self.play_btn.setText(
+            "▶"
+        )
+
+        self.play_state_changed.emit(
+            False
+        )
+
+    # ========================================================
+    # PLAYBACK STATE
+    # ========================================================
+
+    def handle_playback_state(
+        self,
+        state
+    ):
+
+        playing = (
+            state
+            == QMediaPlayer.PlaybackState.PlayingState
+        )
+
+        self.is_playing = (
+            playing
+        )
+
+        self.play_btn.setText(
+            "Ⅱ"
+            if playing
+            else "▶"
+        )
+
+        if playing:
+
+            self.online_autoplay_pending = (
+                False
+            )
+
+            self.online_retry_count = 0
+
+        self.play_state_changed.emit(
+            playing
+        )
+
+    # ========================================================
     # UPDATE SONG
     # ========================================================
 
-    def update_song(self, image_path, title, artist):
+    def update_song(
+        self,
+        image_path,
+        title,
+        artist
+    ):
+
+        self.playback_source = "local"
+
+        self.current_online_song = None
+
+        self.online_autoplay_pending = False
+        self.online_stream_url = ""
+        self.online_retry_count = 0
+        self.current_online_duration_seconds = 0
+
         self.current_image_path = image_path
         self.current_title = title
         self.current_artist = artist
@@ -855,8 +2066,51 @@ class NowPlaying(QWidget):
     # MEDIA STATUS
     # ========================================================
 
-    def handle_media_status(self, status):
-        if status != QMediaPlayer.MediaStatus.EndOfMedia:
+    def handle_media_status(
+        self,
+        status
+    ):
+
+        # ====================================================
+        # ONLINE LOAD / BUFFER
+        # ====================================================
+
+        if (
+            self.playback_source == "online"
+            and self.online_autoplay_pending
+            and status in (
+                QMediaPlayer.MediaStatus.LoadedMedia,
+                QMediaPlayer.MediaStatus.BufferedMedia,
+            )
+        ):
+
+            self.audio_player.play()
+
+        # ====================================================
+        # INVALID MEDIA
+        # ====================================================
+
+        if (
+            status
+            == QMediaPlayer.MediaStatus.InvalidMedia
+        ):
+
+            print(
+                "Invalid media:",
+                self.current_title
+            )
+
+            return
+
+        # ====================================================
+        # END OF MEDIA
+        # ====================================================
+
+        if (
+            status
+            != QMediaPlayer.MediaStatus.EndOfMedia
+        ):
+
             return
 
         print(
@@ -867,49 +2121,136 @@ class NowPlaying(QWidget):
         self.song_finished.emit()
 
         if self.is_repeat:
-            self.audio_player.setPosition(0)
+
+            self.audio_player.setPosition(
+                0
+            )
+
             self.audio_player.play()
-            self.is_playing = True
-            self.play_btn.setText("Ⅱ")
-            self.play_state_changed.emit(True)
+
             return
 
         self.is_playing = False
-        self.play_btn.setText("▶")
-        self.play_state_changed.emit(False)
-        self.next_requested.emit()
+
+        self.play_btn.setText(
+            "▶"
+        )
+
+        self.play_state_changed.emit(
+            False
+        )
+
+        # ====================================================
+        # NEXT SONG BASED ON ACTIVE SOURCE
+        # ====================================================
+
+        if (
+            self.playback_source == "online"
+            and self.online_queue
+        ):
+
+            self.play_online_next()
+
+        else:
+
+            self.next_requested.emit()
 
     # ========================================================
     # PLAY / PAUSE
     # ========================================================
 
     def toggle_play(self):
-        state = self.audio_player.playbackState()
 
-        if state == QMediaPlayer.PlaybackState.PlayingState:
+        state = (
+            self.audio_player
+            .playbackState()
+        )
+
+        if (
+            state
+            == QMediaPlayer.PlaybackState.PlayingState
+        ):
+
+            self.online_autoplay_pending = (
+                False
+            )
+
             self.audio_player.pause()
-            self.is_playing = False
-            self.play_btn.setText("▶")
-            self.play_state_changed.emit(False)
+
         else:
+
+            # If an online source failed to open and Qt has no active
+            # source, rebuild it before trying Play again.
+            if (
+                self.playback_source == "online"
+                and self.audio_player.source().isEmpty()
+                and self.online_stream_url
+            ):
+
+                self.online_autoplay_pending = (
+                    True
+                )
+
+                self.start_online_stream(
+                    self.online_stream_url
+                )
+
+                return
+
             self.audio_player.play()
-            self.is_playing = True
-            self.play_btn.setText("Ⅱ")
-            self.play_state_changed.emit(True)
 
     # ========================================================
     # UPDATE DURATION
     # ========================================================
 
-    def update_duration(self, duration):
+    def update_duration(
+        self,
+        duration
+    ):
+
         if duration <= 0:
-            self.total_time.setText("0:00")
+
+            # Remote streams can briefly report zero while opening.
+            # Keep the duration supplied by the online catalog instead
+            # of flashing back to 0:00.
+            if (
+                self.playback_source == "online"
+                and self.current_online_duration_seconds > 0
+            ):
+
+                minutes = (
+                    self.current_online_duration_seconds
+                    // 60
+                )
+
+                seconds = (
+                    self.current_online_duration_seconds
+                    % 60
+                )
+
+                self.total_time.setText(
+                    f"{minutes}:"
+                    f"{seconds:02d}"
+                )
+
+                return
+
+            self.total_time.setText(
+                "0:00"
+            )
+
             return
 
         self.total_time.setText(
-            format_duration(duration)
+            format_duration(
+                duration
+            )
         )
-        self.slider.setRange(0, 100)
+
+        self.slider.setRange(
+            0,
+            100
+        )
 
     # ========================================================
     # UPDATE PROGRESS

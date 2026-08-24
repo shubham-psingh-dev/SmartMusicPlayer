@@ -1344,6 +1344,23 @@ class HomeScreen(QWidget):
 
     def play_next(self):
 
+        # ==================================================
+        # DAY 19 - ONLINE QUEUE
+        # ==================================================
+
+        if (
+            getattr(
+                self.now_playing,
+                "playback_source",
+                "local"
+            )
+            == "online"
+        ):
+
+            self.now_playing.play_online_next()
+
+            return
+        
         if not self.player_queue:
 
             return
@@ -1414,6 +1431,23 @@ class HomeScreen(QWidget):
 
     def play_previous(self):
 
+        # ==================================================
+        # DAY 19 - ONLINE QUEUE
+        # ==================================================
+
+        if (
+            getattr(
+                self.now_playing,
+                "playback_source",
+                "local"
+            )
+            == "online"
+        ):
+
+            self.now_playing.play_online_previous()
+
+            return
+        
         if not self.player_queue:
 
             return

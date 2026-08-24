@@ -1,4 +1,15 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QUrl,
+)
+
+from PySide6.QtNetwork import (
+    QNetworkAccessManager,
+    QNetworkRequest,
+    QNetworkReply,
+)
+
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -45,6 +56,16 @@ class FloatingPlayer(QFrame):
         self.current_artist = ""
 
         self.is_playing = True
+
+        # ========================================================
+        # ONLINE COVER ART
+        # ========================================================
+
+        self.cover_network = QNetworkAccessManager(
+            self
+        )
+
+        self.cover_reply = None
 
         self.setFixedSize(
             820,
@@ -633,6 +654,182 @@ class FloatingPlayer(QFrame):
             """)
 
     # ========================================================
+    # FLOATING ONLINE COVER
+    # ========================================================
+
+    def load_online_cover(
+        self,
+        image_url
+    ):
+
+        image_url = str(
+            image_url or ""
+        ).strip()
+
+        if not image_url:
+
+            self.album.clear()
+
+            return
+
+        # ----------------------------------------------------
+        # OLD REQUEST
+        # ----------------------------------------------------
+
+        if self.cover_reply is not None:
+
+            try:
+
+                if self.cover_reply.isRunning():
+
+                    self.cover_reply.abort()
+
+            except Exception:
+
+                pass
+
+            self.cover_reply = None
+
+        # ----------------------------------------------------
+        # REQUEST
+        # ----------------------------------------------------
+
+        url = QUrl.fromUserInput(
+            image_url
+        )
+
+        if not url.isValid():
+
+            print(
+                "Floating invalid cover URL:",
+                image_url
+            )
+
+            return
+
+        request = QNetworkRequest(
+            url
+        )
+
+        request.setRawHeader(
+            b"User-Agent",
+            b"Mozilla/5.0 LYRx/0.2"
+        )
+
+        self.cover_reply = (
+            self.cover_network.get(
+                request
+            )
+        )
+
+        self.cover_reply.finished.connect(
+            self.online_cover_loaded
+        )
+
+    # ========================================================
+    # FLOATING ONLINE COVER LOADED
+    # ========================================================
+
+    def online_cover_loaded(self):
+
+        reply = self.sender()
+
+        if reply is None:
+
+            return
+
+        try:
+
+            if (
+                reply.error()
+                != QNetworkReply.NetworkError.NoError
+            ):
+
+                print(
+                    "Floating cover network error:",
+                    reply.errorString()
+                )
+
+                self.album.clear()
+
+                return
+
+            raw_data = bytes(
+                reply.readAll()
+            )
+
+            pixmap = QPixmap()
+
+            if not pixmap.loadFromData(
+                raw_data
+            ):
+
+                print(
+                    "Floating cover decode failed"
+                )
+
+                self.album.clear()
+
+                return
+
+            pixmap = pixmap.scaled(
+                58,
+                58,
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation
+            )
+
+            self.album.clear()
+
+            self.album.setPixmap(
+                pixmap
+            )
+
+        except Exception as error:
+
+            print(
+                "Floating online cover error:",
+                error
+            )
+
+        finally:
+
+            try:
+
+                reply.deleteLater()
+
+            except Exception:
+
+                pass
+
+            if reply is self.cover_reply:
+
+                self.cover_reply = None
+
+    # ========================================================
+    # SET COVER PIXMAP
+    # ========================================================
+
+    def set_cover_pixmap(self, pixmap):
+
+        try:
+            if pixmap is None or pixmap.isNull():
+                return
+
+            scaled = pixmap.scaled(
+                58,
+                58,
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation
+            )
+
+            self.album.clear()
+            self.album.setPixmap(scaled)
+
+        except Exception as error:
+            print("Floating shared cover error:", error)
+
+    # ========================================================
     # SET SONG
     # ========================================================
 
@@ -643,81 +840,176 @@ class FloatingPlayer(QFrame):
         artist
     ):
 
-        self.current_image = image_path
-        self.current_title = title
-        self.current_artist = artist
+        self.current_image = (
+            image_path
+        )
 
-        self.song_label.setText(title)
-        self.artist_label.setText(artist)
+        self.current_title = (
+            title
+        )
 
-        from pathlib import Path
+        self.current_artist = (
+            artist
+        )
 
-        file_dir = Path(__file__).resolve()
+        # ====================================================
+        # TEXT
+        # ====================================================
 
-        project_dir = file_dir.parents[2]
+        self.song_label.setText(
+            title
+        )
 
-        candidates = [
-            project_dir / image_path,
-            file_dir.parents[1] / image_path,
-            Path.cwd() / image_path,
-            Path(image_path)
-        ]
+        self.artist_label.setText(
+            artist
+        )
 
-        image_file = None
+        # ====================================================
+        # ONLINE COVER
+        # ====================================================
 
-        for path in candidates:
+        image_value = str(
+            image_path or ""
+        ).strip()
 
-            try:
+        if image_value.startswith(
+            (
+                "http://",
+                "https://"
+            )
+        ):
 
-                if path.exists() and path.is_file():
+            self.album.clear()
 
-                    image_file = path
-                    break
-
-            except Exception:
-                pass
-
-        if image_file:
-
-            pix = QPixmap(
-                str(image_file)
+            self.load_online_cover(
+                image_value
             )
 
-            if not pix.isNull():
+        # ====================================================
+        # LOCAL COVER
+        # ====================================================
 
-                scaled_pix = pix.scaled(
-                    58,
-                    58,
-                    Qt.KeepAspectRatioByExpanding,
-                    Qt.SmoothTransformation
+        else:
+
+            from pathlib import Path
+
+            file_dir = Path(
+                __file__
+            ).resolve()
+
+            project_dir = (
+                file_dir.parents[2]
+            )
+
+            candidates = [
+
+                project_dir
+                / image_value,
+
+                file_dir.parents[1]
+                / image_value,
+
+                Path.cwd()
+                / image_value,
+
+                Path(
+                    image_value
+                ),
+            ]
+
+            image_file = None
+
+            for path in candidates:
+
+                try:
+
+                    if (
+                        path.exists()
+                        and
+                        path.is_file()
+                    ):
+
+                        image_file = (
+                            path
+                        )
+
+                        break
+
+                except Exception:
+
+                    pass
+
+            if image_file:
+
+                pix = QPixmap(
+                    str(
+                        image_file
+                    )
                 )
 
-                self.album.setPixmap(
-                    scaled_pix
-                )
+                if not pix.isNull():
+
+                    scaled_pix = (
+                        pix.scaled(
+                            58,
+                            58,
+                            Qt.KeepAspectRatioByExpanding,
+                            Qt.SmoothTransformation
+                        )
+                    )
+
+                    self.album.setPixmap(
+                        scaled_pix
+                    )
+
+                else:
+
+                    self.album.clear()
 
             else:
 
                 self.album.clear()
 
-        else:
+        # ====================================================
+        # RESET PROGRESS
+        # ====================================================
 
-            self.album.clear()
+        self.progress.blockSignals(
+            True
+        )
 
-        self.progress.blockSignals(True)
+        self.progress.setValue(
+            0
+        )
 
-        self.progress.setValue(0)
+        self.progress.blockSignals(
+            False
+        )
 
-        self.progress.blockSignals(False)
+        self.current_time.setText(
+            "0:00"
+        )
 
-        self.current_time.setText("0:00")
-        self.total_time.setText("0:00")
+        self.total_time.setText(
+            "0:00"
+        )
+
+        # ====================================================
+        # PLAY STATE
+        # ====================================================
 
         self.is_playing = True
 
-        self.play_button.setText("Ⅱ")
+        self.play_button.setText(
+            "Ⅱ"
+        )
+
+        # ====================================================
+        # SHOW
+        # ====================================================
 
         self.show()
+
         self.raise_()
 
     # ========================================================
@@ -983,6 +1275,14 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 19 - ONLINE DISCOVER MUSIC
+        # ====================================================
+
+        self.discover.online_song_requested.connect(
+            self.play_online_discover_song
+        )
+
+        # ====================================================
         # FAVORITES
         # ====================================================
 
@@ -1083,6 +1383,10 @@ class AppWindow(QMainWindow):
 
             now_playing.song_changed.connect(
                 self.sync_floating_song
+            )
+
+            now_playing.cover_pixmap_changed.connect(
+                self.floating_player.set_cover_pixmap
             )
 
             now_playing.audio_player.positionChanged.connect(
@@ -1471,6 +1775,104 @@ class AppWindow(QMainWindow):
         self.position_floating_player()
 
         self.floating_player.raise_()
+
+    # ========================================================
+    # DAY 19 - ONLINE DISCOVER SONG
+    # ========================================================
+
+    def play_online_discover_song(
+        self,
+        song
+    ):
+
+        try:
+
+            if song is None:
+
+                return
+
+            print()
+            print("=" * 60)
+
+            print(
+                "APP WINDOW ONLINE SONG"
+            )
+
+            print(
+                "Title:",
+                song.title
+            )
+
+            print(
+                "Artist:",
+                song.artist
+            )
+
+            print(
+                "Source:",
+                song.source
+            )
+
+            print("=" * 60)
+            print()
+
+            # ====================================================
+            # SET COMPLETE ONLINE QUEUE
+            # ====================================================
+
+            self.home.now_playing.set_online_queue(
+                self.discover.online_songs,
+                current_song=song
+            )
+
+            # ====================================================
+            # PLAY SELECTED ONLINE SONG
+            # ====================================================
+
+            self.home.now_playing.update_online_song(
+                song,
+                preserve_queue=True
+            )
+
+            # ====================================================
+            # KEEP USER ON DISCOVER
+            # ====================================================
+
+            self.pages.setCurrentWidget(
+                self.discover
+            )
+
+            self.update_sidebar_states(
+                "Discover"
+            )
+
+            # ====================================================
+            # FLOATING PLAYER
+            # ====================================================
+
+            self.update_floating_visibility()
+
+            self.position_floating_player()
+
+            if (
+                self.floating_player.isVisible()
+            ):
+
+                self.floating_player.raise_()
+
+            print(
+                "Online playback started:",
+                song.title,
+                "-",
+                song.artist
+            )
+
+        except Exception as error:
+
+            print(
+                "Online Discover play error:",
+                error
+            )
 
     # ========================================================
     # FAVORITE SONG

@@ -29,9 +29,33 @@ from data.discover_data import (
     GENRES,
 )
 
-from services.music_service import (
-    MusicService,
+from services.provider_registry import (
+    ProviderRegistry,
 )
+
+
+# ============================================================
+# LYRx
+# DAY 20 - PHASE 2
+# FILE 4
+#
+# DISCOVER SCREEN
+#
+# Provider architecture:
+#
+# DiscoverScreen
+#       │
+#       ▼
+# OnlineMusicLoader
+#       │
+#       ▼
+# ProviderRegistry
+#       │
+#       ├── JamendoProvider
+#       ├── Future provider
+#       └── Future provider
+#
+# ============================================================
 
 
 # ============================================================
@@ -40,12 +64,35 @@ from services.music_service import (
 
 class OnlineMusicLoader(QThread):
 
-    songs_loaded = Signal(list)
-    load_failed = Signal(str)
+    # --------------------------------------------------------
+    # songs, mode, query
+    # --------------------------------------------------------
+
+    songs_loaded = Signal(
+        list,
+        str,
+        str,
+    )
+
+    # --------------------------------------------------------
+    # error, mode, query
+    # --------------------------------------------------------
+
+    load_failed = Signal(
+        str,
+        str,
+        str,
+    )
+
+    # ========================================================
+    # INIT
+    # ========================================================
 
     def __init__(
         self,
-        limit=10,
+        mode="trending",
+        query="",
+        limit=12,
         parent=None,
     ):
 
@@ -53,7 +100,32 @@ class OnlineMusicLoader(QThread):
             parent
         )
 
-        self.limit = limit
+        self.mode = str(
+            mode
+            or "trending"
+        ).strip().lower()
+
+        self.query = str(
+            query
+            or ""
+        ).strip()
+
+        try:
+
+            self.limit = max(
+                1,
+                min(
+                    int(limit),
+                    50
+                )
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            self.limit = 12
 
     # ========================================================
     # RUN
@@ -64,338 +136,402 @@ class OnlineMusicLoader(QThread):
         try:
 
             print()
-            print("=" * 60)
-            print("LYRx Discover online loader started")
-            print("=" * 60)
-
-            # ==================================================
-            # CREATE SERVICE INSIDE WORKER THREAD
-            # ==================================================
-
-            service = MusicService()
-
             print(
-                "Discover Jamendo configured:",
-                service.is_configured()
+                "=" * 60
             )
 
-            if not service.is_configured():
+            print(
+                "LYRx Discover provider loader started"
+            )
+
+            print(
+                "Mode:",
+                self.mode
+            )
+
+            if self.query:
+
+                print(
+                    "Query:",
+                    self.query
+                )
+
+            print(
+                "=" * 60
+            )
+
+            # ==================================================
+            # IMPORTANT
+            # ==================================================
+            #
+            # Create ProviderRegistry INSIDE the worker.
+            #
+            # This also creates the provider/service instances
+            # inside this worker thread rather than reusing a
+            # network/session object from the Qt main thread.
+            #
+
+            registry = (
+                ProviderRegistry()
+            )
+
+            print(
+                "Registered providers:",
+                registry.provider_names()
+            )
+
+            print(
+                "Available providers:",
+                [
+                    getattr(
+                        provider,
+                        "provider_name",
+                        "unknown"
+                    )
+                    for provider
+                    in registry.available_providers()
+                ]
+            )
+
+            # ==================================================
+            # NO PROVIDERS
+            # ==================================================
+
+            if not registry.has_available_provider():
 
                 raise RuntimeError(
-                    "JAMENDO_CLIENT_ID is not configured."
+                    "No online music provider is available."
                 )
 
             songs = []
 
             # ==================================================
-            # 1. TRENDING
+            # TRENDING
             # ==================================================
 
-            try:
+            if self.mode == "trending":
 
                 print(
-                    "Discover: requesting trending tracks..."
+                    "Discover: provider trending request..."
                 )
 
-                songs = service.get_trending_tracks(
-                    limit=self.limit
-                )
-
-                print(
-                    "Discover trending returned:",
-                    len(songs)
-                )
-
-            except Exception as error:
-
-                print(
-                    "Discover trending error:",
-                    repr(error)
-                )
-
-                songs = []
-
-            # ==================================================
-            # 2. POPULAR FALLBACK
-            # ==================================================
-
-            if not songs:
-
-                try:
-
-                    print(
-                        "Discover: requesting popular tracks..."
-                    )
-
-                    songs = service.get_popular_tracks(
+                songs = (
+                    registry.get_trending(
                         limit=self.limit
                     )
+                )
+
+                # ------------------------------------------------
+                # FALLBACK
+                # ------------------------------------------------
+
+                if not songs:
 
                     print(
-                        "Discover popular returned:",
-                        len(songs)
+                        "Trending empty. Trying popular..."
                     )
 
-                except Exception as error:
-
-                    print(
-                        "Discover popular error:",
-                        repr(error)
+                    songs = (
+                        registry.get_popular(
+                            limit=self.limit
+                        )
                     )
+
+            # ==================================================
+            # POPULAR
+            # ==================================================
+
+            elif self.mode == "popular":
+
+                print(
+                    "Discover: provider popular request..."
+                )
+
+                songs = (
+                    registry.get_popular(
+                        limit=self.limit
+                    )
+                )
+
+            # ==================================================
+            # NORMAL SEARCH
+            # ==================================================
+
+            elif self.mode == "search":
+
+                if not self.query:
 
                     songs = []
 
-            # ==================================================
-            # 3. SEARCH FALLBACK
-            # ==================================================
-            #
-            # Jamendo can occasionally return zero results for
-            # popularity orders even though the catalog itself
-            # is available.
-            #
-            # LYRx therefore tries real catalog searches.
-            # ==================================================
+                else:
 
-            if not songs:
+                    print(
+                        "Discover provider search:",
+                        self.query
+                    )
 
-                print(
-                    "Discover: popular feeds empty."
-                )
-
-                print(
-                    "Discover: starting catalog search fallback..."
-                )
-
-                search_queries = [
-
-                    "music",
-                    "love",
-                    "rock",
-                    "pop",
-                    "chill",
-                    "electronic",
-                    "acoustic",
-                    "dance",
-
-                ]
-
-                collected = []
-
-                seen_ids = set()
-
-                for query in search_queries:
-
-                    # ------------------------------------------------
-                    # Enough tracks already collected
-                    # ------------------------------------------------
-
-                    if len(collected) >= self.limit:
-
-                        break
-
-                    try:
-
-                        print(
-                            f"Discover fallback search: {query}"
-                        )
-
-                        results = service.search_tracks(
-                            query,
+                    result = (
+                        registry.search(
+                            self.query,
                             limit=self.limit
                         )
+                    )
+
+                    songs = list(
+                        getattr(
+                            result,
+                            "songs",
+                            []
+                        )
+                        or []
+                    )
+
+                    result_error = str(
+                        getattr(
+                            result,
+                            "error",
+                            ""
+                        )
+                        or ""
+                    )
+
+                    if (
+                        not songs
+                        and
+                        result_error
+                    ):
 
                         print(
-                            f"Search '{query}' returned:",
-                            len(results)
+                            "Registry search result error:",
+                            result_error
                         )
 
-                        # --------------------------------------------
-                        # DEDUPLICATE
-                        # --------------------------------------------
+            # ==================================================
+            # GENRE
+            # ==================================================
 
-                        for song in results:
+            elif self.mode == "genre":
 
-                            if song is None:
+                if not self.query:
 
-                                continue
+                    songs = []
 
-                            song_id = str(
-                                getattr(
-                                    song,
-                                    "id",
-                                    ""
-                                )
-                            )
+                else:
 
-                            audio_url = str(
-                                getattr(
-                                    song,
-                                    "audio_url",
-                                    ""
-                                )
-                            ).strip()
+                    print(
+                        "Discover genre request:",
+                        self.query
+                    )
 
-                            # ----------------------------------------
-                            # PLAYABLE TRACKS ONLY
-                            # ----------------------------------------
-
-                            if not audio_url:
-
-                                continue
-
-                            if (
-                                song_id
-                                and
-                                song_id in seen_ids
-                            ):
-
-                                continue
-
-                            if song_id:
-
-                                seen_ids.add(
-                                    song_id
-                                )
-
-                            collected.append(
-                                song
-                            )
-
-                            if (
-                                len(collected)
-                                >= self.limit
-                            ):
-
-                                break
-
-                    except Exception as error:
-
-                        print(
-                            f"Fallback search "
-                            f"'{query}' error:",
-                            repr(error)
+                    songs = (
+                        registry.get_by_genre(
+                            self.query,
+                            limit=self.limit
                         )
+                    )
 
-                songs = collected
+            # ==================================================
+            # MOOD
+            # ==================================================
+
+            elif self.mode == "mood":
+
+                if not self.query:
+
+                    songs = []
+
+                else:
+
+                    print(
+                        "Discover mood request:",
+                        self.query
+                    )
+
+                    songs = (
+                        registry.get_by_mood(
+                            self.query,
+                            limit=self.limit
+                        )
+                    )
+
+            # ==================================================
+            # HINDI
+            # ==================================================
+
+            elif self.mode == "hindi":
 
                 print(
-                    "Discover fallback total:",
-                    len(songs)
+                    "Discover Hindi request..."
                 )
 
-            # ==================================================
-            # FINAL CLEANUP
-            # ==================================================
-
-            clean_songs = []
-
-            seen_ids = set()
-
-            for song in songs:
-
-                if song is None:
-
-                    continue
-
-                audio_url = str(
-                    getattr(
-                        song,
-                        "audio_url",
-                        ""
-                    )
-                ).strip()
-
-                if not audio_url:
-
-                    continue
-
-                song_id = str(
-                    getattr(
-                        song,
-                        "id",
-                        ""
+                songs = (
+                    registry.get_hindi(
+                        limit=self.limit
                     )
                 )
 
-                if (
-                    song_id
-                    and
-                    song_id in seen_ids
-                ):
+            # ==================================================
+            # ENGLISH
+            # ==================================================
 
-                    continue
+            elif self.mode == "english":
 
-                if song_id:
-
-                    seen_ids.add(
-                        song_id
-                    )
-
-                clean_songs.append(
-                    song
+                print(
+                    "Discover English request..."
                 )
 
-                if (
-                    len(clean_songs)
-                    >= self.limit
-                ):
-
-                    break
-
-            songs = clean_songs
+                songs = (
+                    registry.get_english(
+                        limit=self.limit
+                    )
+                )
 
             # ==================================================
-            # DEBUG
+            # ARTIST
             # ==================================================
+
+            elif self.mode == "artist":
+
+                if not self.query:
+
+                    songs = []
+
+                else:
+
+                    print(
+                        "Discover artist request:",
+                        self.query
+                    )
+
+                    songs = (
+                        registry.search_artist(
+                            self.query,
+                            limit=self.limit
+                        )
+                    )
+
+            # ==================================================
+            # SONG TITLE
+            # ==================================================
+
+            elif self.mode == "song":
+
+                if not self.query:
+
+                    songs = []
+
+                else:
+
+                    print(
+                        "Discover song title request:",
+                        self.query
+                    )
+
+                    songs = (
+                        registry.search_song(
+                            self.query,
+                            limit=self.limit
+                        )
+                    )
+
+            # ==================================================
+            # UNKNOWN MODE
+            # ==================================================
+
+            else:
+
+                raise RuntimeError(
+                    f"Unknown Discover loader mode: "
+                    f"{self.mode}"
+                )
+
+            # ==================================================
+            # NORMALIZE
+            # ==================================================
+
+            songs = list(
+                songs
+                or []
+            )
 
             print(
                 "Discover FINAL song count:",
                 len(songs)
             )
 
-            if songs:
+            # ==================================================
+            # DEBUG FIRST RESULTS
+            # ==================================================
 
-                for index, song in enumerate(
-                    songs[:5],
-                    start=1
-                ):
-
-                    print(
-                        f"{index}. "
-                        f"{song.title} "
-                        f"- {song.artist}"
-                    )
-
-            else:
+            for (
+                index,
+                song
+            ) in enumerate(
+                songs[:5],
+                start=1
+            ):
 
                 print(
-                    "Discover: no online songs "
-                    "available after all fallbacks."
+                    f"{index}. "
+                    f"{getattr(song, 'title', 'Unknown')} "
+                    f"- "
+                    f"{getattr(song, 'artist', 'Unknown')}"
                 )
 
-            print("=" * 60)
+            print(
+                "=" * 60
+            )
+
             print()
 
             # ==================================================
-            # SEND TO UI
+            # RESULT
             # ==================================================
 
             self.songs_loaded.emit(
-                songs
+                songs,
+                self.mode,
+                self.query,
             )
 
         except Exception as error:
 
             print()
             print(
-                "Discover loader fatal error:",
+                "=" * 60
+            )
+
+            print(
+                "Discover provider loader ERROR"
+            )
+
+            print(
+                "Mode:",
+                self.mode
+            )
+
+            print(
+                "Query:",
+                self.query
+            )
+
+            print(
+                "Error:",
                 repr(error)
             )
+
+            print(
+                "=" * 60
+            )
+
             print()
 
             self.load_failed.emit(
-                str(error)
+                str(error),
+                self.mode,
+                self.query,
             )
+
 
 # ============================================================
 # DISCOVER SCREEN
@@ -406,6 +542,13 @@ class DiscoverScreen(QWidget):
     # ========================================================
     # OLD LOCAL SIGNAL
     # ========================================================
+    #
+    # KEEP.
+    #
+    # Some older LYRx modules still know local tracks using:
+    #
+    # image_path, title, artist
+    #
 
     song_requested = Signal(
         str,
@@ -414,8 +557,11 @@ class DiscoverScreen(QWidget):
     )
 
     # ========================================================
-    # DAY 19 ONLINE SIGNAL
+    # ONLINE SIGNAL
     # ========================================================
+    #
+    # Emits unified Song object.
+    #
 
     online_song_requested = Signal(
         object
@@ -442,6 +588,28 @@ class DiscoverScreen(QWidget):
         self.online_songs = []
 
         self.music_loader = None
+
+        self.current_mode = (
+            "trending"
+        )
+
+        self.current_query = ""
+
+        # ====================================================
+        # REQUEST QUEUE
+        # ====================================================
+        #
+        # If user clicks another genre/mood while a previous
+        # network request is running, do NOT start two QThreads
+        # simultaneously.
+        #
+        # Store newest requested action and execute it after
+        # current loader finishes.
+        #
+
+        self.pending_mode = None
+
+        self.pending_query = ""
 
         # ====================================================
         # COLLECTIONS
@@ -481,6 +649,10 @@ class DiscoverScreen(QWidget):
 
         self.bottom_text = None
 
+        self.trending_title = None
+
+        self.trending_action = None
+
         # ====================================================
         # BUILD
         # ====================================================
@@ -496,11 +668,11 @@ class DiscoverScreen(QWidget):
         )
 
         # ====================================================
-        # ONLINE LOAD
+        # INITIAL ONLINE LOAD
         # ====================================================
 
         QTimer.singleShot(
-            100,
+            120,
             self.load_online_music
         )
 
@@ -639,6 +811,10 @@ class DiscoverScreen(QWidget):
             self.content
         )
 
+        # ----------------------------------------------------
+        # Bottom margin preserved for floating player.
+        # ----------------------------------------------------
+
         self.content_layout.setContentsMargins(
             0,
             0,
@@ -706,7 +882,8 @@ class DiscoverScreen(QWidget):
         )
 
         self.banner_subtitle = QLabel(
-            "Discover music streaming live from the LYRx online catalog."
+            "Discover music through LYRx's "
+            "multi-provider online catalog."
         )
 
         self.banner_subtitle.setWordWrap(
@@ -733,6 +910,10 @@ class DiscoverScreen(QWidget):
 
         banner_layout.addStretch()
 
+        # ====================================================
+        # BANNER ICON
+        # ====================================================
+
         self.banner_icon = QLabel(
             "♫"
         )
@@ -750,7 +931,7 @@ class DiscoverScreen(QWidget):
         )
 
         # ====================================================
-        # TRENDING HEADER
+        # ONLINE RESULTS HEADER
         # ====================================================
 
         trending_header = (
@@ -759,6 +940,22 @@ class DiscoverScreen(QWidget):
                 "Online  ●",
             )
         )
+
+        # ----------------------------------------------------
+        # Save direct references.
+        # ----------------------------------------------------
+
+        if self.section_titles:
+
+            self.trending_title = (
+                self.section_titles[-1]
+            )
+
+        if self.section_actions:
+
+            self.trending_action = (
+                self.section_actions[-1]
+            )
 
         self.content_layout.addWidget(
             trending_header
@@ -820,19 +1017,23 @@ class DiscoverScreen(QWidget):
         self.build_loading_cards()
 
         # ====================================================
-        # MOODS
+        # MOOD HEADER
         # ====================================================
 
         mood_header = (
             self.create_section_header(
                 "Browse by Mood",
-                "View All  ›",
+                "Choose a mood  ›",
             )
         )
 
         self.content_layout.addWidget(
             mood_header
         )
+
+        # ====================================================
+        # MOOD CONTAINER
+        # ====================================================
 
         mood_container = QWidget()
 
@@ -855,15 +1056,25 @@ class DiscoverScreen(QWidget):
             14
         )
 
+        # ====================================================
+        # MOOD CARDS
+        # ====================================================
+
         for mood in MOODS:
 
-            mood_name = mood[
-                "name"
-            ]
+            mood_name = str(
+                mood.get(
+                    "name",
+                    ""
+                )
+            ).strip()
 
-            mood_icon = mood[
-                "icon"
-            ]
+            mood_icon = str(
+                mood.get(
+                    "icon",
+                    "♫"
+                )
+            )
 
             mood_card = QFrame()
 
@@ -878,6 +1089,19 @@ class DiscoverScreen(QWidget):
             mood_card.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Fixed
+            )
+
+            mood_card.setCursor(
+                Qt.PointingHandCursor
+            )
+
+            # ------------------------------------------------
+            # Store mood name on widget.
+            # ------------------------------------------------
+
+            mood_card.setProperty(
+                "mood_name",
+                mood_name
             )
 
             mood_inner = QVBoxLayout(
@@ -895,6 +1119,10 @@ class DiscoverScreen(QWidget):
                 Qt.AlignCenter
             )
 
+            # ------------------------------------------------
+            # ICON
+            # ------------------------------------------------
+
             icon = QLabel(
                 mood_icon
             )
@@ -907,6 +1135,15 @@ class DiscoverScreen(QWidget):
                 Qt.AlignCenter
             )
 
+            icon.setAttribute(
+                Qt.WA_TransparentForMouseEvents,
+                True
+            )
+
+            # ------------------------------------------------
+            # NAME
+            # ------------------------------------------------
+
             name = QLabel(
                 mood_name
             )
@@ -917,6 +1154,11 @@ class DiscoverScreen(QWidget):
 
             name.setAlignment(
                 Qt.AlignCenter
+            )
+
+            name.setAttribute(
+                Qt.WA_TransparentForMouseEvents,
+                True
             )
 
             mood_inner.addWidget(
@@ -943,24 +1185,41 @@ class DiscoverScreen(QWidget):
                 name
             )
 
+            # ------------------------------------------------
+            # CLICK
+            # ------------------------------------------------
+
+            mood_card.mousePressEvent = (
+                lambda event,
+                value=mood_name:
+                self.handle_mood_click(
+                    event,
+                    value
+                )
+            )
+
         self.content_layout.addWidget(
             mood_container
         )
 
         # ====================================================
-        # GENRES
+        # GENRE HEADER
         # ====================================================
 
         genre_header = (
             self.create_section_header(
                 "Explore Genres",
-                "View All  ›",
+                "Choose a genre  ›",
             )
         )
 
         self.content_layout.addWidget(
             genre_header
         )
+
+        # ====================================================
+        # GENRE CONTAINER
+        # ====================================================
 
         genre_container = QWidget()
 
@@ -983,15 +1242,25 @@ class DiscoverScreen(QWidget):
             14
         )
 
+        # ====================================================
+        # GENRE CARDS
+        # ====================================================
+
         for genre in GENRES:
 
-            genre_name = genre[
-                "name"
-            ]
+            genre_name = str(
+                genre.get(
+                    "name",
+                    ""
+                )
+            ).strip()
 
-            background = genre[
-                "background"
-            ]
+            background = str(
+                genre.get(
+                    "background",
+                    "#30224B"
+                )
+            )
 
             genre_card = QFrame()
 
@@ -1004,6 +1273,11 @@ class DiscoverScreen(QWidget):
                 background
             )
 
+            genre_card.setProperty(
+                "genre_name",
+                genre_name
+            )
+
             genre_card.setMinimumHeight(
                 90
             )
@@ -1011,6 +1285,10 @@ class DiscoverScreen(QWidget):
             genre_card.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Fixed
+            )
+
+            genre_card.setCursor(
+                Qt.PointingHandCursor
             )
 
             genre_layout_inner = (
@@ -1023,6 +1301,10 @@ class DiscoverScreen(QWidget):
                 Qt.AlignCenter
             )
 
+            # ------------------------------------------------
+            # LABEL
+            # ------------------------------------------------
+
             genre_label = QLabel(
                 genre_name
             )
@@ -1033,6 +1315,11 @@ class DiscoverScreen(QWidget):
 
             genre_label.setAlignment(
                 Qt.AlignCenter
+            )
+
+            genre_label.setAttribute(
+                Qt.WA_TransparentForMouseEvents,
+                True
             )
 
             genre_layout_inner.addWidget(
@@ -1051,6 +1338,19 @@ class DiscoverScreen(QWidget):
                 genre_label
             )
 
+            # ------------------------------------------------
+            # CLICK
+            # ------------------------------------------------
+
+            genre_card.mousePressEvent = (
+                lambda event,
+                value=genre_name:
+                self.handle_genre_click(
+                    event,
+                    value
+                )
+            )
+
         self.content_layout.addWidget(
             genre_container
         )
@@ -1060,7 +1360,7 @@ class DiscoverScreen(QWidget):
         # ====================================================
 
         self.bottom_text = QLabel(
-            "LYRx online catalog powered by Jamendo ✦"
+            "LYRx multi-provider music discovery ✦"
         )
 
         self.bottom_text.setAlignment(
@@ -1070,6 +1370,10 @@ class DiscoverScreen(QWidget):
         self.content_layout.addWidget(
             self.bottom_text
         )
+
+        # ====================================================
+        # EXTRA BOTTOM SPACE
+        # ====================================================
 
         self.content_layout.addSpacing(
             120
@@ -1082,6 +1386,11 @@ class DiscoverScreen(QWidget):
     def build_loading_cards(self):
 
         self.clear_trending_cards()
+
+        # ----------------------------------------------------
+        # Preserve existing LYRx blueprint:
+        # 4 cards visible in one row.
+        # ----------------------------------------------------
 
         for index in range(4):
 
@@ -1107,6 +1416,10 @@ class DiscoverScreen(QWidget):
                 12
             )
 
+            layout.setSpacing(
+                8
+            )
+
             placeholder = QLabel(
                 "♫"
             )
@@ -1125,7 +1438,7 @@ class DiscoverScreen(QWidget):
             )
 
             title = QLabel(
-                "Loading..."
+                "Loading music..."
             )
 
             title.setObjectName(
@@ -1159,6 +1472,13 @@ class DiscoverScreen(QWidget):
 
     def clear_trending_cards(self):
 
+        if not hasattr(
+            self,
+            "trending_layout"
+        ):
+
+            return
+
         while self.trending_layout.count():
 
             item = (
@@ -1166,7 +1486,9 @@ class DiscoverScreen(QWidget):
                 .takeAt(0)
             )
 
-            widget = item.widget()
+            widget = (
+                item.widget()
+            )
 
             if widget:
 
@@ -1179,10 +1501,40 @@ class DiscoverScreen(QWidget):
         self.music_cards.clear()
 
     # ========================================================
-    # LOAD ONLINE
+    # INITIAL ONLINE LOAD
     # ========================================================
 
     def load_online_music(self):
+
+        self.request_online_music(
+            mode="trending",
+            query=""
+        )
+
+    # ========================================================
+    # GENERIC PROVIDER REQUEST
+    # ========================================================
+
+    def request_online_music(
+        self,
+        mode="search",
+        query="",
+        limit=12,
+    ):
+
+        mode = str(
+            mode
+            or "search"
+        ).strip().lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        # ====================================================
+        # ACTIVE THREAD
+        # ====================================================
 
         if (
             self.music_loader is not None
@@ -1190,15 +1542,63 @@ class DiscoverScreen(QWidget):
             self.music_loader.isRunning()
         ):
 
+            # ------------------------------------------------
+            # Keep newest request.
+            # ------------------------------------------------
+
+            self.pending_mode = mode
+
+            self.pending_query = query
+
+            self.online_status.setText(
+                "Finishing current request..."
+            )
+
+            self.apply_online_status_theme()
+
             return
 
-        self.online_status.setText(
-            "Connecting to LYRx online music..."
+        # ====================================================
+        # STATE
+        # ====================================================
+
+        self.current_mode = mode
+
+        self.current_query = query
+
+        # ====================================================
+        # SECTION TITLE
+        # ====================================================
+
+        self.update_results_heading(
+            mode,
+            query
         )
+
+        # ====================================================
+        # LOADING UI
+        # ====================================================
+
+        self.online_status.setText(
+            self.loading_status_text(
+                mode,
+                query
+            )
+        )
+
+        self.apply_online_status_theme()
+
+        self.build_loading_cards()
+
+        # ====================================================
+        # THREAD
+        # ====================================================
 
         self.music_loader = (
             OnlineMusicLoader(
-                limit=10,
+                mode=mode,
+                query=query,
+                limit=limit,
                 parent=self
             )
         )
@@ -1218,63 +1618,277 @@ class DiscoverScreen(QWidget):
         self.music_loader.start()
 
     # ========================================================
+    # LEGACY / GLOBAL SEARCH METHOD
+    # ========================================================
+    #
+    # KEEP THIS METHOD NAME.
+    #
+    # Other LYRx screens can continue calling:
+    #
+    # discover.search_online_music("artist or song")
+    #
+
+    def search_online_music(
+        self,
+        query
+    ):
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        if not query:
+
+            self.load_online_music()
+
+            return
+
+        self.request_online_music(
+            mode="search",
+            query=query,
+            limit=12,
+        )
+
+    # ========================================================
+    # SEARCH ARTIST
+    # ========================================================
+
+    def search_artist(
+        self,
+        artist_name
+    ):
+
+        artist_name = str(
+            artist_name
+            or ""
+        ).strip()
+
+        if not artist_name:
+
+            return
+
+        self.request_online_music(
+            mode="artist",
+            query=artist_name,
+            limit=12,
+        )
+
+    # ========================================================
+    # SEARCH SONG
+    # ========================================================
+
+    def search_song(
+        self,
+        song_title
+    ):
+
+        song_title = str(
+            song_title
+            or ""
+        ).strip()
+
+        if not song_title:
+
+            return
+
+        self.request_online_music(
+            mode="song",
+            query=song_title,
+            limit=12,
+        )
+
+    # ========================================================
+    # HINDI
+    # ========================================================
+
+    def load_hindi_music(self):
+
+        self.request_online_music(
+            mode="hindi",
+            query="Hindi",
+            limit=12,
+        )
+
+    # ========================================================
+    # ENGLISH
+    # ========================================================
+
+    def load_english_music(self):
+
+        self.request_online_music(
+            mode="english",
+            query="English",
+            limit=12,
+        )
+
+    # ========================================================
     # ONLINE LOADED
     # ========================================================
 
     def online_music_loaded(
         self,
-        songs
+        songs,
+        mode,
+        query
     ):
 
-        self.online_songs = list(
-            songs or []
+        # ====================================================
+        # STATE
+        # ====================================================
+
+        self.current_mode = (
+            str(mode)
         )
 
+        self.current_query = (
+            str(query)
+        )
+
+        self.online_songs = list(
+            songs
+            or []
+        )
+
+        # ====================================================
+        # CLEAR LOADING
+        # ====================================================
+
         self.clear_trending_cards()
+
+        # ====================================================
+        # NO RESULTS
+        # ====================================================
 
         if not self.online_songs:
 
             self.online_status.setText(
-                "Online catalog connected, but no tracks were returned."
+                self.empty_status_text(
+                    mode,
+                    query
+                )
             )
 
             self.apply_online_status_theme()
 
-            self.show_online_empty_state()
+            self.show_online_empty_state(
+                mode,
+                query
+            )
 
             print(
-                "Discover: API returned 0 usable songs."
+                "Discover: provider returned "
+                "0 usable songs."
             )
 
             return
 
-        # ----------------------------------------------------
-        # Preserve current blueprint:
-        # four cards in this row.
-        # ----------------------------------------------------
+        # ====================================================
+        # CURRENT BLUEPRINT
+        # ====================================================
+        #
+        # Keep only 4 visible cards in the Discover row.
+        #
+        # The loader may fetch more because:
+        #
+        # - queue can use more songs later
+        # - See All can use them later
+        # - recommendation engine can use them later
+        #
 
         visible_songs = (
             self.online_songs[:4]
         )
 
+        # ====================================================
+        # MUSIC CARDS
+        # ====================================================
+
         for song in visible_songs:
+
+            # ------------------------------------------------
+            # Defensive display values.
+            # ------------------------------------------------
+
+            try:
+
+                title = (
+                    song.display_title()
+                )
+
+            except Exception:
+
+                title = (
+                    getattr(
+                        song,
+                        "title",
+                        "Unknown Track"
+                    )
+                    or "Unknown Track"
+                )
+
+            try:
+
+                artist = (
+                    song.display_artist()
+                )
+
+            except Exception:
+
+                artist = (
+                    getattr(
+                        song,
+                        "artist",
+                        "Unknown Artist"
+                    )
+                    or "Unknown Artist"
+                )
+
+            try:
+
+                duration_text = (
+                    song.duration_text()
+                )
+
+            except Exception:
+
+                duration_text = "0:00"
+
+            image_url = str(
+                getattr(
+                    song,
+                    "image_url",
+                    ""
+                )
+                or ""
+            )
+
+            # =================================================
+            # MUSIC CARD
+            # =================================================
 
             card = MusicCard(
 
-                song.image_url,
+                image_url,
 
-                song.display_title(),
+                title,
 
-                song.display_artist(),
+                artist,
 
                 duration_text=(
-                    song.duration_text()
+                    duration_text
                 ),
 
-                song_data=song,
+                song_data=(
+                    song
+                ),
 
-                # Online favorites will be upgraded
-                # after the unified Library migration.
+                # ------------------------------------------------
+                # Online Favorites migration will be handled
+                # separately once Favorites/Library are unified
+                # around Song objects.
+                # ------------------------------------------------
+
                 favorite_enabled=False,
             )
 
@@ -1283,9 +1897,17 @@ class DiscoverScreen(QWidget):
                 QSizePolicy.Fixed
             )
 
+            # =================================================
+            # ONLINE PLAY
+            # =================================================
+
             card.online_play_requested.connect(
                 self.handle_online_song_request
             )
+
+            # =================================================
+            # THEME
+            # =================================================
 
             card.set_theme_state(
                 self.is_dark
@@ -1299,16 +1921,36 @@ class DiscoverScreen(QWidget):
                 card
             )
 
+        # ====================================================
+        # STATUS
+        # ====================================================
+
         self.online_status.setText(
-            f"●  Live catalog connected  ·  "
-            f"{len(self.online_songs)} tracks loaded"
+            self.success_status_text(
+                mode,
+                query,
+                len(
+                    self.online_songs
+                )
+            )
         )
 
         self.apply_online_status_theme()
 
+        # ====================================================
+        # HEADING
+        # ====================================================
+
+        self.update_results_heading(
+            mode,
+            query
+        )
+
         print(
             "Discover online songs loaded:",
-            len(self.online_songs)
+            len(
+                self.online_songs
+            )
         )
 
     # ========================================================
@@ -1317,7 +1959,9 @@ class DiscoverScreen(QWidget):
 
     def online_music_failed(
         self,
-        error_message
+        error_message,
+        mode,
+        query
     ):
 
         print(
@@ -1327,13 +1971,22 @@ class DiscoverScreen(QWidget):
 
         self.clear_trending_cards()
 
+        self.online_songs = []
+
         self.online_status.setText(
             "Online music is temporarily unavailable."
         )
 
-        self.show_online_empty_state()
+        self.show_online_error_state(
+            error_message
+        )
 
         self.apply_online_status_theme()
+
+        self.update_results_heading(
+            mode,
+            query
+        )
 
     # ========================================================
     # LOADER FINISHED
@@ -1341,26 +1994,462 @@ class DiscoverScreen(QWidget):
 
     def online_loader_finished(self):
 
+        # ----------------------------------------------------
+        # Cleanup old worker.
+        # ----------------------------------------------------
+
         if self.music_loader:
 
             self.music_loader.deleteLater()
 
             self.music_loader = None
 
+        # ====================================================
+        # PENDING REQUEST
+        # ====================================================
+
+        if self.pending_mode is not None:
+
+            mode = self.pending_mode
+
+            query = self.pending_query
+
+            self.pending_mode = None
+
+            self.pending_query = ""
+
+            QTimer.singleShot(
+                20,
+                lambda:
+                self.request_online_music(
+                    mode=mode,
+                    query=query,
+                    limit=12,
+                )
+            )
+
+    # ========================================================
+    # HEADING
+    # ========================================================
+
+    def update_results_heading(
+        self,
+        mode,
+        query
+    ):
+
+        if self.trending_title is None:
+
+            return
+
+        mode = str(
+            mode
+            or "trending"
+        ).lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        # ====================================================
+        # TRENDING
+        # ====================================================
+
+        if mode == "trending":
+
+            title = (
+                "Trending Now"
+            )
+
+        # ====================================================
+        # POPULAR
+        # ====================================================
+
+        elif mode == "popular":
+
+            title = (
+                "Popular Now"
+            )
+
+        # ====================================================
+        # GENRE
+        # ====================================================
+
+        elif mode == "genre":
+
+            title = (
+                f"{query} · Online"
+                if query
+                else "Genre · Online"
+            )
+
+        # ====================================================
+        # MOOD
+        # ====================================================
+
+        elif mode == "mood":
+
+            title = (
+                f"{query} Mood · Online"
+                if query
+                else "Mood Music · Online"
+            )
+
+        # ====================================================
+        # HINDI
+        # ====================================================
+
+        elif mode == "hindi":
+
+            title = (
+                "Hindi Music · Online"
+            )
+
+        # ====================================================
+        # ENGLISH
+        # ====================================================
+
+        elif mode == "english":
+
+            title = (
+                "English Music · Online"
+            )
+
+        # ====================================================
+        # ARTIST
+        # ====================================================
+
+        elif mode == "artist":
+
+            title = (
+                f"Artist · {query}"
+                if query
+                else "Artist Results"
+            )
+
+        # ====================================================
+        # SONG
+        # ====================================================
+
+        elif mode == "song":
+
+            title = (
+                f"Song · {query}"
+                if query
+                else "Song Results"
+            )
+
+        # ====================================================
+        # SEARCH
+        # ====================================================
+
+        else:
+
+            title = (
+                f"Search · {query}"
+                if query
+                else "Online Search"
+            )
+
+        self.trending_title.setText(
+            title
+        )
+
+        # ----------------------------------------------------
+        # Right-side status text.
+        # ----------------------------------------------------
+
+        if self.trending_action is not None:
+
+            self.trending_action.setText(
+                "Online  ●"
+            )
+
+    # ========================================================
+    # LOADING STATUS
+    # ========================================================
+
+    @staticmethod
+    def loading_status_text(
+        mode,
+        query
+    ):
+
+        mode = str(
+            mode
+            or ""
+        ).lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        if mode == "trending":
+
+            return (
+                "Loading trending music "
+                "from available providers..."
+            )
+
+        if mode == "genre":
+
+            return (
+                f"Finding {query} music..."
+            )
+
+        if mode == "mood":
+
+            return (
+                f"Finding music for your "
+                f"{query} mood..."
+            )
+
+        if mode == "hindi":
+
+            return (
+                "Finding Hindi music..."
+            )
+
+        if mode == "english":
+
+            return (
+                "Finding English music..."
+            )
+
+        if mode == "artist":
+
+            return (
+                f"Searching artist: {query}..."
+            )
+
+        if mode == "song":
+
+            return (
+                f"Searching song: {query}..."
+            )
+
+        return (
+            f"Searching online music"
+            f"{f' for {query}' if query else ''}..."
+        )
+
+    # ========================================================
+    # SUCCESS STATUS
+    # ========================================================
+
+    @staticmethod
+    def success_status_text(
+        mode,
+        query,
+        count
+    ):
+
+        mode = str(
+            mode
+            or ""
+        ).lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        if mode == "genre":
+
+            return (
+                f"●  {query} catalog connected"
+                f"  ·  {count} tracks loaded"
+            )
+
+        if mode == "mood":
+
+            return (
+                f"●  {query} mood results"
+                f"  ·  {count} tracks loaded"
+            )
+
+        if mode == "search":
+
+            return (
+                f"●  Search results for "
+                f"“{query}”"
+                f"  ·  {count} tracks"
+            )
+
+        if mode == "artist":
+
+            return (
+                f"●  Artist results for "
+                f"“{query}”"
+                f"  ·  {count} tracks"
+            )
+
+        if mode == "song":
+
+            return (
+                f"●  Song results for "
+                f"“{query}”"
+                f"  ·  {count} tracks"
+            )
+
+        if mode == "hindi":
+
+            return (
+                f"●  Hindi catalog"
+                f"  ·  {count} tracks loaded"
+            )
+
+        if mode == "english":
+
+            return (
+                f"●  English catalog"
+                f"  ·  {count} tracks loaded"
+            )
+
+        return (
+            f"●  Live catalog connected"
+            f"  ·  {count} tracks loaded"
+        )
+
+    # ========================================================
+    # EMPTY STATUS
+    # ========================================================
+
+    @staticmethod
+    def empty_status_text(
+        mode,
+        query
+    ):
+
+        mode = str(
+            mode
+            or ""
+        ).lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        if mode == "genre":
+
+            return (
+                f"No {query} tracks were returned "
+                f"by the current providers."
+            )
+
+        if mode == "mood":
+
+            return (
+                f"No tracks were returned for "
+                f"the {query} mood."
+            )
+
+        if mode in (
+            "search",
+            "artist",
+            "song",
+        ):
+
+            return (
+                f"No online tracks found for "
+                f"“{query}”."
+            )
+
+        if mode == "hindi":
+
+            return (
+                "The current providers returned "
+                "no Hindi tracks."
+            )
+
+        if mode == "english":
+
+            return (
+                "The current providers returned "
+                "no English tracks."
+            )
+
+        return (
+            "Online catalog connected, "
+            "but no tracks were returned."
+        )
+
     # ========================================================
     # EMPTY STATE
     # ========================================================
 
-    def show_online_empty_state(self):
+    def show_online_empty_state(
+        self,
+        mode="",
+        query=""
+    ):
+
+        mode = str(
+            mode
+            or ""
+        ).lower()
+
+        query = str(
+            query
+            or ""
+        ).strip()
+
+        if mode == "genre":
+
+            message = (
+                f"♫\n\n"
+                f"No {query} tracks are available "
+                f"from the current provider.\n\n"
+                f"More providers can be added to LYRx "
+                f"without changing this screen."
+            )
+
+        elif mode == "mood":
+
+            message = (
+                f"♫\n\n"
+                f"No music was found for the "
+                f"{query} mood.\n\n"
+                f"Try another mood or search."
+            )
+
+        elif mode in (
+            "search",
+            "artist",
+            "song",
+        ):
+
+            message = (
+                f"♫\n\n"
+                f"No online music found for "
+                f"“{query}”.\n\n"
+                f"Try another song, artist, "
+                f"genre or keyword."
+            )
+
+        else:
+
+            message = (
+                "♫\n\n"
+                "No online tracks are available "
+                "right now.\n\n"
+                "Check your internet connection "
+                "and provider configuration."
+            )
 
         empty = QLabel(
-            "♫\n\n"
-            "No online tracks are available right now.\n"
-            "Check your internet connection and Jamendo configuration."
+            message
         )
 
         empty.setAlignment(
             Qt.AlignCenter
+        )
+
+        empty.setWordWrap(
+            True
         )
 
         empty.setMinimumHeight(
@@ -1386,6 +2475,156 @@ class DiscoverScreen(QWidget):
         )
 
     # ========================================================
+    # ERROR STATE
+    # ========================================================
+
+    def show_online_error_state(
+        self,
+        error_message
+    ):
+
+        error_message = str(
+            error_message
+            or "Unknown provider error."
+        )
+
+        label = QLabel(
+            "⚠\n\n"
+            "LYRx couldn't load online music.\n\n"
+            f"{error_message}"
+        )
+
+        label.setAlignment(
+            Qt.AlignCenter
+        )
+
+        label.setWordWrap(
+            True
+        )
+
+        label.setMinimumHeight(
+            220
+        )
+
+        label.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed
+        )
+
+        label.setObjectName(
+            "OnlineEmpty"
+        )
+
+        self.trending_layout.addWidget(
+            label,
+            1
+        )
+
+        self.apply_online_empty_theme(
+            label
+        )
+
+    # ========================================================
+    # MOOD CLICK
+    # ========================================================
+
+    def handle_mood_click(
+        self,
+        event,
+        mood_name
+    ):
+
+        if (
+            event is not None
+            and
+            event.button()
+            != Qt.LeftButton
+        ):
+
+            return
+
+        mood_name = str(
+            mood_name
+            or ""
+        ).strip()
+
+        if not mood_name:
+
+            return
+
+        print(
+            "LYRx mood selected:",
+            mood_name
+        )
+
+        # ====================================================
+        # IMPORTANT
+        # ====================================================
+        #
+        # This is NOT generic text search anymore.
+        #
+        # ProviderRegistry.get_by_mood()
+        #
+
+        self.request_online_music(
+            mode="mood",
+            query=mood_name,
+            limit=12,
+        )
+
+    # ========================================================
+    # GENRE CLICK
+    # ========================================================
+
+    def handle_genre_click(
+        self,
+        event,
+        genre_name
+    ):
+
+        if (
+            event is not None
+            and
+            event.button()
+            != Qt.LeftButton
+        ):
+
+            return
+
+        genre_name = str(
+            genre_name
+            or ""
+        ).strip()
+
+        if not genre_name:
+
+            return
+
+        print(
+            "LYRx genre selected:",
+            genre_name
+        )
+
+        # ====================================================
+        # IMPORTANT
+        # ====================================================
+        #
+        # This now uses:
+        #
+        # ProviderRegistry.get_by_genre()
+        #
+        # instead of:
+        #
+        # search_online_music(genre_name)
+        #
+
+        self.request_online_music(
+            mode="genre",
+            query=genre_name,
+            limit=12,
+        )
+
+    # ========================================================
     # ONLINE SONG REQUEST
     # ========================================================
 
@@ -1398,17 +2637,64 @@ class DiscoverScreen(QWidget):
 
             return
 
+        title = str(
+            getattr(
+                song,
+                "title",
+                "Unknown Track"
+            )
+        )
+
+        artist = str(
+            getattr(
+                song,
+                "artist",
+                "Unknown Artist"
+            )
+        )
+
+        audio_url = str(
+            getattr(
+                song,
+                "audio_url",
+                ""
+            )
+            or ""
+        )
+
+        print()
         print(
-            "Discover ONLINE song selected:",
-            song.title,
-            "-",
-            song.artist
+            "=" * 60
         )
 
         print(
-            "Audio URL:",
-            song.audio_url
+            "Discover ONLINE song selected:"
         )
+
+        print(
+            "Song:",
+            title
+        )
+
+        print(
+            "Artist:",
+            artist
+        )
+
+        print(
+            "Audio:",
+            audio_url
+        )
+
+        print(
+            "=" * 60
+        )
+
+        print()
+
+        # ====================================================
+        # SEND SONG OBJECT TO APP WINDOW
+        # ====================================================
 
         self.online_song_requested.emit(
             song
@@ -1510,7 +2796,7 @@ class DiscoverScreen(QWidget):
         return header
 
     # ========================================================
-    # THEME
+    # THEME STATE
     # ========================================================
 
     def set_theme_state(
@@ -1521,6 +2807,10 @@ class DiscoverScreen(QWidget):
         self.is_dark = bool(
             is_dark
         )
+
+        # ====================================================
+        # SIDEBAR
+        # ====================================================
 
         try:
 
@@ -1535,23 +2825,35 @@ class DiscoverScreen(QWidget):
                 error
             )
 
+        # ====================================================
+        # SCROLL
+        # ====================================================
+
         self.apply_scroll_theme()
 
         # ====================================================
-        # HEADER
+        # HEADER COLORS
         # ====================================================
 
         if self.is_dark:
 
-            title_color = "#FFFFFF"
+            title_color = (
+                "#FFFFFF"
+            )
 
-            subtitle_color = "#AFA4C8"
+            subtitle_color = (
+                "#AFA4C8"
+            )
 
         else:
 
-            title_color = "#241B35"
+            title_color = (
+                "#241B35"
+            )
 
-            subtitle_color = "#766A89"
+            subtitle_color = (
+                "#766A89"
+            )
 
         self.title_label.setStyleSheet(
             f"""
@@ -1574,10 +2876,14 @@ class DiscoverScreen(QWidget):
             """
         )
 
+        # ====================================================
+        # BANNER
+        # ====================================================
+
         self.apply_banner_theme()
 
         # ====================================================
-        # SECTION
+        # SECTION TITLES
         # ====================================================
 
         for title in self.section_titles:
@@ -1590,12 +2896,19 @@ class DiscoverScreen(QWidget):
                         if self.is_dark
                         else "#2A203B"
                     };
+
                     font-size: 23px;
+
                     font-weight: 700;
+
                     background: transparent;
                 }}
                 """
             )
+
+        # ====================================================
+        # SECTION ACTIONS
+        # ====================================================
 
         for action in self.section_actions:
 
@@ -1607,18 +2920,37 @@ class DiscoverScreen(QWidget):
                         if self.is_dark
                         else "#7440D9"
                     };
+
                     font-size: 13px;
+
                     font-weight: 600;
+
                     background: transparent;
                 }}
                 """
             )
 
+        # ====================================================
+        # MOODS
+        # ====================================================
+
         self.apply_mood_theme()
+
+        # ====================================================
+        # GENRES
+        # ====================================================
 
         self.apply_genre_theme()
 
+        # ====================================================
+        # STATUS
+        # ====================================================
+
         self.apply_online_status_theme()
+
+        # ====================================================
+        # LOADING
+        # ====================================================
 
         self.apply_loading_theme()
 
@@ -1634,8 +2966,11 @@ class DiscoverScreen(QWidget):
                     if self.is_dark
                     else "#8B7D9E"
                 };
+
                 font-size: 12px;
+
                 padding: 20px;
+
                 background: transparent;
             }}
             """
@@ -1649,9 +2984,14 @@ class DiscoverScreen(QWidget):
 
             try:
 
-                card.set_theme_state(
-                    self.is_dark
-                )
+                if hasattr(
+                    card,
+                    "set_theme_state"
+                ):
+
+                    card.set_theme_state(
+                        self.is_dark
+                    )
 
             except Exception as error:
 
@@ -1659,6 +2999,10 @@ class DiscoverScreen(QWidget):
                     "Discover MusicCard theme error:",
                     error
                 )
+
+        # ====================================================
+        # REPAINT
+        # ====================================================
 
         self.update()
 
@@ -1683,19 +3027,27 @@ class DiscoverScreen(QWidget):
 
         if self.is_dark:
 
-            color = "#8F84A6"
+            color = (
+                "#8F84A6"
+            )
 
         else:
 
-            color = "#756A88"
+            color = (
+                "#756A88"
+            )
 
         self.online_status.setStyleSheet(
             f"""
             QLabel {{
                 color: {color};
+
                 font-size: 11px;
+
                 font-weight: 600;
+
                 background: transparent;
+
                 padding-left: 2px;
             }}
             """
@@ -1716,42 +3068,67 @@ class DiscoverScreen(QWidget):
 
         if self.is_dark:
 
-            card_bg = "#181329"
+            card_bg = (
+                "#181329"
+            )
 
-            border = "#30224B"
+            border = (
+                "#30224B"
+            )
 
-            text_color = "#756A91"
+            text_color = (
+                "#756A91"
+            )
 
-            cover_bg = "#211633"
+            cover_bg = (
+                "#211633"
+            )
 
         else:
 
-            card_bg = "#F1EBFA"
+            card_bg = (
+                "#F1EBFA"
+            )
 
-            border = "#D7CBE8"
+            border = (
+                "#D7CBE8"
+            )
 
-            text_color = "#8A7899"
+            text_color = (
+                "#8A7899"
+            )
 
-            cover_bg = "#E5DCEB"
+            cover_bg = (
+                "#E5DCEB"
+            )
 
         self.trending_container.setStyleSheet(
             f"""
             QFrame#LoadingMusicCard {{
                 background: {card_bg};
+
                 border: 1px solid {border};
+
                 border-radius: 20px;
             }}
 
+
             QLabel#LoadingCover {{
                 background: {cover_bg};
+
                 color: #8B5CF6;
+
                 border-radius: 18px;
+
                 font-size: 40px;
             }}
 
+
             QLabel#LoadingText {{
                 color: {text_color};
+
                 background: transparent;
+
                 font-size: 12px;
             }}
             """
@@ -1771,12 +3148,19 @@ class DiscoverScreen(QWidget):
             label.setStyleSheet(
                 """
                 QLabel#OnlineEmpty {
+
                     color: #9589AA;
+
                     background: #181329;
+
                     border: 1px solid #30224B;
+
                     border-radius: 18px;
+
                     font-size: 13px;
+
                     font-weight: 600;
+
                     padding: 25px;
                 }
                 """
@@ -1787,12 +3171,19 @@ class DiscoverScreen(QWidget):
             label.setStyleSheet(
                 """
                 QLabel#OnlineEmpty {
+
                     color: #756A88;
+
                     background: #F1EBFA;
+
                     border: 1px solid #D7CBE8;
+
                     border-radius: 18px;
+
                     font-size: 13px;
+
                     font-weight: 600;
+
                     padding: 25px;
                 }
                 """
@@ -1804,6 +3195,26 @@ class DiscoverScreen(QWidget):
 
     def apply_scroll_theme(self):
 
+        if self.is_dark:
+
+            handle = (
+                "#7C3AED"
+            )
+
+            hover = (
+                "#9F67FF"
+            )
+
+        else:
+
+            handle = (
+                "#8B5CF6"
+            )
+
+            hover = (
+                "#7040D4"
+            )
+
         self.scroll.setStyleSheet(
             f"""
             QScrollArea {{
@@ -1811,38 +3222,40 @@ class DiscoverScreen(QWidget):
                 border: none;
             }}
 
+
             QScrollArea > QWidget > QWidget {{
                 background: transparent;
             }}
 
+
             QScrollBar:vertical {{
                 width: 9px;
+
                 background: transparent;
+
                 margin: 2px;
             }}
 
+
             QScrollBar::handle:vertical {{
-                background: {
-                    "#7C3AED"
-                    if self.is_dark
-                    else "#8B5CF6"
-                };
+                background: {handle};
+
                 border-radius: 4px;
+
                 min-height: 55px;
             }}
 
+
             QScrollBar::handle:vertical:hover {{
-                background: {
-                    "#9F67FF"
-                    if self.is_dark
-                    else "#7040D4"
-                };
+                background: {hover};
             }}
+
 
             QScrollBar::add-line:vertical,
             QScrollBar::sub-line:vertical {{
                 height: 0px;
             }}
+
 
             QScrollBar::add-page:vertical,
             QScrollBar::sub-page:vertical {{
@@ -1859,41 +3272,70 @@ class DiscoverScreen(QWidget):
 
         if self.is_dark:
 
-            banner_bg = "#18122A"
+            banner_bg = (
+                "#18122A"
+            )
 
-            border = "#30224B"
+            border = (
+                "#30224B"
+            )
 
-            hover_border = "#53358A"
+            hover_border = (
+                "#53358A"
+            )
 
-            title = "#FFFFFF"
+            title = (
+                "#FFFFFF"
+            )
 
-            subtitle = "#AAA0C5"
+            subtitle = (
+                "#AAA0C5"
+            )
 
-            icon = "#A970FF"
+            icon = (
+                "#A970FF"
+            )
 
         else:
 
-            banner_bg = "#EDE6FA"
+            banner_bg = (
+                "#EDE6FA"
+            )
 
-            border = "#D3C5EA"
+            border = (
+                "#D3C5EA"
+            )
 
-            hover_border = "#B99BEA"
+            hover_border = (
+                "#B99BEA"
+            )
 
-            title = "#281B3B"
+            title = (
+                "#281B3B"
+            )
 
-            subtitle = "#756785"
+            subtitle = (
+                "#756785"
+            )
 
-            icon = "#7C3AED"
+            icon = (
+                "#7C3AED"
+            )
 
         self.banner.setStyleSheet(
             f"""
             QFrame#DiscoverBanner {{
+
                 background: {banner_bg};
+
                 border: 1px solid {border};
+
                 border-radius: 24px;
             }}
 
+
             QFrame#DiscoverBanner:hover {{
+
                 border: 1px solid {hover_border};
             }}
             """
@@ -1903,8 +3345,11 @@ class DiscoverScreen(QWidget):
             f"""
             QLabel {{
                 color: {title};
+
                 font-size: 25px;
+
                 font-weight: 800;
+
                 background: transparent;
             }}
             """
@@ -1914,7 +3359,9 @@ class DiscoverScreen(QWidget):
             f"""
             QLabel {{
                 color: {subtitle};
+
                 font-size: 14px;
+
                 background: transparent;
             }}
             """
@@ -1924,8 +3371,11 @@ class DiscoverScreen(QWidget):
             f"""
             QLabel {{
                 color: {icon};
+
                 font-size: 72px;
+
                 font-weight: 800;
+
                 background: transparent;
             }}
             """
@@ -1941,30 +3391,43 @@ class DiscoverScreen(QWidget):
 
             card_style = """
             QFrame#MoodCard {
+
                 background: #181329;
+
                 border: 1px solid #30224B;
+
                 border-radius: 18px;
             }
 
+
             QFrame#MoodCard:hover {
+
                 background: #24183D;
+
                 border: 1px solid #7048C7;
             }
             """
 
             icon_style = """
             QLabel#MoodIcon {
+
                 color: #FFFFFF;
+
                 font-size: 25px;
+
                 background: transparent;
             }
             """
 
             name_style = """
             QLabel#MoodName {
+
                 color: #D9D3EA;
+
                 font-size: 13px;
+
                 font-weight: 600;
+
                 background: transparent;
             }
             """
@@ -1973,30 +3436,43 @@ class DiscoverScreen(QWidget):
 
             card_style = """
             QFrame#MoodCard {
+
                 background: #F1EBFA;
+
                 border: 1px solid #D7CBE8;
+
                 border-radius: 18px;
             }
 
+
             QFrame#MoodCard:hover {
+
                 background: #E8DDF7;
+
                 border: 1px solid #A98AD7;
             }
             """
 
             icon_style = """
             QLabel#MoodIcon {
+
                 color: #49366A;
+
                 font-size: 25px;
+
                 background: transparent;
             }
             """
 
             name_style = """
             QLabel#MoodName {
+
                 color: #594B6E;
+
                 font-size: 13px;
+
                 font-weight: 600;
+
                 background: transparent;
             }
             """
@@ -2033,26 +3509,47 @@ class DiscoverScreen(QWidget):
                 )
             )
 
-            if original_background is None:
+            if not original_background:
 
                 original_background = (
                     "#30224B"
                 )
 
+            if self.is_dark:
+
+                hover_border = (
+                    "#A970FF"
+                )
+
+                normal_border = (
+                    "rgba(255,255,255,20)"
+                )
+
+            else:
+
+                hover_border = (
+                    "#7C3AED"
+                )
+
+                normal_border = (
+                    "rgba(70,50,100,45)"
+                )
+
             card.setStyleSheet(
                 f"""
                 QFrame#GenreCard {{
+
                     background: {original_background};
+
                     border-radius: 18px;
-                    border: 1px solid rgba(255,255,255,20);
+
+                    border: 1px solid {normal_border};
                 }}
 
+
                 QFrame#GenreCard:hover {{
-                    border: 1px solid {
-                        "#A970FF"
-                        if self.is_dark
-                        else "#7C3AED"
-                    };
+
+                    border: 1px solid {hover_border};
                 }}
                 """
             )
@@ -2062,9 +3559,13 @@ class DiscoverScreen(QWidget):
             label.setStyleSheet(
                 """
                 QLabel#GenreLabel {
+
                     color: #FFFFFF;
+
                     font-size: 16px;
+
                     font-weight: 700;
+
                     background: transparent;
                 }
                 """
@@ -2088,6 +3589,10 @@ class DiscoverScreen(QWidget):
         )
 
         rect = self.rect()
+
+        # ====================================================
+        # GRADIENT
+        # ====================================================
 
         gradient = QLinearGradient(
             0,
@@ -2144,7 +3649,7 @@ class DiscoverScreen(QWidget):
         )
 
         # ====================================================
-        # GLOW
+        # TOP GLOW
         # ====================================================
 
         painter.setPen(
@@ -2168,6 +3673,10 @@ class DiscoverScreen(QWidget):
             500,
             400
         )
+
+        # ====================================================
+        # RIGHT GLOW
+        # ====================================================
 
         painter.setBrush(
             QColor(

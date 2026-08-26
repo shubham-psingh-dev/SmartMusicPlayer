@@ -4,6 +4,10 @@ from PySide6.QtCore import (
     QUrl,
 )
 
+from PySide6.QtGui import (
+    QPixmap,
+)
+
 from PySide6.QtNetwork import (
     QNetworkAccessManager,
     QNetworkRequest,
@@ -1283,6 +1287,28 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 20 - GLOBAL ONLINE SEARCH
+        # ====================================================
+        #
+        # Home Header:
+        #     type query
+        #     press Enter
+        #         ↓
+        # HomeScreen.online_search_requested
+        #         ↓
+        # AppWindow.handle_global_online_search()
+        #         ↓
+        # DiscoverScreen.search_online_music()
+        #
+        # The actual API/network work stays inside DiscoverScreen
+        # and its worker thread. AppWindow only routes the request.
+        #
+
+        self.home.online_search_requested.connect(
+            self.handle_global_online_search
+        )
+
+        # ====================================================
         # FAVORITES
         # ====================================================
 
@@ -1582,6 +1608,91 @@ class AppWindow(QMainWindow):
         )
 
     # ========================================================
+    # DAY 20 - GLOBAL ONLINE SEARCH ROUTER
+    # ========================================================
+
+    def handle_global_online_search(
+        self,
+        query
+    ):
+
+        query = str(
+            query or ""
+        ).strip()
+
+        if not query:
+
+            return
+
+        print()
+        print("=" * 60)
+        print("LYRx DAY 20 - GLOBAL ONLINE SEARCH")
+        print("Query:", query)
+        print("=" * 60)
+        print()
+
+        # ====================================================
+        # OPEN DISCOVER
+        # ====================================================
+
+        self.pages.setCurrentWidget(
+            self.discover
+        )
+
+        self.update_sidebar_states(
+            "Discover"
+        )
+
+        # ====================================================
+        # KEEP FLOATING PLAYER RULES CONSISTENT
+        # ====================================================
+
+        self.update_floating_visibility()
+
+        self.position_floating_player()
+
+        if self.floating_player.isVisible():
+
+            self.floating_player.raise_()
+
+        # ====================================================
+        # SEND QUERY TO DISCOVER
+        # ====================================================
+        #
+        # FILE 4 / DiscoverScreen will provide:
+        #
+        #     search_online_music(query)
+        #
+        # Keeping this hasattr guard means window.py can still
+        # launch safely before File 4 is pasted.
+        #
+
+        if hasattr(
+            self.discover,
+            "search_online_music"
+        ):
+
+            try:
+
+                self.discover.search_online_music(
+                    query
+                )
+
+            except Exception as error:
+
+                print(
+                    "Global online search routing error:",
+                    error
+                )
+
+        else:
+
+            print(
+                "DiscoverScreen.search_online_music() "
+                "is not added yet. Apply File 4 next."
+            )
+
+    # ========================================================
     # PAGE NAVIGATION
     # ========================================================
 
@@ -1777,7 +1888,7 @@ class AppWindow(QMainWindow):
         self.floating_player.raise_()
 
     # ========================================================
-    # DAY 19 - ONLINE DISCOVER SONG
+    # DAY 20 - ONLINE DISCOVER / SEARCH SONG
     # ========================================================
 
     def play_online_discover_song(
@@ -1791,6 +1902,178 @@ class AppWindow(QMainWindow):
 
                 return
 
+            # ====================================================
+            # SAFE SONG DATA
+            # ====================================================
+
+            title = str(
+                getattr(
+                    song,
+                    "title",
+                    ""
+                )
+                or "Unknown Track"
+            )
+
+            artist = str(
+                getattr(
+                    song,
+                    "artist",
+                    ""
+                )
+                or "Unknown Artist"
+            )
+
+            image_url = str(
+                getattr(
+                    song,
+                    "image_url",
+                    ""
+                )
+                or ""
+            )
+
+            # ====================================================
+            # DAY 20 - UNIFIED PLAYABLE URL
+            # ====================================================
+            #
+            # Jamendo:
+            #     song.audio_url
+            #
+            # iTunes:
+            #     song.preview_url
+            #
+            # Unified provider Song:
+            #     song.playable_url()
+            #
+            # This keeps Day 19 Jamendo playback working while
+            # allowing Day 20 iTunes preview playback.
+            #
+
+            audio_url = ""
+
+            try:
+
+                if hasattr(
+                    song,
+                    "playable_url"
+                ):
+
+                    audio_url = str(
+                        song.playable_url()
+                        or ""
+                    ).strip()
+
+                else:
+
+                    audio_url = str(
+
+                        getattr(
+                            song,
+                            "audio_url",
+                            ""
+                        )
+
+                        or
+
+                        getattr(
+                            song,
+                            "preview_url",
+                            ""
+                        )
+
+                        or
+
+                        ""
+
+                    ).strip()
+
+            except Exception as error:
+
+                print(
+                    "Playable URL resolve error:",
+                    error
+                )
+
+                audio_url = str(
+
+                    getattr(
+                        song,
+                        "audio_url",
+                        ""
+                    )
+
+                    or
+
+                    getattr(
+                        song,
+                        "preview_url",
+                        ""
+                    )
+
+                    or
+
+                    ""
+
+                ).strip()
+
+            # ====================================================
+            # DAY 19 PLAYER COMPATIBILITY
+            # ====================================================
+            #
+            # NowPlaying.update_online_song() still uses audio_url
+            # as its playback source. For preview-only providers
+            # such as iTunes, expose the resolved preview through
+            # audio_url for the playback layer.
+            #
+
+            if audio_url:
+
+                try:
+
+                    song.audio_url = (
+                        audio_url
+                    )
+
+                except Exception:
+
+                    pass
+
+            # ====================================================
+            # DAY 20 PROVIDER COMPATIBILITY
+            # ====================================================
+            #
+            # Old Song model:
+            #     song.source
+            #
+            # New provider model:
+            #     song.provider
+            #
+            # Support BOTH so Day 19 and Day 20 code can coexist.
+            #
+
+            source_name = str(
+
+                getattr(
+                    song,
+                    "source",
+                    ""
+                )
+
+                or
+
+                getattr(
+                    song,
+                    "provider",
+                    ""
+                )
+
+                or
+
+                "online"
+
+            )
+
             print()
             print("=" * 60)
 
@@ -1800,28 +2083,138 @@ class AppWindow(QMainWindow):
 
             print(
                 "Title:",
-                song.title
+                title
             )
 
             print(
                 "Artist:",
-                song.artist
+                artist
             )
 
             print(
                 "Source:",
-                song.source
+                source_name
+            )
+
+            print(
+                "Audio:",
+                audio_url
             )
 
             print("=" * 60)
             print()
 
             # ====================================================
+            # VALIDATE AUDIO
+            # ====================================================
+
+            if not audio_url:
+
+                print(
+                    "Online song has no playable audio or preview URL:",
+                    title
+                )
+
+                return
+
+            print(
+                "Resolved playable URL:",
+                audio_url
+            )
+
+            # ====================================================
+            # GET CURRENT DISCOVER QUEUE
+            # ====================================================
+
+            online_queue = list(
+                getattr(
+                    self.discover,
+                    "online_songs",
+                    []
+                )
+                or []
+            )
+
+            # ====================================================
+            # SEARCH RESULTS MAY USE ANOTHER RESULT COLLECTION
+            # ====================================================
+
+            search_results = list(
+                getattr(
+                    self.discover,
+                    "search_results",
+                    []
+                )
+                or []
+            )
+
+            if search_results:
+
+                # ------------------------------------------------
+                # Use search queue only if clicked song belongs
+                # to it.
+                # ------------------------------------------------
+
+                song_id = str(
+                    getattr(
+                        song,
+                        "id",
+                        ""
+                    )
+                    or ""
+                )
+
+                found_in_search = False
+
+                for item in search_results:
+
+                    if item is song:
+
+                        found_in_search = True
+                        break
+
+                    item_id = str(
+                        getattr(
+                            item,
+                            "id",
+                            ""
+                        )
+                        or ""
+                    )
+
+                    if (
+                        song_id
+                        and
+                        item_id
+                        and
+                        song_id == item_id
+                    ):
+
+                        found_in_search = True
+                        break
+
+                if found_in_search:
+
+                    online_queue = (
+                        search_results
+                    )
+
+            # ====================================================
+            # FALLBACK
+            # ====================================================
+
+            if not online_queue:
+
+                online_queue = [
+                    song
+                ]
+
+            # ====================================================
             # SET COMPLETE ONLINE QUEUE
             # ====================================================
 
             self.home.now_playing.set_online_queue(
-                self.discover.online_songs,
+                online_queue,
                 current_song=song
             )
 
@@ -1847,7 +2240,22 @@ class AppWindow(QMainWindow):
             )
 
             # ====================================================
-            # FLOATING PLAYER
+            # FLOATING PLAYER IMMEDIATE SYNC
+            # ====================================================
+            #
+            # Normally NowPlaying.song_changed handles this.
+            # We also sync here so artwork/text doesn't depend
+            # on network/event timing.
+            #
+
+            self.floating_player.set_song(
+                image_url,
+                title,
+                artist
+            )
+
+            # ====================================================
+            # VISIBILITY
             # ====================================================
 
             self.update_floating_visibility()
@@ -1855,24 +2263,42 @@ class AppWindow(QMainWindow):
             self.position_floating_player()
 
             if (
-                self.floating_player.isVisible()
+                self.floating_player
+                .isVisible()
             ):
 
                 self.floating_player.raise_()
 
             print(
                 "Online playback started:",
-                song.title,
+                title,
                 "-",
-                song.artist
+                artist
             )
 
         except Exception as error:
 
+            print()
+            print("=" * 60)
+
             print(
-                "Online Discover play error:",
+                "ONLINE DISCOVER PLAY ERROR"
+            )
+
+            print(
+                "Type:",
+                type(
+                    error
+                ).__name__
+            )
+
+            print(
+                "Error:",
                 error
             )
+
+            print("=" * 60)
+            print()
 
     # ========================================================
     # FAVORITE SONG

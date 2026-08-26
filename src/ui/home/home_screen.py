@@ -1,7 +1,11 @@
 import random
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+)
+
 from PySide6.QtGui import (
     QColor,
     QLinearGradient,
@@ -31,6 +35,30 @@ from data.playlist_store import playlist_store
 
 
 class HomeScreen(QWidget):
+
+    # =========================================================
+    # DAY 20 - GLOBAL ONLINE SEARCH
+    # =========================================================
+    #
+    # Header search:
+    #
+    #   User types query
+    #       ↓
+    #   presses Enter
+    #       ↓
+    #   Header.online_search_requested
+    #       ↓
+    #   HomeScreen.online_search_requested
+    #       ↓
+    #   AppWindow
+    #       ↓
+    #   Discover online results
+    #
+    # HomeScreen itself will NOT call MusicService.
+    #
+    # This keeps API/network work out of the Home UI.
+    #
+    online_search_requested = Signal(str)
 
     def __init__(self):
 
@@ -318,8 +346,35 @@ class HomeScreen(QWidget):
         # SEARCH
         # ==================================================
 
+        # --------------------------------------------------
+        # EXISTING LOCAL SEARCH
+        # --------------------------------------------------
+        #
+        # Typing inside the Home search bar continues to
+        # filter the local Continue Listening cards.
+        #
         self.header.search_changed.connect(
             self.filter_music_cards
+        )
+
+        # --------------------------------------------------
+        # DAY 20 - GLOBAL ONLINE SEARCH
+        # --------------------------------------------------
+        #
+        # Pressing Enter is different from simply typing.
+        #
+        # Example:
+        #
+        #   Arijit Singh
+        #       +
+        #   ENTER
+        #
+        # Header sends the query here.
+        #
+        # HomeScreen forwards it to AppWindow.
+        #
+        self.header.online_search_requested.connect(
+            self.handle_online_search_request
         )
 
         # ==================================================
@@ -1191,6 +1246,67 @@ class HomeScreen(QWidget):
 
         print(
             f"{title} {state} favorites"
+        )
+
+    # =========================================================
+    # DAY 20 - GLOBAL ONLINE SEARCH REQUEST
+    # =========================================================
+
+    def handle_online_search_request(
+        self,
+        query
+    ):
+
+        query = str(
+            query or ""
+        ).strip()
+
+        # -----------------------------------------------------
+        # IGNORE EMPTY QUERY
+        # -----------------------------------------------------
+
+        if not query:
+
+            return
+
+        print()
+        print(
+            "=" * 60
+        )
+
+        print(
+            "LYRx HOME -> GLOBAL ONLINE SEARCH"
+        )
+
+        print(
+            "Query:",
+            query
+        )
+
+        print(
+            "=" * 60
+        )
+
+        print()
+
+        # -----------------------------------------------------
+        # FORWARD TO APP WINDOW
+        # -----------------------------------------------------
+        #
+        # IMPORTANT:
+        #
+        # We intentionally do NOT:
+        #
+        #   MusicService()
+        #   requests.get(...)
+        #   Jamendo API call
+        #
+        # from HomeScreen.
+        #
+        # AppWindow will route the request to Discover.
+        #
+        self.online_search_requested.emit(
+            query
         )
 
     # =========================================================

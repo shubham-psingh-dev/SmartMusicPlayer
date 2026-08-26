@@ -121,4 +121,32 @@ These commands are connected to the actual LYRx audio player.
 - Preserved local music playback compatibility
 - Added online stream error handling and retry support
 
+- [x] Day 20 -  Multi-Provider Online Music Search
+
+### Completed
+
+- Added unified multi-provider music architecture
+- Added ProviderRegistry
+- Integrated iTunes catalog provider
+- Retained Jamendo provider as online playable fallback
+- Added mainstream Hindi / Bollywood / English catalog discovery
+- Added artist and song search support
+- Added genre and mood-ready provider architecture
+- Added online album artwork support
+- Added online song playback pipeline
+- Added provider-independent Song model
+- Added preview/full playback capability detection
+
+### Current Provider Support
+
+- iTunes / Apple catalog:
+  - Mainstream song discovery
+  - Hindi / Bollywood / English music
+  - Album artwork
+  - Artist / album metadata
+  - Preview playback
+- Jamendo:
+  - Independent online catalog
+  - Full-track playback where available
+
 Version: LYRx Alpha 1.0

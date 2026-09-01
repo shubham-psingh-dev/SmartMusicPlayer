@@ -14,6 +14,10 @@ from PySide6.QtNetwork import (
     QNetworkReply,
 )
 
+from data.youtube_favorites_store import (
+    youtube_favorites_store
+)
+
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -24,6 +28,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QVBoxLayout,
     QSlider,
+    QWidget,
+    QSizePolicy,
 )
 
 from ui.home.home_screen import HomeScreen
@@ -33,7 +39,10 @@ from ui.basic_page import BasicPage
 from ui.library.library_screen import LibraryScreen
 from ui.playlists.playlist_screen import PlaylistScreen
 from ui.assistant.assistant_screen import AssistantScreen
+from ui.yt_box.yt_box_screen import YTBoxScreen
+from widgets.sidebar import Sidebar
 from data.playlist_store import playlist_store
+from services.youtube_service import youtube_service
 
 from core.theme_manager import ThemeManager
 
@@ -1064,6 +1073,90 @@ class FloatingPlayer(QFrame):
 
 
 # ============================================================
+# YT BOX PAGE SHELL
+# ============================================================
+
+class YTBoxPage(QWidget):
+
+    play_requested = Signal(object)
+    favorite_requested = Signal(object)
+    playlist_requested = Signal(object)
+
+    def __init__(self, parent=None):
+
+        super().__init__(parent)
+
+        self.setObjectName("YTBoxPage")
+        self.current_is_dark = True
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        self.sidebar = Sidebar()
+
+        self.sidebar.setSizePolicy(
+            QSizePolicy.Fixed,
+            QSizePolicy.Expanding
+        )
+
+        root.addWidget(self.sidebar)
+
+        self.main = YTBoxScreen()
+
+        self.main.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+
+        root.addWidget(
+            self.main,
+            1
+        )
+
+        self.main.play_requested.connect(
+            self.play_requested.emit
+        )
+
+        self.main.favorite_requested.connect(
+            self.favorite_requested.emit
+        )
+
+        self.main.playlist_requested.connect(
+            self.playlist_requested.emit
+        )
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+
+        self.current_is_dark = bool(is_dark)
+
+        try:
+            self.sidebar.set_theme_state(
+                self.current_is_dark
+            )
+        except Exception as error:
+            print(
+                "YT BOX sidebar theme error:",
+                error
+            )
+
+        try:
+            self.main.set_theme_state(
+                self.current_is_dark
+            )
+        except Exception as error:
+            print(
+                "YT BOX content theme error:",
+                error
+            )
+
+        self.update()
+
+
+# ============================================================
 # APP WINDOW
 # ============================================================
 
@@ -1229,6 +1322,16 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 21 - YT BOX
+        # ====================================================
+
+        self.yt_box = YTBoxPage()
+
+        self.pages.addWidget(
+            self.yt_box
+        )
+
+        # ====================================================
         # SETTINGS
         # ====================================================
 
@@ -1253,6 +1356,7 @@ class AppWindow(QMainWindow):
             self.library.sidebar,
             self.playlists.sidebar,
             self.assistant.sidebar,
+            self.yt_box.sidebar,
             self.settings.sidebar
         ]
 
@@ -1309,11 +1413,36 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 21 - YT BOX SIGNALS
+        # ====================================================
+        #
+        # File 4 only wires the screen into AppWindow.
+        # Play/Favorite/Playlist behavior is handled by the
+        # dedicated YT BOX integration steps that follow.
+        #
+
+        self.yt_box.play_requested.connect(
+            self.play_youtube_track
+        )
+
+        self.yt_box.favorite_requested.connect(
+            self.handle_yt_box_favorite_requested
+        )
+
+        self.yt_box.playlist_requested.connect(
+            self.handle_yt_box_playlist_requested
+        )
+
+        # ====================================================
         # FAVORITES
         # ====================================================
 
         self.favorites.play_requested.connect(
             self.play_favorite_song
+        )
+
+        self.favorites.youtube_play_requested.connect(
+            self.play_youtube_favorite
         )
 
         # ====================================================
@@ -1468,6 +1597,7 @@ class AppWindow(QMainWindow):
             self.library,
             self.playlists,
             self.assistant,
+            self.yt_box,
             self.settings
         ]
 
@@ -1595,6 +1725,7 @@ class AppWindow(QMainWindow):
             self.library,
             self.playlists,
             self.assistant,
+            self.yt_box,
             self.settings
         ):
 
@@ -1715,6 +1846,8 @@ class AppWindow(QMainWindow):
 
             "AI Assistant": self.assistant,
 
+            "YT BOX": self.yt_box,
+
             "Settings": self.settings
         }
 
@@ -1756,6 +1889,20 @@ class AppWindow(QMainWindow):
             try:
 
                 self.assistant.input_box.setFocus()
+
+            except Exception:
+
+                pass
+
+        # ====================================================
+        # YT BOX PAGE
+        # ====================================================
+
+        if page_name == "YT BOX":
+
+            try:
+
+                self.yt_box.main.search_input.setFocus()
 
             except Exception:
 
@@ -2299,6 +2446,351 @@ class AppWindow(QMainWindow):
 
             print("=" * 60)
             print()
+
+    # ========================================================
+    # DAY 21 - YT BOX PLAY
+    # ========================================================
+
+    def play_youtube_track(
+        self,
+        track
+    ):
+
+        try:
+
+            if track is None:
+                return
+
+            title = str(
+                getattr(
+                    track,
+                    "title",
+                    ""
+                )
+                or "YouTube Track"
+            )
+
+            channel = str(
+                getattr(
+                    track,
+                    "channel",
+                    ""
+                )
+                or "YouTube"
+            )
+
+            thumbnail_url = str(
+                getattr(
+                    track,
+                    "thumbnail_url",
+                    ""
+                )
+                or ""
+            )
+
+            # --------------------------------------------
+            # Floating metadata
+            # --------------------------------------------
+
+            self.floating_player.set_song(
+                thumbnail_url,
+                title,
+                channel
+            )
+
+            self.floating_player.set_playing(
+                False
+            )
+
+            # --------------------------------------------
+            # Official YouTube playback
+            # --------------------------------------------
+
+            opened = (
+                youtube_service.open_track(
+                    track
+                )
+            )
+
+            if not opened:
+
+                print(
+                    "YT BOX could not open:",
+                    title
+                )
+
+                return
+
+            # --------------------------------------------
+            # Stay on YT BOX
+            # --------------------------------------------
+
+            self.pages.setCurrentWidget(
+                self.yt_box
+            )
+
+            self.update_sidebar_states(
+                "YT BOX"
+            )
+
+            self.update_floating_visibility()
+
+            self.position_floating_player()
+
+            print(
+                "YT BOX opened on YouTube:",
+                title
+            )
+
+        except Exception as error:
+
+            print(
+                "YT BOX PLAY ERROR:",
+                error
+            )
+
+    # ========================================================
+    # DAY 21 - YT BOX REQUEST ROUTERS
+    # ========================================================
+
+    def handle_yt_box_play_requested(self, track):
+        """
+        File 4 routing checkpoint.
+
+        The YT BOX card is now connected all the way to
+        AppWindow. The dedicated playback behavior is added
+        in the next YT BOX integration file.
+        """
+
+        if track is None:
+            return
+
+        print()
+        print("=" * 60)
+        print("APP WINDOW - YT BOX PLAY REQUEST")
+        print("Title:", getattr(track, "title", ""))
+        print("Channel:", getattr(track, "channel", ""))
+
+        try:
+            print("URL:", track.youtube_url())
+        except Exception:
+            print("URL:", getattr(track, "webpage_url", ""))
+
+        print("YT BOX playback integration is the next step.")
+        print("=" * 60)
+        print()
+
+    def handle_yt_box_favorite_requested(
+        self,
+        track
+    ):
+        
+        if track is None:
+            return
+
+        try:
+
+            is_favorite = (
+                youtube_favorites_store
+                .toggle(
+                    track
+                )
+            )
+
+            print(
+                "YT BOX favorite:",
+                "ADDED"
+                if is_favorite
+                else "REMOVED",
+                "-",
+                getattr(
+                    track,
+                    "title",
+                    "YouTube Track"
+                )
+            )
+
+            self.favorites.reload_favorites()
+
+        
+        except Exception as error:
+
+            print(
+                "YT BOX favorite error:",
+                error
+            )
+
+    def handle_yt_box_playlist_requested(
+        self,
+        track
+    ):
+
+        if track is None:
+            return
+
+        try:
+
+            # ====================================================
+            # YOUTUBE TRACK METADATA
+            # ====================================================
+
+            title = str(
+                getattr(
+                    track,
+                    "title",
+                    ""
+                )
+                or "YouTube Track"
+            )
+
+            channel = str(
+                getattr(
+                    track,
+                    "channel",
+                    ""
+                )
+                or "YouTube"
+            )
+
+            thumbnail_url = str(
+                getattr(
+                    track,
+                    "thumbnail_url",
+                    ""
+                )
+                or ""
+            )
+
+            video_id = str(
+                getattr(
+                    track,
+                    "video_id",
+                    ""
+                )
+                or ""
+            )
+
+            youtube_url = ""
+
+            try:
+
+                if hasattr(
+                    track,
+                    "youtube_url"
+                ):
+
+                    youtube_url = str(
+                        track.youtube_url()
+                        or ""
+                    ).strip()
+
+            except Exception:
+
+                youtube_url = ""
+
+            if not youtube_url:
+
+                youtube_url = str(
+                    getattr(
+                        track,
+                        "webpage_url",
+                        ""
+                    )
+                    or ""
+                ).strip()
+
+            # ====================================================
+            # DEBUG
+            # ====================================================
+
+            print()
+            print("=" * 60)
+            print("LYRx YT BOX - ADD TO PLAYLIST")
+            print("Title:", title)
+            print("Channel:", channel)
+            print("Video ID:", video_id)
+            print("URL:", youtube_url)
+            print("=" * 60)
+            print()
+
+            # ====================================================
+            # EXISTING PLAYLIST SYSTEM
+            # ====================================================
+            #
+            # Day 21:
+            # Store YT track using the existing playlist schema:
+            #
+            # image  -> YouTube thumbnail
+            # title  -> video/song title
+            # artist -> YouTube channel
+            #
+            # Day 22:
+            # We will extend playlist metadata with:
+            # source/video_id/webpage_url
+            # when unified YouTube playback is implemented.
+            # ====================================================
+
+            added = (
+                self.playlists
+                .add_song_to_playlist(
+                    thumbnail_url,
+                    title,
+                    channel
+                )
+            )
+
+            if added:
+
+                print(
+                    "YT BOX added to playlist:",
+                    title
+                )
+
+            else:
+
+                print(
+                    "YT BOX playlist add cancelled "
+                    "or track already exists:",
+                    title
+                )
+
+        except Exception as error:
+
+            print()
+            print("=" * 60)
+            print("YT BOX PLAYLIST ERROR")
+            print(
+                "Type:",
+                type(error).__name__
+            )
+            print(
+                "Error:",
+                error
+            )
+            print("=" * 60)
+            print()
+
+    def play_youtube_favorite(
+        self,
+        item
+    ):
+
+        from types import SimpleNamespace
+
+        if not isinstance(
+            item,
+            dict
+        ):
+
+            return
+
+        track = SimpleNamespace(
+            **item
+        )
+
+        self.play_youtube_track(
+            track
+        )
 
     # ========================================================
     # FAVORITE SONG
@@ -3241,7 +3733,8 @@ class AppWindow(QMainWindow):
         if current not in (
             self.discover,
             self.favorites,
-            self.library
+            self.library,
+            self.yt_box
         ):
 
             return

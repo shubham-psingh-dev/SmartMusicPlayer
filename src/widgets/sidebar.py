@@ -759,6 +759,16 @@ class Sidebar(QWidget):
         # ====================================================
         # NAVIGATION
         # ====================================================
+        #
+        # DAY 21:
+        #
+        # YT BOX added between AI Assistant and Settings.
+        #
+        # Existing page_changed architecture remains untouched.
+        #
+        # If youtube.svg does not exist yet, NavButton simply
+        # renders without an icon. Navigation still works.
+        # ====================================================
 
         menu = [
 
@@ -792,12 +802,25 @@ class Sidebar(QWidget):
                 "sparkles.svg",
             ),
 
+            # =================================================
+            # DAY 21 - YT BOX
+            # =================================================
+
+            (
+                "YT BOX",
+                "youtube.svg",
+            ),
+
             (
                 "Settings",
                 "settings.svg",
             ),
 
         ]
+
+        # ====================================================
+        # CREATE NAV BUTTONS
+        # ====================================================
 
         for text, icon in menu:
 
@@ -1446,6 +1469,29 @@ class Sidebar(QWidget):
                 button.setChecked(
                     False,
                 )
+
+        # ----------------------------------------------------
+        # Ensure clicked button remains selected.
+        # ----------------------------------------------------
+
+        if isinstance(
+            sender,
+            NavButton,
+        ):
+
+            sender.setChecked(
+                True,
+            )
+
+        # ----------------------------------------------------
+        # Existing generic navigation signal.
+        #
+        # YT BOX will emit exactly:
+        #
+        #       "YT BOX"
+        #
+        # AppWindow will route it in File 4.
+        # ----------------------------------------------------
 
         self.page_changed.emit(
             page_name,

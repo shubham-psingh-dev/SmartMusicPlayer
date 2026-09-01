@@ -1,26 +1,34 @@
 # ============================================================
 # LYRx
-# DAY 20 - FINAL TASK
-# MULTI-PROVIDER ARCHITECTURE
+# DAY 21 - PHASE 1
 #
-# FILE 3
+# FILE 2
 # provider_registry.py
 #
 # PURPOSE:
-#   Central manager for all LYRx music providers.
+#   Unified multi-provider registry.
 #
-# CURRENT PROVIDERS:
+# PROVIDERS:
 #
-#   1. ITunesProvider
-#      - mainstream catalog
-#      - Hindi / Bollywood / English
-#      - previews when available
+#   Spotify
+#       - mainstream catalog
+#       - authenticated full playback control
 #
-#   2. JamendoProvider
-#      - full playable independent catalog
+#   iTunes
+#       - mainstream catalog
+#       - preview fallback
+#
+#   Jamendo
+#       - independent catalog
+#       - direct full-track streaming
 #
 # IMPORTANT:
-#   UI should eventually talk only to ProviderRegistry.
+#
+#   Spotify is only considered "catalog ready" after the user
+#   has authenticated.
+#
+#   Therefore a configured-but-logged-out Spotify provider
+#   cannot break Discover/Home search.
 # ============================================================
 
 from __future__ import annotations
@@ -37,12 +45,16 @@ from services.music_provider import (
     Song,
 )
 
-from services.jamendo_provider import (
-    JamendoProvider,
+from services.spotify_provider import (
+    SpotifyProvider,
 )
 
 from services.itunes_provider import (
     ITunesProvider,
+)
+
+from services.jamendo_provider import (
+    JamendoProvider,
 )
 
 
@@ -53,38 +65,42 @@ from services.itunes_provider import (
 class ProviderRegistry:
 
     """
-    Central music-provider manager for LYRx.
+    Central provider manager for LYRx.
 
-    ------------------------------------------------------------
+    ==========================================================
     ARCHITECTURE
-    ------------------------------------------------------------
+    ==========================================================
 
-        Home / Discover / AI / Search
-                    │
-                    ▼
-            ProviderRegistry
-                    │
-          ┌─────────┴─────────┐
-          ▼                   ▼
-    ITunesProvider      JamendoProvider
+        LYRx UI
+           │
+           ▼
+    ProviderRegistry
+           │
+           ├── SpotifyProvider
+           │       authenticated mainstream playback
+           │
+           ├── ITunesProvider
+           │       mainstream catalog / preview
+           │
+           └── JamendoProvider
+                   direct online music
 
-    ------------------------------------------------------------
-    GOAL
-    ------------------------------------------------------------
+    ==========================================================
+    PROVIDER PRIORITY
+    ==========================================================
 
-    UI/player modules should not need provider-specific logic.
+    When Spotify is authenticated:
 
-    They request:
+        Spotify
+        iTunes
+        Jamendo
 
-        search()
-        get_trending()
-        get_popular()
-        get_hindi()
-        get_english()
-        get_by_genre()
-        get_by_mood()
+    When Spotify is NOT authenticated:
 
-    Registry handles provider priority and fallback.
+        iTunes
+        Jamendo
+
+    Existing Day 19 / Day 20 architecture remains compatible.
     """
 
     # ========================================================
@@ -96,7 +112,7 @@ class ProviderRegistry:
     ):
 
         # ----------------------------------------------------
-        # PROVIDER MAP
+        # PROVIDERS
         # ----------------------------------------------------
 
         self.providers: Dict[
@@ -105,13 +121,8 @@ class ProviderRegistry:
         ] = {}
 
         # ----------------------------------------------------
-        # GENERAL PRIORITY
+        # PRIORITY
         # ----------------------------------------------------
-        #
-        # Mainstream catalog first.
-        #
-        # Jamendo remains fallback for full playable tracks.
-        #
 
         self.provider_priority: List[str] = []
 
@@ -122,13 +133,13 @@ class ProviderRegistry:
         self.default_provider_name = ""
 
         # ----------------------------------------------------
-        # BUILT-IN PROVIDERS
+        # REGISTER BUILT-IN PROVIDERS
         # ----------------------------------------------------
 
         self._register_default_providers()
 
     # ========================================================
-    # DEFAULT PROVIDERS
+    # REGISTER DEFAULT PROVIDERS
     # ========================================================
 
     def _register_default_providers(
@@ -136,18 +147,30 @@ class ProviderRegistry:
     ):
 
         # ====================================================
-        # ITUNES FIRST
+        # SPOTIFY
         # ====================================================
         #
-        # Mainstream catalog:
-        #
-        #   Arijit Singh
-        #   Bollywood
-        #   Hindi
-        #   English
-        #   global artists
-        #
-        # Playback may be preview-only.
+        # Highest priority once authenticated.
+        # ====================================================
+
+        try:
+
+            spotify = SpotifyProvider()
+
+            self.register(
+                spotify,
+                make_default=False,
+            )
+
+        except Exception as error:
+
+            print(
+                "ProviderRegistry Spotify init error:",
+                error
+            )
+
+        # ====================================================
+        # ITUNES
         # ====================================================
 
         try:
@@ -167,10 +190,7 @@ class ProviderRegistry:
             )
 
         # ====================================================
-        # JAMENDO SECOND
-        # ====================================================
-        #
-        # Full playable independent catalog.
+        # JAMENDO
         # ====================================================
 
         try:
@@ -188,6 +208,41 @@ class ProviderRegistry:
                 "ProviderRegistry Jamendo init error:",
                 error
             )
+
+        # ====================================================
+        # EXPLICIT PRIORITY
+        # ====================================================
+
+        preferred_order = [
+
+            "spotify",
+
+            "itunes",
+
+            "jamendo",
+        ]
+
+        ordered = []
+
+        for provider_name in preferred_order:
+
+            if provider_name in self.providers:
+
+                ordered.append(
+                    provider_name
+                )
+
+        for provider_name in self.provider_priority:
+
+            if provider_name not in ordered:
+
+                ordered.append(
+                    provider_name
+                )
+
+        self.provider_priority = (
+            ordered
+        )
 
     # ========================================================
     # REGISTER
@@ -218,9 +273,17 @@ class ProviderRegistry:
                 "Music provider must define provider_name."
             )
 
+        # ----------------------------------------------------
+        # SAVE
+        # ----------------------------------------------------
+
         self.providers[
             provider_name
         ] = provider
+
+        # ----------------------------------------------------
+        # PRIORITY
+        # ----------------------------------------------------
 
         if (
             provider_name
@@ -230,6 +293,10 @@ class ProviderRegistry:
             self.provider_priority.append(
                 provider_name
             )
+
+        # ----------------------------------------------------
+        # DEFAULT
+        # ----------------------------------------------------
 
         if (
             make_default
@@ -280,18 +347,27 @@ class ProviderRegistry:
 
         if (
             self.default_provider_name
-            == provider_name
+            ==
+            provider_name
         ):
 
-            if self.provider_priority:
+            self.default_provider_name = ""
 
-                self.default_provider_name = (
-                    self.provider_priority[0]
-                )
+            # ------------------------------------------------
+            # Pick first usable normal provider.
+            # ------------------------------------------------
 
-            else:
+            for candidate in (
+                self.provider_priority
+            ):
 
-                self.default_provider_name = ""
+                if candidate in self.providers:
+
+                    self.default_provider_name = (
+                        candidate
+                    )
+
+                    break
 
     # ========================================================
     # GET PROVIDER
@@ -316,6 +392,69 @@ class ProviderRegistry:
         )
 
     # ========================================================
+    # SPOTIFY PROVIDER
+    # ========================================================
+
+    def get_spotify_provider(
+        self
+    ) -> Optional[SpotifyProvider]:
+
+        provider = self.get_provider(
+            "spotify"
+        )
+
+        if isinstance(
+            provider,
+            SpotifyProvider
+        ):
+
+            return provider
+
+        return None
+
+    # ========================================================
+    # ITUNES PROVIDER
+    # ========================================================
+
+    def get_itunes_provider(
+        self
+    ) -> Optional[ITunesProvider]:
+
+        provider = self.get_provider(
+            "itunes"
+        )
+
+        if isinstance(
+            provider,
+            ITunesProvider
+        ):
+
+            return provider
+
+        return None
+
+    # ========================================================
+    # JAMENDO PROVIDER
+    # ========================================================
+
+    def get_jamendo_provider(
+        self
+    ) -> Optional[JamendoProvider]:
+
+        provider = self.get_provider(
+            "jamendo"
+        )
+
+        if isinstance(
+            provider,
+            JamendoProvider
+        ):
+
+            return provider
+
+        return None
+
+    # ========================================================
     # DEFAULT PROVIDER
     # ========================================================
 
@@ -323,16 +462,60 @@ class ProviderRegistry:
         self
     ) -> Optional[MusicProvider]:
 
-        if not self.default_provider_name:
+        # ====================================================
+        # AUTHENTICATED SPOTIFY BECOMES EFFECTIVE DEFAULT
+        # ====================================================
 
-            return None
-
-        return self.get_provider(
-            self.default_provider_name
+        spotify = (
+            self.get_spotify_provider()
         )
 
+        if spotify is not None:
+
+            try:
+
+                if (
+                    spotify.is_available()
+                    and
+                    spotify.is_authenticated()
+                ):
+
+                    return spotify
+
+            except Exception:
+
+                pass
+
+        # ====================================================
+        # CONFIGURED DEFAULT
+        # ====================================================
+
+        if self.default_provider_name:
+
+            provider = self.get_provider(
+                self.default_provider_name
+            )
+
+            if provider is not None:
+
+                return provider
+
+        # ====================================================
+        # FALLBACK
+        # ====================================================
+
+        providers = (
+            self.available_providers()
+        )
+
+        if providers:
+
+            return providers[0]
+
+        return None
+
     # ========================================================
-    # SET DEFAULT
+    # SET DEFAULT PROVIDER
     # ========================================================
 
     def set_default_provider(
@@ -371,12 +554,101 @@ class ProviderRegistry:
         )
 
     # ========================================================
+    # PROVIDER AVAILABLE
+    # ========================================================
+
+    @staticmethod
+    def _provider_available(
+        provider
+    ) -> bool:
+
+        if provider is None:
+
+            return False
+
+        try:
+
+            return bool(
+                provider.is_available()
+            )
+
+        except Exception:
+
+            return False
+
+    # ========================================================
+    # PROVIDER READY FOR CATALOG
+    # ========================================================
+
+    @staticmethod
+    def _provider_catalog_ready(
+        provider
+    ) -> bool:
+
+        if provider is None:
+
+            return False
+
+        # ----------------------------------------------------
+        # PROVIDER AVAILABLE
+        # ----------------------------------------------------
+
+        try:
+
+            if not provider.is_available():
+
+                return False
+
+        except Exception:
+
+            return False
+
+        # ====================================================
+        # SPOTIFY SPECIAL CASE
+        # ====================================================
+        #
+        # Spotify API catalog requests require authorization.
+        #
+        # Configured but logged-out Spotify should NOT be
+        # considered ready.
+        # ====================================================
+
+        provider_name = str(
+            getattr(
+                provider,
+                "provider_name",
+                ""
+            )
+            or ""
+        ).lower()
+
+        if provider_name == "spotify":
+
+            try:
+
+                return bool(
+                    provider.is_authenticated()
+                )
+
+            except Exception:
+
+                return False
+
+        return True
+
+    # ========================================================
     # AVAILABLE PROVIDERS
     # ========================================================
 
     def available_providers(
         self
     ) -> List[MusicProvider]:
+
+        """
+        Providers ready for actual catalog requests.
+
+        Spotify will only appear here after authentication.
+        """
 
         available = []
 
@@ -394,7 +666,9 @@ class ProviderRegistry:
 
             try:
 
-                if provider.is_available():
+                if self._provider_catalog_ready(
+                    provider
+                ):
 
                     available.append(
                         provider
@@ -411,16 +685,109 @@ class ProviderRegistry:
         return available
 
     # ========================================================
+    # CONFIGURED PROVIDERS
+    # ========================================================
+
+    def configured_providers(
+        self
+    ) -> List[MusicProvider]:
+
+        """
+        Returns providers that have enough configuration to exist,
+        even if login is still required.
+        """
+
+        result = []
+
+        for provider_name in (
+            self.provider_priority
+        ):
+
+            provider = self.providers.get(
+                provider_name
+            )
+
+            if provider is None:
+
+                continue
+
+            try:
+
+                if provider.is_available():
+
+                    result.append(
+                        provider
+                    )
+
+            except Exception:
+
+                continue
+
+        return result
+
+    # ========================================================
     # HAS AVAILABLE PROVIDER
     # ========================================================
 
     def has_available_provider(
-        self,
+        self
     ) -> bool:
 
         return bool(
             self.available_providers()
         )
+
+    # ========================================================
+    # SPOTIFY CONFIGURED
+    # ========================================================
+
+    def spotify_configured(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if spotify is None:
+
+            return False
+
+        try:
+
+            return bool(
+                spotify.is_configured()
+            )
+
+        except Exception:
+
+            return False
+
+    # ========================================================
+    # SPOTIFY AUTHENTICATED
+    # ========================================================
+
+    def spotify_authenticated(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if spotify is None:
+
+            return False
+
+        try:
+
+            return bool(
+                spotify.is_authenticated()
+            )
+
+        except Exception:
+
+            return False
 
     # ========================================================
     # PLAYABLE PROVIDERS
@@ -476,17 +843,23 @@ class ProviderRegistry:
             self.available_providers()
         ):
 
-            if bool(
-                getattr(
-                    provider,
-                    "supports_full_playback",
-                    False
-                )
-            ):
+            try:
 
-                result.append(
-                    provider
-                )
+                if bool(
+                    getattr(
+                        provider,
+                        "supports_full_playback",
+                        False
+                    )
+                ):
+
+                    result.append(
+                        provider
+                    )
+
+            except Exception:
+
+                continue
 
         return result
 
@@ -522,43 +895,19 @@ class ProviderRegistry:
         )
 
     # ========================================================
-    # SONG KEY
+    # SONG PROVIDER
     # ========================================================
 
     @staticmethod
-    def _song_key(
-        song: Song,
-    ):
+    def song_provider_name(
+        song
+    ) -> str:
 
         if song is None:
 
-            return (
-                "",
-                "",
-            )
+            return ""
 
-        # ----------------------------------------------------
-        # Prefer Song's own unified key.
-        # ----------------------------------------------------
-
-        try:
-
-            if hasattr(
-                song,
-                "unique_key"
-            ):
-
-                return song.unique_key()
-
-        except Exception:
-
-            pass
-
-        # ----------------------------------------------------
-        # FALLBACK
-        # ----------------------------------------------------
-
-        provider = str(
+        return str(
 
             getattr(
                 song,
@@ -579,6 +928,46 @@ class ProviderRegistry:
             ""
 
         ).strip().lower()
+
+    # ========================================================
+    # SONG KEY
+    # ========================================================
+
+    @staticmethod
+    def _song_key(
+        song
+    ):
+
+        if song is None:
+
+            return (
+                "",
+                "",
+            )
+
+        # ----------------------------------------------------
+        # MODEL-SUPPLIED KEY
+        # ----------------------------------------------------
+
+        try:
+
+            if hasattr(
+                song,
+                "unique_key"
+            ):
+
+                return song.unique_key()
+
+        except Exception:
+
+            pass
+
+        provider = (
+            ProviderRegistry
+            .song_provider_name(
+                song
+            )
+        )
 
         song_id = str(
             getattr(
@@ -620,6 +1009,69 @@ class ProviderRegistry:
         )
 
     # ========================================================
+    # CROSS-PROVIDER SONG KEY
+    # ========================================================
+
+    @staticmethod
+    def _cross_provider_key(
+        song
+    ):
+
+        """
+        Used to prevent the same song from appearing repeatedly
+        from Spotify + iTunes + Jamendo.
+        """
+
+        if song is None:
+
+            return (
+                "",
+                ""
+            )
+
+        title = str(
+            getattr(
+                song,
+                "title",
+                ""
+            )
+            or ""
+        ).strip().lower()
+
+        artist = str(
+            getattr(
+                song,
+                "artist",
+                ""
+            )
+            or ""
+        ).strip().lower()
+
+        # ----------------------------------------------------
+        # BASIC NORMALIZATION
+        # ----------------------------------------------------
+
+        title = (
+            title
+            .replace(
+                " - single",
+                ""
+            )
+            .replace(
+                "(single)",
+                ""
+            )
+            .strip()
+        )
+
+        artist = artist.strip()
+
+        return (
+            title,
+            artist,
+        )
+
+    # ========================================================
     # DEDUPLICATE
     # ========================================================
 
@@ -627,11 +1079,14 @@ class ProviderRegistry:
         self,
         songs,
         limit=None,
+        cross_provider=True,
     ) -> List[Song]:
 
         result = []
 
-        seen = set()
+        seen_provider = set()
+
+        seen_cross = set()
 
         for song in (
             songs
@@ -642,16 +1097,43 @@ class ProviderRegistry:
 
                 continue
 
-            key = self._song_key(
-                song
+            provider_key = (
+                self._song_key(
+                    song
+                )
             )
 
-            if key in seen:
+            if provider_key in seen_provider:
 
                 continue
 
-            seen.add(
-                key
+            if cross_provider:
+
+                cross_key = (
+                    self._cross_provider_key(
+                        song
+                    )
+                )
+
+                if (
+                    cross_key
+                    !=
+                    (
+                        "",
+                        ""
+                    )
+                    and
+                    cross_key in seen_cross
+                ):
+
+                    continue
+
+                seen_cross.add(
+                    cross_key
+                )
+
+            seen_provider.add(
+                provider_key
             )
 
             result.append(
@@ -661,7 +1143,9 @@ class ProviderRegistry:
             if (
                 limit is not None
                 and
-                len(result) >= limit
+                len(result)
+                >=
+                limit
             ):
 
                 break
@@ -669,13 +1153,13 @@ class ProviderRegistry:
         return result
 
     # ========================================================
-    # SORT SEARCH RESULTS
+    # SEARCH SCORE
     # ========================================================
 
     @staticmethod
     def _search_score(
-        song: Song,
-        query: str,
+        song,
+        query
     ):
 
         query = str(
@@ -701,75 +1185,86 @@ class ProviderRegistry:
             or ""
         ).strip().lower()
 
-        provider = str(
-
-            getattr(
-                song,
-                "provider",
-                ""
+        provider = (
+            ProviderRegistry
+            .song_provider_name(
+                song
             )
-
-            or
-
-            getattr(
-                song,
-                "source",
-                ""
-            )
-
-            or
-
-            ""
-
-        ).strip().lower()
+        )
 
         score = 100
 
-        # ----------------------------------------------------
-        # EXACT TITLE
-        # ----------------------------------------------------
+        # ====================================================
+        # TITLE RELEVANCE
+        # ====================================================
 
         if title == query:
 
-            score -= 50
+            score -= 60
 
         elif query in title:
 
-            score -= 35
+            score -= 40
 
-        # ----------------------------------------------------
-        # ARTIST
-        # ----------------------------------------------------
+        # ====================================================
+        # ARTIST RELEVANCE
+        # ====================================================
 
         if artist == query:
 
-            score -= 40
+            score -= 50
 
         elif query in artist:
 
-            score -= 25
+            score -= 30
 
-        # ----------------------------------------------------
-        # MAINSTREAM PROVIDER PRIORITY
-        # ----------------------------------------------------
+        # ====================================================
+        # PROVIDER PRIORITY
+        # ====================================================
+        #
+        # Spotify authenticated:
+        #     strongest result preference
+        #
+        # iTunes:
+        #     strong mainstream fallback
+        #
+        # Jamendo:
+        #     independent fallback
+        # ====================================================
 
-        if provider == "itunes":
+        if provider == "spotify":
 
-            score -= 8
+            score -= 20
 
-        # ----------------------------------------------------
+        elif provider == "itunes":
+
+            score -= 10
+
+        elif provider == "jamendo":
+
+            score -= 3
+
+        # ====================================================
         # FULL PLAYBACK BONUS
-        # ----------------------------------------------------
+        # ====================================================
 
         try:
 
             if song.has_full_playback():
 
-                score -= 3
+                score -= 5
 
         except Exception:
 
-            pass
+            if bool(
+                getattr(
+                    song,
+                    "full_playback",
+                    False
+                )
+            ):
+
+                score -= 5
 
         return score
 
@@ -792,6 +1287,10 @@ class ProviderRegistry:
         limit = self._normalize_limit(
             limit
         )
+
+        # ====================================================
+        # EMPTY QUERY
+        # ====================================================
 
         if not query:
 
@@ -838,6 +1337,56 @@ class ProviderRegistry:
                     ),
                 )
 
+            # ------------------------------------------------
+            # SPOTIFY REQUIRES LOGIN
+            # ------------------------------------------------
+
+            if (
+                str(
+                    provider_name
+                ).lower()
+                ==
+                "spotify"
+            ):
+
+                try:
+
+                    if not provider.is_authenticated():
+
+                        return MusicSearchResult(
+
+                            query=query,
+
+                            songs=[],
+
+                            total=0,
+
+                            provider="spotify",
+
+                            error=(
+                                "Spotify account is "
+                                "not authenticated."
+                            ),
+                        )
+
+                except Exception:
+
+                    return MusicSearchResult(
+
+                        query=query,
+
+                        songs=[],
+
+                        total=0,
+
+                        provider="spotify",
+
+                        error=(
+                            "Spotify authentication "
+                            "state unavailable."
+                        ),
+                    )
+
             try:
 
                 if not provider.is_available():
@@ -865,7 +1414,13 @@ class ProviderRegistry:
                     limit
                 )
 
-                return result.normalize()
+                try:
+
+                    return result.normalize()
+
+                except Exception:
+
+                    return result
 
             except Exception as error:
 
@@ -887,7 +1442,7 @@ class ProviderRegistry:
                 )
 
         # ====================================================
-        # MULTI PROVIDER
+        # MULTI-PROVIDER SEARCH
         # ====================================================
 
         collected = []
@@ -897,37 +1452,50 @@ class ProviderRegistry:
         errors = []
 
         # ----------------------------------------------------
-        # Ask every available provider.
-        #
-        # We do NOT stop immediately after iTunes results,
-        # because Jamendo may also provide fully playable
-        # alternatives.
+        # Ask all catalog-ready providers.
         # ----------------------------------------------------
-
-        per_provider_limit = max(
-            limit,
-            10
-        )
 
         for provider in (
             self.available_providers()
         ):
 
-            if not getattr(
-                provider,
-                "supports_search",
-                True
-            ):
-
-                continue
+            provider_name_value = str(
+                getattr(
+                    provider,
+                    "provider_name",
+                    ""
+                )
+                or ""
+            )
 
             try:
+
+                if not getattr(
+                    provider,
+                    "supports_search",
+                    True
+                ):
+
+                    continue
+
+                # ------------------------------------------------
+                # Spotify provider caps search internally.
+                # ------------------------------------------------
+
+                provider_limit = (
+                    min(
+                        limit,
+                        10
+                    )
+                    if provider_name_value == "spotify"
+                    else limit
+                )
 
                 result = provider.search(
 
                     query,
 
-                    per_provider_limit
+                    provider_limit
                 )
 
             except Exception as error:
@@ -938,11 +1506,7 @@ class ProviderRegistry:
 
                 print(
                     "Provider search error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
+                    provider_name_value,
                     error
                 )
 
@@ -955,7 +1519,9 @@ class ProviderRegistry:
             ):
 
                 errors.append(
-                    result.error
+                    str(
+                        result.error
+                    )
                 )
 
             songs = list(
@@ -974,25 +1540,21 @@ class ProviderRegistry:
                 )
 
                 providers_used.append(
-                    str(
-                        getattr(
-                            provider,
-                            "provider_name",
-                            ""
-                        )
-                    )
+                    provider_name_value
                 )
 
         # ====================================================
-        # DEDUP
+        # DEDUPLICATE
         # ====================================================
 
-        collected = self._deduplicate(
-            collected
+        collected = (
+            self._deduplicate(
+                collected
+            )
         )
 
         # ====================================================
-        # RELEVANCE SORT
+        # RELEVANCE
         # ====================================================
 
         collected.sort(
@@ -1003,9 +1565,11 @@ class ProviderRegistry:
                 )
         )
 
-        songs = collected[
-            :limit
-        ]
+        songs = (
+            collected[
+                :limit
+            ]
+        )
 
         return MusicSearchResult(
 
@@ -1036,6 +1600,92 @@ class ProviderRegistry:
         )
 
     # ========================================================
+    # COLLECT METHOD
+    # ========================================================
+
+    def _collect_provider_method(
+        self,
+        method_name,
+        *args,
+        limit=20,
+    ) -> List[Song]:
+
+        limit = (
+            self._normalize_limit(
+                limit
+            )
+        )
+
+        collected = []
+
+        for provider in (
+            self.available_providers()
+        ):
+
+            provider_name = str(
+                getattr(
+                    provider,
+                    "provider_name",
+                    "unknown"
+                )
+                or "unknown"
+            )
+
+            method = getattr(
+                provider,
+                method_name,
+                None
+            )
+
+            if not callable(
+                method
+            ):
+
+                continue
+
+            try:
+
+                provider_limit = (
+                    min(
+                        limit,
+                        10
+                    )
+                    if provider_name
+                    ==
+                    "spotify"
+                    else limit
+                )
+
+                songs = method(
+
+                    *args,
+
+                    provider_limit
+                )
+
+            except Exception as error:
+
+                print(
+                    f"Provider {method_name} error:",
+                    provider_name,
+                    error
+                )
+
+                continue
+
+            collected.extend(
+                songs
+                or []
+            )
+
+        return self._deduplicate(
+
+            collected,
+
+            limit
+        )
+
+    # ========================================================
     # TRENDING
     # ========================================================
 
@@ -1044,23 +1694,100 @@ class ProviderRegistry:
         limit: int = 20,
     ) -> List[Song]:
 
-        limit = self._normalize_limit(
-            limit
+        limit = (
+            self._normalize_limit(
+                limit
+            )
         )
 
         collected = []
 
-        # ----------------------------------------------------
-        # Mainstream catalog first.
-        # ----------------------------------------------------
+        # ====================================================
+        # SPOTIFY
+        # ====================================================
+        #
+        # Day 21 Spotify provider does not yet implement a
+        # dedicated chart endpoint.
+        #
+        # Therefore use Hindi/mainstream discovery when
+        # authenticated.
+        # ====================================================
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is not None
+            and
+            self.spotify_authenticated()
+        ):
+
+            try:
+
+                spotify_songs = (
+                    spotify.get_hindi(
+                        min(
+                            limit,
+                            10
+                        )
+                    )
+                )
+
+                collected.extend(
+                    spotify_songs
+                    or []
+                )
+
+            except Exception as error:
+
+                print(
+                    "Spotify trending fallback error:",
+                    error
+                )
+
+        # ====================================================
+        # OTHER PROVIDERS
+        # ====================================================
 
         for provider in (
             self.available_providers()
         ):
 
+            provider_name = (
+                self.song_provider_name(
+                    provider
+                )
+            )
+
+            provider_name = str(
+                getattr(
+                    provider,
+                    "provider_name",
+                    provider_name
+                )
+                or ""
+            ).lower()
+
+            if provider_name == "spotify":
+
+                continue
+
+            method = getattr(
+                provider,
+                "get_trending",
+                None
+            )
+
+            if not callable(
+                method
+            ):
+
+                continue
+
             try:
 
-                songs = provider.get_trending(
+                songs = method(
                     limit
                 )
 
@@ -1068,11 +1795,7 @@ class ProviderRegistry:
 
                 print(
                     "Provider trending error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
+                    provider_name,
                     error
                 )
 
@@ -1105,13 +1828,79 @@ class ProviderRegistry:
 
         collected = []
 
-        for provider in (
-            self.available_providers()
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        # ====================================================
+        # SPOTIFY MAINSTREAM
+        # ====================================================
+
+        if (
+            spotify is not None
+            and
+            self.spotify_authenticated()
         ):
 
             try:
 
-                songs = provider.get_popular(
+                songs = (
+                    spotify.get_hindi(
+                        min(
+                            limit,
+                            10
+                        )
+                    )
+                )
+
+                collected.extend(
+                    songs
+                    or []
+                )
+
+            except Exception as error:
+
+                print(
+                    "Spotify popular fallback error:",
+                    error
+                )
+
+        # ====================================================
+        # ITUNES / JAMENDO
+        # ====================================================
+
+        for provider in (
+            self.available_providers()
+        ):
+
+            provider_name = str(
+                getattr(
+                    provider,
+                    "provider_name",
+                    ""
+                )
+                or ""
+            ).lower()
+
+            if provider_name == "spotify":
+
+                continue
+
+            method = getattr(
+                provider,
+                "get_popular",
+                None
+            )
+
+            if not callable(
+                method
+            ):
+
+                continue
+
+            try:
+
+                songs = method(
                     limit
                 )
 
@@ -1119,11 +1908,7 @@ class ProviderRegistry:
 
                 print(
                     "Provider popular error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
+                    provider_name,
                     error
                 )
 
@@ -1160,49 +1945,15 @@ class ProviderRegistry:
 
             return []
 
-        limit = self._normalize_limit(
-            limit
-        )
+        return (
+            self._collect_provider_method(
 
-        collected = []
+                "get_by_genre",
 
-        for provider in (
-            self.available_providers()
-        ):
+                genre,
 
-            try:
-
-                songs = provider.get_by_genre(
-
-                    genre,
-
-                    limit
-                )
-
-            except Exception as error:
-
-                print(
-                    "Provider genre error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
-                    error
-                )
-
-                continue
-
-            collected.extend(
-                songs
-                or []
+                limit=limit,
             )
-
-        return self._deduplicate(
-
-            collected,
-
-            limit
         )
 
     # ========================================================
@@ -1224,49 +1975,15 @@ class ProviderRegistry:
 
             return []
 
-        limit = self._normalize_limit(
-            limit
-        )
+        return (
+            self._collect_provider_method(
 
-        collected = []
+                "get_by_mood",
 
-        for provider in (
-            self.available_providers()
-        ):
+                mood,
 
-            try:
-
-                songs = provider.get_by_mood(
-
-                    mood,
-
-                    limit
-                )
-
-            except Exception as error:
-
-                print(
-                    "Provider mood error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
-                    error
-                )
-
-                continue
-
-            collected.extend(
-                songs
-                or []
+                limit=limit,
             )
-
-        return self._deduplicate(
-
-            collected,
-
-            limit
         )
 
     # ========================================================
@@ -1278,46 +1995,13 @@ class ProviderRegistry:
         limit: int = 20,
     ) -> List[Song]:
 
-        limit = self._normalize_limit(
-            limit
-        )
+        return (
+            self._collect_provider_method(
 
-        collected = []
+                "get_hindi",
 
-        for provider in (
-            self.available_providers()
-        ):
-
-            try:
-
-                songs = provider.get_hindi(
-                    limit
-                )
-
-            except Exception as error:
-
-                print(
-                    "Provider Hindi error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
-                    error
-                )
-
-                continue
-
-            collected.extend(
-                songs
-                or []
+                limit=limit,
             )
-
-        return self._deduplicate(
-
-            collected,
-
-            limit
         )
 
     # ========================================================
@@ -1329,46 +2013,13 @@ class ProviderRegistry:
         limit: int = 20,
     ) -> List[Song]:
 
-        limit = self._normalize_limit(
-            limit
-        )
+        return (
+            self._collect_provider_method(
 
-        collected = []
+                "get_english",
 
-        for provider in (
-            self.available_providers()
-        ):
-
-            try:
-
-                songs = provider.get_english(
-                    limit
-                )
-
-            except Exception as error:
-
-                print(
-                    "Provider English error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
-                    error
-                )
-
-                continue
-
-            collected.extend(
-                songs
-                or []
+                limit=limit,
             )
-
-        return self._deduplicate(
-
-            collected,
-
-            limit
         )
 
     # ========================================================
@@ -1390,46 +2041,15 @@ class ProviderRegistry:
 
             return []
 
-        limit = self._normalize_limit(
-            limit
-        )
+        songs = (
+            self._collect_provider_method(
 
-        collected = []
+                "search_artist",
 
-        for provider in (
-            self.available_providers()
-        ):
+                artist,
 
-            try:
-
-                songs = provider.search_artist(
-
-                    artist,
-
-                    limit
-                )
-
-            except Exception as error:
-
-                print(
-                    "Provider artist error:",
-                    getattr(
-                        provider,
-                        "provider_name",
-                        "unknown"
-                    ),
-                    error
-                )
-
-                continue
-
-            collected.extend(
-                songs
-                or []
+                limit=limit,
             )
-
-        songs = self._deduplicate(
-            collected
         )
 
         artist_lower = (
@@ -1438,7 +2058,9 @@ class ProviderRegistry:
 
         songs.sort(
             key=lambda song: (
+
                 0
+
                 if artist_lower
                 in str(
                     getattr(
@@ -1448,6 +2070,7 @@ class ProviderRegistry:
                     )
                     or ""
                 ).lower()
+
                 else 1
             )
         )
@@ -1475,6 +2098,10 @@ class ProviderRegistry:
 
             return []
 
+        # ----------------------------------------------------
+        # Generic search has better relevance handling.
+        # ----------------------------------------------------
+
         result = self.search(
 
             title,
@@ -1488,24 +2115,365 @@ class ProviderRegistry:
         )
 
     # ========================================================
-    # FIND FULL-PLAYBACK ALTERNATIVE
+    # SONG NEEDS REMOTE PLAYBACK
+    # ========================================================
+
+    def song_uses_remote_playback(
+        self,
+        song
+    ) -> bool:
+
+        provider = (
+            self.song_provider_name(
+                song
+            )
+        )
+
+        if provider == "spotify":
+
+            return True
+
+        metadata = getattr(
+            song,
+            "metadata",
+            {}
+        )
+
+        if isinstance(
+            metadata,
+            dict
+        ):
+
+            return (
+                metadata.get(
+                    "playback_mode"
+                )
+                ==
+                "spotify_remote"
+            )
+
+        return False
+
+    # ========================================================
+    # PLAY SONG
+    # ========================================================
+
+    def play_song(
+        self,
+        song,
+        device_id="",
+    ) -> bool:
+
+        """
+        Provider-aware playback entry point.
+
+        Spotify:
+            Spotify Connect / remote playback.
+
+        Jamendo / iTunes:
+            Existing QMediaPlayer path remains handled by
+            NowPlaying/AppWindow for now.
+        """
+
+        if song is None:
+
+            return False
+
+        provider_name = (
+            self.song_provider_name(
+                song
+            )
+        )
+
+        # ====================================================
+        # SPOTIFY
+        # ====================================================
+
+        if provider_name == "spotify":
+
+            spotify = (
+                self.get_spotify_provider()
+            )
+
+            if spotify is None:
+
+                print(
+                    "Spotify provider is unavailable."
+                )
+
+                return False
+
+            if not self.spotify_authenticated():
+
+                print(
+                    "Spotify is not authenticated."
+                )
+
+                return False
+
+            return spotify.play_track(
+
+                song,
+
+                device_id=device_id,
+            )
+
+        # ====================================================
+        # DIRECT PLAYBACK PROVIDERS
+        # ====================================================
+
+        return False
+
+    # ========================================================
+    # SPOTIFY LOGIN
+    # ========================================================
+
+    def login_spotify(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if spotify is None:
+
+            print(
+                "Spotify provider is not registered."
+            )
+
+            return False
+
+        if not spotify.is_configured():
+
+            print(
+                "Spotify provider is not configured."
+            )
+
+            return False
+
+        return spotify.login_interactive()
+
+    # ========================================================
+    # SPOTIFY LOGOUT
+    # ========================================================
+
+    def logout_spotify(
+        self
+    ):
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if spotify is None:
+
+            return
+
+        spotify.logout()
+
+    # ========================================================
+    # PAUSE SPOTIFY
+    # ========================================================
+
+    def pause_spotify(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.pause()
+
+    # ========================================================
+    # RESUME SPOTIFY
+    # ========================================================
+
+    def resume_spotify(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.resume()
+
+    # ========================================================
+    # NEXT SPOTIFY
+    # ========================================================
+
+    def next_spotify(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.next_track()
+
+    # ========================================================
+    # PREVIOUS SPOTIFY
+    # ========================================================
+
+    def previous_spotify(
+        self
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.previous_track()
+
+    # ========================================================
+    # SEEK SPOTIFY
+    # ========================================================
+
+    def seek_spotify(
+        self,
+        position_ms
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.seek(
+            position_ms
+        )
+
+    # ========================================================
+    # SPOTIFY VOLUME
+    # ========================================================
+
+    def set_spotify_volume(
+        self,
+        value
+    ) -> bool:
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return False
+
+        return spotify.set_volume(
+            value
+        )
+
+    # ========================================================
+    # SPOTIFY DEVICES
+    # ========================================================
+
+    def spotify_devices(
+        self
+    ):
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return []
+
+        return spotify.get_devices()
+
+    # ========================================================
+    # SPOTIFY RECENTLY PLAYED
+    # ========================================================
+
+    def spotify_recently_played(
+        self,
+        limit=10,
+    ):
+
+        spotify = (
+            self.get_spotify_provider()
+        )
+
+        if (
+            spotify is None
+            or
+            not self.spotify_authenticated()
+        ):
+
+            return []
+
+        return spotify.recently_played(
+            limit
+        )
+
+    # ========================================================
+    # FULL PLAYBACK ALTERNATIVE
     # ========================================================
 
     def find_full_playback_alternative(
         self,
-        song: Song,
-        limit: int = 10,
+        song,
+        limit=10,
     ) -> Optional[Song]:
 
         """
-        If selected song only has a preview, try providers that
-        support full playback for a matching track.
+        Day 21:
 
-        This does NOT guarantee the exact copyrighted recording
-        exists on another provider.
+        First try Spotify exact-match search.
 
-        It only returns a result when title/artist matching is
-        reasonably strong.
+        If Spotify is unavailable, try other providers that
+        support full playback.
         """
 
         if song is None:
@@ -1513,18 +2481,18 @@ class ProviderRegistry:
             return None
 
         # ----------------------------------------------------
-        # Already full playable.
+        # Already Spotify.
         # ----------------------------------------------------
 
-        try:
+        if (
+            self.song_provider_name(
+                song
+            )
+            ==
+            "spotify"
+        ):
 
-            if song.has_full_playback():
-
-                return song
-
-        except Exception:
-
-            pass
+            return song
 
         title = str(
             getattr(
@@ -1548,28 +2516,43 @@ class ProviderRegistry:
 
             return None
 
-        query = (
-            f"{title} {artist}"
-            if artist
-            else title
+        # ====================================================
+        # SPOTIFY FIRST
+        # ====================================================
+
+        spotify = (
+            self.get_spotify_provider()
         )
 
-        for provider in (
-            self.full_playback_providers()
+        if (
+            spotify is not None
+            and
+            self.spotify_authenticated()
         ):
 
-            try:
+            query = (
+                f"{title} {artist}"
+                if artist
+                else title
+            )
 
-                result = provider.search(
+            result = spotify.search(
 
-                    query,
+                query,
 
-                    limit
+                limit=min(
+                    limit,
+                    10
                 )
+            )
 
-            except Exception:
+            title_lower = (
+                title.lower()
+            )
 
-                continue
+            artist_lower = (
+                artist.lower()
+            )
 
             for candidate in (
                 result.songs
@@ -1583,7 +2566,7 @@ class ProviderRegistry:
                         ""
                     )
                     or ""
-                ).strip().lower()
+                ).lower()
 
                 candidate_artist = str(
                     getattr(
@@ -1592,33 +2575,28 @@ class ProviderRegistry:
                         ""
                     )
                     or ""
-                ).strip().lower()
-
-                title_lower = (
-                    title.lower()
-                )
-
-                artist_lower = (
-                    artist.lower()
-                )
+                ).lower()
 
                 title_match = (
+
                     title_lower
-                    == candidate_title
+                    ==
+                    candidate_title
+
                     or
-                    title_lower in candidate_title
+
+                    title_lower
+                    in candidate_title
+
                     or
-                    candidate_title in title_lower
+
+                    candidate_title
+                    in title_lower
                 )
 
                 artist_match = (
 
                     not artist_lower
-
-                    or
-
-                    artist_lower
-                    == candidate_artist
 
                     or
 
@@ -1635,6 +2613,100 @@ class ProviderRegistry:
                     title_match
                     and
                     artist_match
+                ):
+
+                    return candidate
+
+        # ====================================================
+        # OTHER FULL-PLAYBACK PROVIDERS
+        # ====================================================
+
+        for provider in (
+            self.full_playback_providers()
+        ):
+
+            provider_name = str(
+                getattr(
+                    provider,
+                    "provider_name",
+                    ""
+                )
+                or ""
+            ).lower()
+
+            if provider_name == "spotify":
+
+                continue
+
+            search_method = getattr(
+                provider,
+                "search",
+                None
+            )
+
+            if not callable(
+                search_method
+            ):
+
+                continue
+
+            query = (
+                f"{title} {artist}"
+                if artist
+                else title
+            )
+
+            try:
+
+                result = search_method(
+
+                    query,
+
+                    limit
+                )
+
+            except Exception:
+
+                continue
+
+            for candidate in (
+                getattr(
+                    result,
+                    "songs",
+                    []
+                )
+                or []
+            ):
+
+                candidate_title = str(
+                    getattr(
+                        candidate,
+                        "title",
+                        ""
+                    )
+                    or ""
+                ).lower()
+
+                candidate_artist = str(
+                    getattr(
+                        candidate,
+                        "artist",
+                        ""
+                    )
+                    or ""
+                ).lower()
+
+                if (
+                    title.lower()
+                    ==
+                    candidate_title
+                    and
+                    (
+                        not artist
+                        or
+                        artist.lower()
+                        in candidate_artist
+                    )
                 ):
 
                     return candidate
@@ -1663,35 +2735,98 @@ class ProviderRegistry:
 
                 continue
 
+            # =================================================
+            # BASE STATUS
+            # =================================================
+
             try:
 
-                provider_status = (
-                    provider.status()
+                available = bool(
+                    provider.is_available()
                 )
 
             except Exception:
 
-                provider_status = {
+                available = False
 
-                    "provider":
-                        provider_name,
+            # =================================================
+            # AUTH
+            # =================================================
 
-                    "available":
-                        False,
+            authenticated = None
 
-                    "enabled":
-                        False,
+            if provider_name == "spotify":
 
-                    "last_error":
-                        "Status unavailable.",
+                try:
 
-                    "capabilities":
-                        {},
-                }
+                    authenticated = bool(
+                        provider.is_authenticated()
+                    )
+
+                except Exception:
+
+                    authenticated = False
+
+            # =================================================
+            # CATALOG READY
+            # =================================================
+
+            catalog_ready = bool(
+                self._provider_catalog_ready(
+                    provider
+                )
+            )
 
             status_data[
                 provider_name
-            ] = provider_status
+            ] = {
+
+                "available":
+                    available,
+
+                "catalog_ready":
+                    catalog_ready,
+
+                "authenticated":
+                    authenticated,
+
+                "enabled":
+                    bool(
+                        getattr(
+                            provider,
+                            "enabled",
+                            True
+                        )
+                    ),
+
+                "full_playback":
+                    bool(
+                        getattr(
+                            provider,
+                            "supports_full_playback",
+                            False
+                        )
+                    ),
+
+                "preview":
+                    bool(
+                        getattr(
+                            provider,
+                            "supports_preview",
+                            False
+                        )
+                    ),
+
+                "last_error":
+                    str(
+                        getattr(
+                            provider,
+                            "last_error",
+                            ""
+                        )
+                        or ""
+                    ),
+            }
 
         return status_data
 
@@ -1704,13 +2839,13 @@ class ProviderRegistry:
     ):
 
         print()
-        print("=" * 60)
+        print("=" * 64)
 
         print(
-            "LYRx MULTI-PROVIDER REGISTRY"
+            "LYRx DAY 21 MULTI-PROVIDER REGISTRY"
         )
 
-        print("=" * 60)
+        print("=" * 64)
 
         print(
             "Registered:",
@@ -1718,15 +2853,20 @@ class ProviderRegistry:
         )
 
         print(
-            "Default:",
-            (
-                self.default_provider_name
-                or "None"
-            )
+            "Configured:",
+            [
+                getattr(
+                    provider,
+                    "provider_name",
+                    "unknown"
+                )
+                for provider
+                in self.configured_providers()
+            ]
         )
 
         print(
-            "Available:",
+            "Catalog ready:",
             [
                 getattr(
                     provider,
@@ -1739,16 +2879,26 @@ class ProviderRegistry:
         )
 
         print(
-            "Full playback:",
-            [
+            "Spotify configured:",
+            self.spotify_configured()
+        )
+
+        print(
+            "Spotify authenticated:",
+            self.spotify_authenticated()
+        )
+
+        print(
+            "Effective default:",
+            (
                 getattr(
-                    provider,
+                    self.get_default_provider(),
                     "provider_name",
-                    "unknown"
+                    "None"
                 )
-                for provider
-                in self.full_playback_providers()
-            ]
+                if self.get_default_provider()
+                else "None"
+            )
         )
 
         print()
@@ -1759,54 +2909,69 @@ class ProviderRegistry:
         ) in self.status().items():
 
             print(
-                f"{provider_name}:"
+                provider_name.upper()
             )
 
             print(
                 "  Available:",
-                info.get(
-                    "available",
-                    False
-                )
+                info[
+                    "available"
+                ]
             )
 
             print(
-                "  Enabled:",
-                info.get(
-                    "enabled",
-                    False
+                "  Catalog ready:",
+                info[
+                    "catalog_ready"
+                ]
+            )
+
+            if (
+                info[
+                    "authenticated"
+                ]
+                is not None
+            ):
+
+                print(
+                    "  Authenticated:",
+                    info[
+                        "authenticated"
+                    ]
                 )
+
+            print(
+                "  Full playback:",
+                info[
+                    "full_playback"
+                ]
             )
 
             print(
-                "  Last error:",
+                "  Preview:",
+                info[
+                    "preview"
+                ]
+            )
+
+            print(
+                "  Error:",
                 (
-                    info.get(
-                        "last_error",
-                        ""
-                    )
+                    info[
+                        "last_error"
+                    ]
                     or "None"
                 )
             )
 
-            capabilities = info.get(
-                "capabilities",
-                {}
-            )
-
-            print(
-                "  Capabilities:",
-                capabilities
-            )
-
             print()
 
-        print("=" * 60)
+        print("=" * 64)
         print()
 
 
 # ============================================================
-# SHARED INSTANCE
+# SHARED REGISTRY
 # ============================================================
 
 provider_registry = (

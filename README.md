@@ -149,4 +149,18 @@ These commands are connected to the actual LYRx audio player.
   - Independent online catalog
   - Full-track playback where available
 
+- [x] Day 21 - YT BOX & Online Playback Improvements
+
+### Added
+- Dedicated YT BOX page for YouTube music/video discovery
+- YouTube metadata search with dynamic result cards
+- YouTube favorites with persistent local storage
+- YouTube favorites integrated into the main Favorites page
+- Add YouTube results to existing playlists
+- Create a new playlist directly from the Add to Playlist dialog
+- Modernized Add to Playlist popup UI
+- Improved online queue handling for iTunes tracks
+- Fixed iTunes Next Up direct-click playback
+- Improved Next / Previous behavior for online songs
+
 Version: LYRx Alpha 1.0

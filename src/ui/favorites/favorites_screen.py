@@ -1,8 +1,29 @@
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QLinearGradient
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QUrl
+)
+
+from PySide6.QtGui import (
+    QColor,
+    QPainter,
+    QLinearGradient,
+    QPixmap,
+)
+
+
+from PySide6.QtNetwork import (
+    QNetworkAccessManager,
+    QNetworkRequest,
+)
+
+from data.youtube_favorites_store import (
+    youtube_favorites_store
+)
+
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -41,6 +62,10 @@ class FavoritesScreen(QWidget):
         str
     )
 
+    youtube_play_requested = Signal(
+    object
+    )
+
     def __init__(self):
 
         super().__init__()
@@ -48,6 +73,16 @@ class FavoritesScreen(QWidget):
         self.setWindowTitle(
             "🎵 LYRx - Favorites"
         )
+
+        self.youtube_cards = []
+
+        self.youtube_network = (
+            QNetworkAccessManager(
+            self
+            )
+        )
+
+        self.youtube_replies = []
 
         self.favorite_cards = []
 
@@ -500,9 +535,23 @@ class FavoritesScreen(QWidget):
 
         for card in self.favorite_cards:
 
-            card.deleteLater()
+            try:
+                card.deleteLater()
+
+            except Exception:
+                pass
 
         self.favorite_cards.clear()
+
+        for card in self.youtube_cards:
+
+            try:
+                card.deleteLater()
+
+            except Exception:
+                pass
+
+        self.youtube_cards.clear()
 
     # ========================================================
     # RELOAD FAVORITES
@@ -512,28 +561,49 @@ class FavoritesScreen(QWidget):
 
         self.clear_cards()
 
-        favorites = self.read_favorites()
+        # ========================================================
+        # LOCAL FAVORITES
+        # ========================================================
 
-        self.count_label.setText(
-            f"{len(favorites)} "
-            f"{'song' if len(favorites) == 1 else 'songs'}"
+        favorites = (
+            self.read_favorites()
         )
 
-        # ====================================================
-        # EMPTY
-        # ====================================================
+        # ========================================================
+        # YOUTUBE FAVORITES
+        # ========================================================
 
-        if not favorites:
+        youtube_favorites = (
+            youtube_favorites_store
+            .get_favorites()
+        )
+
+        total_count = (
+            len(favorites)
+            +
+            len(youtube_favorites)
+        )
+
+        self.count_label.setText(
+            f"{total_count} "
+            f"{'song' if total_count == 1 else 'songs'}"
+        )
+
+        # ========================================================
+        # EMPTY
+        # ========================================================
+
+        if total_count == 0:
 
             self.empty_state.show()
 
             return
 
-        # ====================================================
-        # SONGS EXIST
-        # ====================================================
-
         self.empty_state.hide()
+
+        # ========================================================
+        # LOCAL FAVORITES
+        # ========================================================
 
         for item in favorites:
 
@@ -575,6 +645,16 @@ class FavoritesScreen(QWidget):
                 self.handle_favorite_changed
             )
 
+            try:
+
+                card.set_theme_state(
+                    self.current_is_dark
+                )
+
+            except Exception:
+
+                pass
+
             self.content_layout.addWidget(
                 card,
                 alignment=Qt.AlignLeft
@@ -583,6 +663,489 @@ class FavoritesScreen(QWidget):
             self.favorite_cards.append(
                 card
             )
+
+        # ========================================================
+        # YOUTUBE FAVORITES
+        # ========================================================
+
+        for item in youtube_favorites:
+
+            card = self.create_youtube_card(
+                item
+            )
+
+            self.content_layout.addWidget(
+                card,
+                alignment=Qt.AlignLeft
+            )
+
+            self.youtube_cards.append(
+                card
+            )
+
+    # ========================================================
+    # YOUTUBE FAVORITE CARD
+    # ========================================================
+
+    def create_youtube_card(
+        self,
+        item
+    ):
+
+        card = QFrame()
+
+        card.setObjectName(
+            "YouTubeFavoriteCard"
+        )
+
+        card.setFixedHeight(
+            108
+        )
+
+        card.setMinimumWidth(
+            560
+        )
+
+        card.setMaximumWidth(
+            760
+        )
+
+        row = QHBoxLayout(
+            card
+        )
+
+        row.setContentsMargins(
+            12,
+            10,
+            14,
+            10
+        )
+
+        row.setSpacing(
+            14
+        )
+
+        # ====================================================
+        # COVER
+        # ====================================================
+
+        cover = QLabel(
+            "▶"
+        )
+
+        cover.setFixedSize(
+            88,
+            88
+        )
+
+        cover.setAlignment(
+            Qt.AlignCenter
+        )
+
+        cover.setStyleSheet("""
+        QLabel {
+            background: #211633;
+            color: #A970FF;
+            border-radius: 12px;
+            font-size: 24px;
+        }
+        """)
+
+        row.addWidget(
+            cover
+        )
+
+        thumbnail = str(
+            item.get(
+                "thumbnail_url",
+                ""
+            )
+            or ""
+        )
+
+        if thumbnail:
+
+            self.load_youtube_thumbnail(
+                thumbnail,
+                cover
+            )
+
+        # ====================================================
+        # TEXT
+        # ====================================================
+
+        info = QVBoxLayout()
+
+        info.setSpacing(
+            4
+        )
+
+        title = QLabel(
+            str(
+                item.get(
+                    "title",
+                    "YouTube Track"
+                )
+            )
+        )
+
+        title.setWordWrap(
+            True
+        )
+
+        channel = QLabel(
+            str(
+                item.get(
+                    "channel",
+                    "YouTube"
+                )
+            )
+        )
+
+        duration_seconds = int(
+            item.get(
+                "duration",
+                0
+            )
+            or 0
+        )
+
+        minutes = (
+            duration_seconds
+            // 60
+        )
+
+        seconds = (
+            duration_seconds
+            % 60
+        )
+
+        duration = QLabel(
+            f"YouTube  •  "
+            f"{minutes}:{seconds:02d}"
+        )
+
+        title.setStyleSheet("""
+        QLabel {
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            background: transparent;
+        }
+        """)
+
+        channel.setStyleSheet("""
+        QLabel {
+            color: #AFA4C8;
+            font-size: 11px;
+            background: transparent;
+        }
+        """)
+
+        duration.setStyleSheet("""
+        QLabel {
+            color: #8B5CF6;
+            font-size: 10px;
+            font-weight: 600;
+            background: transparent;
+        }
+        """)
+
+        info.addWidget(
+            title
+        )
+
+        info.addWidget(
+            channel
+        )
+
+        info.addWidget(
+            duration
+        )
+
+        info.addStretch()
+
+        row.addLayout(
+            info,
+            1
+        )
+
+        # ====================================================
+        # PLAY
+        # ====================================================
+
+        play_button = QLabel(
+            "▶  Play"
+        )
+
+        play_button.setFixedSize(
+            76,
+            36
+        )
+
+        play_button.setAlignment(
+            Qt.AlignCenter
+        )
+
+        play_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        play_button.setStyleSheet("""
+        QLabel {
+            color: white;
+            background: #7C3AED;
+            border-radius: 18px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        QLabel:hover {
+            background: #8B5CF6;
+        }
+        """)
+
+        play_button.mousePressEvent = (
+            lambda event,
+            selected=dict(item):
+            self.handle_youtube_play(
+                selected
+            )
+        )
+
+        row.addWidget(
+            play_button
+        )
+
+        # ====================================================
+        # REMOVE FAVORITE
+        # ====================================================
+
+        remove_button = QLabel(
+            "♥"
+        )
+
+        remove_button.setFixedSize(
+            38,
+            38
+        )
+
+        remove_button.setAlignment(
+            Qt.AlignCenter
+        )
+
+        remove_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        remove_button.setStyleSheet("""
+        QLabel {
+            color: #C084FC;
+            background: rgba(124,58,237,22);
+            border: 1px solid rgba(139,92,246,80);
+            border-radius: 19px;
+            font-size: 17px;
+        }
+
+        QLabel:hover {
+            color: white;
+            background: rgba(124,58,237,60);
+        }
+        """)
+
+        remove_button.mousePressEvent = (
+            lambda event,
+            selected=dict(item):
+            self.remove_youtube_favorite(
+                selected
+            )
+        )
+
+        row.addWidget(
+            remove_button
+        )
+
+        # ====================================================
+        # CARD THEME
+        # ====================================================
+
+        if self.current_is_dark:
+
+            card.setStyleSheet("""
+            QFrame#YouTubeFavoriteCard {
+                background: #151024;
+                border: 1px solid #2D2348;
+                border-radius: 18px;
+            }
+
+            QFrame#YouTubeFavoriteCard:hover {
+                border: 1px solid #7C3AED;
+                background: #19112B;
+            }
+            """)
+
+        else:
+
+            card.setStyleSheet("""
+            QFrame#YouTubeFavoriteCard {
+                background: #F4EEF8;
+                border: 1px solid #DCCEF0;
+                border-radius: 18px;
+            }
+
+            QFrame#YouTubeFavoriteCard:hover {
+                border: 1px solid #8B5CF6;
+                background: #EEE5F6;
+            }
+            """)
+
+        return card
+
+
+    # ========================================================
+    # PLAY YOUTUBE FAVORITE
+    # ========================================================
+
+    def handle_youtube_play(
+        self,
+        item
+    ):
+
+        self.youtube_play_requested.emit(
+            item
+        )
+
+    # ========================================================
+    # REMOVE YOUTUBE FAVORITE
+    # ========================================================
+
+    def remove_youtube_favorite(
+        self,
+        item
+    ):
+
+        youtube_favorites_store.remove(
+            item
+        )
+
+        self.reload_favorites()
+
+    # ========================================================
+    # LOAD YOUTUBE THUMBNAIL
+    # ========================================================
+
+    def load_youtube_thumbnail(
+        self,
+        image_url,
+        label
+    ):
+
+        url = QUrl(
+            str(
+                image_url
+                or ""
+            )
+        )
+
+        if not url.isValid():
+
+            return
+
+        request = QNetworkRequest(
+            url
+        )
+
+        request.setRawHeader(
+            b"User-Agent",
+            b"Mozilla/5.0 LYRx"
+        )
+
+        reply = (
+            self.youtube_network.get(
+                request
+            )
+        )
+
+        self.youtube_replies.append(
+            reply
+        )
+
+        reply.finished.connect(
+            lambda r=reply,
+            target=label:
+            self.youtube_thumbnail_loaded(
+                r,
+                target
+            )
+        )
+
+    # ========================================================
+    # YOUTUBE THUMBNAIL LOADED
+    # ========================================================
+
+    def youtube_thumbnail_loaded(
+        self,
+        reply,
+        label
+    ):
+
+        try:
+
+            data = bytes(
+                reply.readAll()
+            )
+
+            pixmap = QPixmap()
+
+            if not pixmap.loadFromData(
+                data
+            ):
+
+                return
+
+            pixmap = pixmap.scaled(
+                88,
+                88,
+                Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation
+            )
+
+            label.clear()
+
+            label.setPixmap(
+                pixmap
+            )
+
+        except RuntimeError:
+
+            pass
+
+        except Exception as error:
+
+            print(
+                "YT favorite thumbnail error:",
+                error
+            )
+
+        finally:
+
+            try:
+
+                self.youtube_replies.remove(
+                    reply
+                )
+
+            except Exception:
+
+                pass
+
+            try:
+
+                reply.deleteLater()
+
+            except Exception:
+
+                pass
 
     # ========================================================
     # PLAY FAVORITE

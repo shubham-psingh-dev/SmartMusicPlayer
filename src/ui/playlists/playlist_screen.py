@@ -418,22 +418,56 @@ class AddToPlaylistDialog(QDialog):
         song_title,
         parent=None,
         is_dark=True,
+        store=None,
     ):
 
         super().__init__(parent)
 
-        self.playlists = playlists
-        self.song_title = song_title
-        self.is_dark = is_dark
+        self.playlists = list(
+            playlists
+            or []
+        )
+
+        self.song_title = str(
+            song_title
+            or "Selected track"
+        )
+
+        self.is_dark = bool(
+            is_dark
+        )
+
+        self.store = store
 
         self.selected_playlist_id = None
+
+        self.playlist_buttons = []
+
+        self.setObjectName(
+            "AddToPlaylistDialog"
+        )
 
         self.setWindowTitle(
             "Add to Playlist"
         )
 
+        self.setModal(
+            True
+        )
+
+        self.setWindowFlags(
+            Qt.Dialog
+            |
+            Qt.FramelessWindowHint
+        )
+
+        self.setAttribute(
+            Qt.WA_TranslucentBackground,
+            True
+        )
+
         self.setFixedWidth(
-            440
+            500
         )
 
         self.build_ui()
@@ -445,7 +479,30 @@ class AddToPlaylistDialog(QDialog):
 
     def build_ui(self):
 
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(
+            self
+        )
+
+        outer.setContentsMargins(
+            12,
+            12,
+            12,
+            12
+        )
+
+        self.panel = QFrame()
+
+        self.panel.setObjectName(
+            "PlaylistPickerPanel"
+        )
+
+        outer.addWidget(
+            self.panel
+        )
+
+        layout = QVBoxLayout(
+            self.panel
+        )
 
         layout.setContentsMargins(
             26,
@@ -458,50 +515,549 @@ class AddToPlaylistDialog(QDialog):
             14
         )
 
-        title = QLabel(
+        # ----------------------------------------------------
+        # HEADER
+        # ----------------------------------------------------
+
+        header = QHBoxLayout()
+
+        header.setContentsMargins(
+            0,
+            0,
+            0,
+            0
+        )
+
+        header.setSpacing(
+            12
+        )
+
+        title_box = QVBoxLayout()
+
+        title_box.setSpacing(
+            3
+        )
+
+        self.title_label = QLabel(
             "Add to Playlist"
         )
 
-        title.setStyleSheet(
-            """
-            QLabel {
-                color: white;
-                font-size: 21px;
-                font-weight: 800;
-                background: transparent;
-            }
-            """
+        self.title_label.setObjectName(
+            "PickerTitle"
         )
 
-        layout.addWidget(title)
-
-        subtitle = QLabel(
-            f'Select a playlist for "{self.song_title}"'
+        title_box.addWidget(
+            self.title_label
         )
 
-        subtitle.setWordWrap(True)
-
-        subtitle.setStyleSheet(
-            """
-            QLabel {
-                color: #9C92B8;
-                font-size: 12px;
-                background: transparent;
-            }
-            """
+        self.subtitle_label = QLabel(
+            f'Choose where to save "{self.song_title}"'
         )
 
-        layout.addWidget(subtitle)
+        self.subtitle_label.setObjectName(
+            "PickerSubtitle"
+        )
 
-        self.playlist_buttons = []
+        self.subtitle_label.setWordWrap(
+            True
+        )
+
+        title_box.addWidget(
+            self.subtitle_label
+        )
+
+        header.addLayout(
+            title_box,
+            1
+        )
+
+        self.close_button = QPushButton(
+            "×"
+        )
+
+        self.close_button.setObjectName(
+            "PickerClose"
+        )
+
+        self.close_button.setFixedSize(
+            34,
+            34
+        )
+
+        self.close_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.close_button.clicked.connect(
+            self.reject
+        )
+
+        header.addWidget(
+            self.close_button
+        )
+
+        layout.addLayout(
+            header
+        )
+
+        # ----------------------------------------------------
+        # MINI TRACK STRIP
+        # ----------------------------------------------------
+
+        self.track_strip = QFrame()
+
+        self.track_strip.setObjectName(
+            "PickerTrackStrip"
+        )
+
+        track_row = QHBoxLayout(
+            self.track_strip
+        )
+
+        track_row.setContentsMargins(
+            12,
+            10,
+            12,
+            10
+        )
+
+        track_row.setSpacing(
+            10
+        )
+
+        track_icon = QLabel(
+            "♫"
+        )
+
+        track_icon.setObjectName(
+            "PickerTrackIcon"
+        )
+
+        track_icon.setFixedSize(
+            38,
+            38
+        )
+
+        track_icon.setAlignment(
+            Qt.AlignCenter
+        )
+
+        track_row.addWidget(
+            track_icon
+        )
+
+        track_name = QLabel(
+            self.song_title
+        )
+
+        track_name.setObjectName(
+            "PickerTrackName"
+        )
+
+        track_name.setWordWrap(
+            True
+        )
+
+        track_row.addWidget(
+            track_name,
+            1
+        )
+
+        layout.addWidget(
+            self.track_strip
+        )
+
+        # ----------------------------------------------------
+        # SECTION TITLE
+        # ----------------------------------------------------
+
+        section_row = QHBoxLayout()
+
+        section_row.setContentsMargins(
+            0,
+            2,
+            0,
+            0
+        )
+
+        self.section_label = QLabel(
+            "Your playlists"
+        )
+
+        self.section_label.setObjectName(
+            "PickerSection"
+        )
+
+        section_row.addWidget(
+            self.section_label
+        )
+
+        section_row.addStretch()
+
+        self.count_label = QLabel(
+            ""
+        )
+
+        self.count_label.setObjectName(
+            "PickerCount"
+        )
+
+        section_row.addWidget(
+            self.count_label
+        )
+
+        layout.addLayout(
+            section_row
+        )
+
+        # ----------------------------------------------------
+        # PLAYLIST SCROLL AREA
+        # ----------------------------------------------------
+
+        self.playlist_scroll = QScrollArea()
+
+        self.playlist_scroll.setObjectName(
+            "PickerScroll"
+        )
+
+        self.playlist_scroll.setWidgetResizable(
+            True
+        )
+
+        self.playlist_scroll.setFrameShape(
+            QFrame.NoFrame
+        )
+
+        self.playlist_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAlwaysOff
+        )
+
+        self.playlist_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded
+        )
+
+        self.playlist_scroll.setMinimumHeight(
+            118
+        )
+
+        self.playlist_scroll.setMaximumHeight(
+            225
+        )
+
+        self.playlist_container = QWidget()
+
+        self.playlist_container.setObjectName(
+            "PickerListContainer"
+        )
+
+        self.playlist_layout = QVBoxLayout(
+            self.playlist_container
+        )
+
+        self.playlist_layout.setContentsMargins(
+            0,
+            0,
+            6,
+            0
+        )
+
+        self.playlist_layout.setSpacing(
+            9
+        )
+
+        self.playlist_layout.setAlignment(
+            Qt.AlignTop
+        )
+
+        self.playlist_scroll.setWidget(
+            self.playlist_container
+        )
+
+        layout.addWidget(
+            self.playlist_scroll
+        )
+
+        self.rebuild_playlist_buttons()
+
+        # ----------------------------------------------------
+        # CREATE NEW PLAYLIST
+        # ----------------------------------------------------
+
+        self.create_toggle_button = QPushButton(
+            "＋  Create New Playlist"
+        )
+
+        self.create_toggle_button.setObjectName(
+            "CreateToggleButton"
+        )
+
+        self.create_toggle_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.create_toggle_button.setMinimumHeight(
+            44
+        )
+
+        self.create_toggle_button.clicked.connect(
+            self.toggle_create_panel
+        )
+
+        layout.addWidget(
+            self.create_toggle_button
+        )
+
+        # ----------------------------------------------------
+        # INLINE CREATE PANEL
+        # ----------------------------------------------------
+
+        self.create_panel = QFrame()
+
+        self.create_panel.setObjectName(
+            "InlineCreatePanel"
+        )
+
+        create_layout = QVBoxLayout(
+            self.create_panel
+        )
+
+        create_layout.setContentsMargins(
+            14,
+            14,
+            14,
+            14
+        )
+
+        create_layout.setSpacing(
+            10
+        )
+
+        self.create_heading = QLabel(
+            "New playlist"
+        )
+
+        self.create_heading.setObjectName(
+            "InlineCreateHeading"
+        )
+
+        create_layout.addWidget(
+            self.create_heading
+        )
+
+        self.name_input = QLineEdit()
+
+        self.name_input.setObjectName(
+            "InlinePlaylistName"
+        )
+
+        self.name_input.setPlaceholderText(
+            "Playlist name"
+        )
+
+        self.name_input.setMinimumHeight(
+            42
+        )
+
+        create_layout.addWidget(
+            self.name_input
+        )
+
+        self.description_input = QLineEdit()
+
+        self.description_input.setObjectName(
+            "InlinePlaylistDescription"
+        )
+
+        self.description_input.setPlaceholderText(
+            "Description (optional)"
+        )
+
+        self.description_input.setMinimumHeight(
+            42
+        )
+
+        create_layout.addWidget(
+            self.description_input
+        )
+
+        create_actions = QHBoxLayout()
+
+        create_actions.setContentsMargins(
+            0,
+            2,
+            0,
+            0
+        )
+
+        create_actions.setSpacing(
+            8
+        )
+
+        create_actions.addStretch()
+
+        self.create_cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        self.create_cancel_button.setObjectName(
+            "InlineCancelButton"
+        )
+
+        self.create_cancel_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.create_cancel_button.clicked.connect(
+            self.hide_create_panel
+        )
+
+        create_actions.addWidget(
+            self.create_cancel_button
+        )
+
+        self.create_add_button = QPushButton(
+            "Create & Add"
+        )
+
+        self.create_add_button.setObjectName(
+            "InlineCreateAddButton"
+        )
+
+        self.create_add_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.create_add_button.clicked.connect(
+            self.create_and_select_playlist
+        )
+
+        create_actions.addWidget(
+            self.create_add_button
+        )
+
+        create_layout.addLayout(
+            create_actions
+        )
+
+        self.create_panel.hide()
+
+        layout.addWidget(
+            self.create_panel
+        )
+
+        # ----------------------------------------------------
+        # FOOTER
+        # ----------------------------------------------------
+
+        footer = QHBoxLayout()
+
+        footer.setContentsMargins(
+            0,
+            2,
+            0,
+            0
+        )
+
+        footer.addStretch()
+
+        self.cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        self.cancel_button.setObjectName(
+            "PickerCancel"
+        )
+
+        self.cancel_button.setCursor(
+            Qt.PointingHandCursor
+        )
+
+        self.cancel_button.setMinimumHeight(
+            38
+        )
+
+        self.cancel_button.clicked.connect(
+            self.reject
+        )
+
+        footer.addWidget(
+            self.cancel_button
+        )
+
+        layout.addLayout(
+            footer
+        )
+
+    # ========================================================
+    # PLAYLIST BUTTONS
+    # ========================================================
+
+    def rebuild_playlist_buttons(self):
+
+        while self.playlist_layout.count():
+
+            item = (
+                self.playlist_layout
+                .takeAt(0)
+            )
+
+            widget = item.widget()
+
+            if widget:
+
+                widget.setParent(
+                    None
+                )
+
+                widget.deleteLater()
+
+        self.playlist_buttons.clear()
+
+        self.count_label.setText(
+            f"{len(self.playlists)} saved"
+        )
+
+        if not self.playlists:
+
+            empty = QLabel(
+                "No playlists yet.\nCreate one below and this track will be added instantly."
+            )
+
+            empty.setObjectName(
+                "PickerEmpty"
+            )
+
+            empty.setAlignment(
+                Qt.AlignCenter
+            )
+
+            empty.setWordWrap(
+                True
+            )
+
+            empty.setMinimumHeight(
+                92
+            )
+
+            self.playlist_layout.addWidget(
+                empty
+            )
+
+            return
 
         for playlist in self.playlists:
 
             button = QPushButton()
 
-            name = playlist.get(
-                "name",
-                "Playlist"
+            button.setObjectName(
+                "PlaylistChoiceButton"
+            )
+
+            name = str(
+                playlist.get(
+                    "name",
+                    "Playlist"
+                )
             )
 
             count = len(
@@ -518,7 +1074,7 @@ class AddToPlaylistDialog(QDialog):
             )
 
             button.setText(
-                f"♫  {name}   •   {count} {word}"
+                f"♫   {name}\n      {count} {word}"
             )
 
             button.setCursor(
@@ -526,7 +1082,7 @@ class AddToPlaylistDialog(QDialog):
             )
 
             button.setMinimumHeight(
-                46
+                58
             )
 
             playlist_id = str(
@@ -539,40 +1095,136 @@ class AddToPlaylistDialog(QDialog):
             button.clicked.connect(
                 lambda checked=False,
                 pid=playlist_id:
-                self.select_playlist(pid)
+                self.select_playlist(
+                    pid
+                )
             )
 
-            layout.addWidget(button)
+            self.playlist_layout.addWidget(
+                button
+            )
 
             self.playlist_buttons.append(
                 button
             )
 
-        if not self.playlists:
+    # ========================================================
+    # CREATE PANEL
+    # ========================================================
 
-            empty = QLabel(
-                "No playlists available."
-            )
+    def toggle_create_panel(self):
 
-            empty.setAlignment(
-                Qt.AlignCenter
-            )
+        if self.create_panel.isVisible():
 
-            empty.setMinimumHeight(
-                70
-            )
+            self.hide_create_panel()
 
-            layout.addWidget(empty)
+            return
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Cancel
+        self.create_panel.show()
+
+        self.create_toggle_button.setText(
+            "−  Hide New Playlist"
         )
 
-        buttons.rejected.connect(
-            self.reject
+        self.name_input.setFocus()
+
+        self.adjustSize()
+
+    def hide_create_panel(self):
+
+        self.create_panel.hide()
+
+        self.create_toggle_button.setText(
+            "＋  Create New Playlist"
         )
 
-        layout.addWidget(buttons)
+        self.name_input.clear()
+        self.description_input.clear()
+
+        self.adjustSize()
+
+    # ========================================================
+    # CREATE + SELECT
+    # ========================================================
+
+    def create_and_select_playlist(self):
+
+        name = (
+            self.name_input
+            .text()
+            .strip()
+        )
+
+        description = (
+            self.description_input
+            .text()
+            .strip()
+        )
+
+        if not name:
+
+            QMessageBox.warning(
+                self,
+                "Playlist Name",
+                "Please enter a playlist name."
+            )
+
+            self.name_input.setFocus()
+
+            return
+
+        if self.store is None:
+
+            QMessageBox.warning(
+                self,
+                "Playlist Store",
+                "Playlist storage is unavailable."
+            )
+
+            return
+
+        new_playlist = (
+            self.store
+            .create_playlist(
+                name,
+                description
+            )
+        )
+
+        if new_playlist is None:
+
+            QMessageBox.warning(
+                self,
+                "Playlist Exists",
+                "A playlist with this name already exists."
+            )
+
+            self.name_input.setFocus()
+
+            return
+
+        self.playlists = list(
+            self.store
+            .get_playlists()
+            or []
+        )
+
+        self.rebuild_playlist_buttons()
+
+        new_id = str(
+            new_playlist.get(
+                "id",
+                ""
+            )
+        )
+
+        if not new_id:
+
+            return
+
+        self.select_playlist(
+            new_id
+        )
 
     # ========================================================
     # SELECT
@@ -611,30 +1263,219 @@ class AddToPlaylistDialog(QDialog):
 
             self.setStyleSheet(
                 """
-                QDialog {
-                    background: #171126;
+                QDialog#AddToPlaylistDialog {
+                    background: transparent;
                 }
 
-                QPushButton {
+                QFrame#PlaylistPickerPanel {
+                    background: #140F22;
+                    border: 1px solid #3A2A58;
+                    border-radius: 22px;
+                }
+
+                QLabel#PickerTitle {
+                    color: #FFFFFF;
+                    font-size: 24px;
+                    font-weight: 800;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerSubtitle {
+                    color: #A99DBF;
+                    font-size: 12px;
+                    background: transparent;
+                    border: none;
+                }
+
+                QPushButton#PickerClose {
                     background: #211735;
-                    color: #F3EEFC;
-                    border: 1px solid #3B2C55;
-                    border-radius: 11px;
-                    padding: 8px 12px;
+                    color: #BEB1D4;
+                    border: 1px solid #392A55;
+                    border-radius: 17px;
+                    font-size: 18px;
+                    font-weight: 700;
+                    padding: 0px;
+                }
+
+                QPushButton#PickerClose:hover {
+                    background: #35234F;
+                    color: white;
+                    border: 1px solid #7C3AED;
+                }
+
+                QFrame#PickerTrackStrip {
+                    background: #1C142D;
+                    border: 1px solid #322348;
+                    border-radius: 14px;
+                }
+
+                QLabel#PickerTrackIcon {
+                    background: #2A1B42;
+                    color: #B68CFF;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 18px;
+                    font-weight: 700;
+                }
+
+                QLabel#PickerTrackName {
+                    color: #EDE7F7;
+                    font-size: 12px;
+                    font-weight: 650;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerSection {
+                    color: #F4EFFB;
+                    font-size: 13px;
+                    font-weight: 700;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerCount {
+                    color: #927FB2;
+                    font-size: 11px;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerEmpty {
+                    color: #8F83A6;
+                    font-size: 11px;
+                    background: #191128;
+                    border: 1px dashed #3B2A57;
+                    border-radius: 12px;
+                    padding: 12px;
+                }
+
+                QScrollArea#PickerScroll {
+                    background: transparent;
+                    border: none;
+                }
+
+                QWidget#PickerListContainer {
+                    background: transparent;
+                }
+
+                QScrollBar:vertical {
+                    background: transparent;
+                    width: 7px;
+                    margin: 2px;
+                }
+
+                QScrollBar::handle:vertical {
+                    background: #51327F;
+                    border-radius: 3px;
+                    min-height: 34px;
+                }
+
+                QScrollBar::add-line:vertical,
+                QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+
+                QPushButton#PlaylistChoiceButton {
+                    background: #211735;
+                    color: #F4EFFB;
+                    border: 1px solid #392A55;
+                    border-radius: 13px;
+                    padding: 8px 14px;
                     text-align: left;
                     font-size: 12px;
                     font-weight: 650;
                 }
 
-                QPushButton:hover {
-                    background: #30204C;
-                    border: 1px solid #7C3AED;
+                QPushButton#PlaylistChoiceButton:hover {
+                    background: #2E2046;
+                    color: white;
+                    border: 1px solid #8B5CF6;
                 }
 
-                QDialogButtonBox QPushButton {
+                QPushButton#PlaylistChoiceButton:pressed {
+                    background: #7C3AED;
+                    border: 1px solid #A78BFA;
+                }
+
+                QPushButton#CreateToggleButton {
+                    background: rgba(124, 58, 237, 28);
+                    color: #C7A7FF;
+                    border: 1px dashed #7043B7;
+                    border-radius: 13px;
+                    padding: 0 14px;
+                    text-align: left;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+
+                QPushButton#CreateToggleButton:hover {
+                    background: rgba(124, 58, 237, 55);
+                    color: white;
+                    border: 1px solid #8B5CF6;
+                }
+
+                QFrame#InlineCreatePanel {
+                    background: #1A122A;
+                    border: 1px solid #3B2958;
+                    border-radius: 15px;
+                }
+
+                QLabel#InlineCreateHeading {
+                    color: white;
+                    font-size: 13px;
+                    font-weight: 750;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLineEdit#InlinePlaylistName,
+                QLineEdit#InlinePlaylistDescription {
+                    background: #100B1B;
+                    color: #F7F3FC;
+                    border: 1px solid #3A2955;
+                    border-radius: 11px;
+                    padding: 0 12px;
+                    font-size: 12px;
+                    selection-background-color: #7C3AED;
+                }
+
+                QLineEdit#InlinePlaylistName:focus,
+                QLineEdit#InlinePlaylistDescription:focus {
+                    border: 1px solid #8B5CF6;
+                }
+
+                QPushButton#InlineCancelButton,
+                QPushButton#PickerCancel {
                     background: #211735;
                     color: #B8ABC9;
                     border: 1px solid #3B2C55;
+                    border-radius: 10px;
+                    padding: 8px 15px;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+
+                QPushButton#InlineCancelButton:hover,
+                QPushButton#PickerCancel:hover {
+                    background: #30204C;
+                    color: white;
+                }
+
+                QPushButton#InlineCreateAddButton {
+                    background: #7C3AED;
+                    color: white;
+                    border: 1px solid #8B5CF6;
+                    border-radius: 10px;
+                    padding: 8px 16px;
+                    font-size: 11px;
+                    font-weight: 750;
+                }
+
+                QPushButton#InlineCreateAddButton:hover {
+                    background: #8B5CF6;
+                    border: 1px solid #A78BFA;
                 }
                 """
             )
@@ -643,30 +1484,200 @@ class AddToPlaylistDialog(QDialog):
 
             self.setStyleSheet(
                 """
-                QDialog {
-                    background: #EEE9F4;
+                QDialog#AddToPlaylistDialog {
+                    background: transparent;
                 }
 
-                QPushButton {
-                    background: white;
+                QFrame#PlaylistPickerPanel {
+                    background: #F8F4FB;
+                    border: 1px solid #D9CEE5;
+                    border-radius: 22px;
+                }
+
+                QLabel#PickerTitle {
                     color: #302744;
-                    border: 1px solid #D4C9E3;
-                    border-radius: 11px;
-                    padding: 8px 12px;
+                    font-size: 24px;
+                    font-weight: 800;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerSubtitle {
+                    color: #786A8B;
+                    font-size: 12px;
+                    background: transparent;
+                    border: none;
+                }
+
+                QPushButton#PickerClose {
+                    background: #EEE7F5;
+                    color: #665675;
+                    border: 1px solid #D8CCE4;
+                    border-radius: 17px;
+                    font-size: 18px;
+                    font-weight: 700;
+                    padding: 0px;
+                }
+
+                QPushButton#PickerClose:hover {
+                    background: white;
+                    color: #7C3AED;
+                    border: 1px solid #9B72D1;
+                }
+
+                QFrame#PickerTrackStrip {
+                    background: #F1EAF7;
+                    border: 1px solid #DDD1E8;
+                    border-radius: 14px;
+                }
+
+                QLabel#PickerTrackIcon {
+                    background: #E5DAF0;
+                    color: #7C3AED;
+                    border: none;
+                    border-radius: 10px;
+                    font-size: 18px;
+                    font-weight: 700;
+                }
+
+                QLabel#PickerTrackName {
+                    color: #43364F;
+                    font-size: 12px;
+                    font-weight: 650;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerSection {
+                    color: #40334D;
+                    font-size: 13px;
+                    font-weight: 700;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerCount {
+                    color: #8B7A9B;
+                    font-size: 11px;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLabel#PickerEmpty {
+                    color: #82728F;
+                    font-size: 11px;
+                    background: #F2ECF7;
+                    border: 1px dashed #CDBBDD;
+                    border-radius: 12px;
+                    padding: 12px;
+                }
+
+                QScrollArea#PickerScroll {
+                    background: transparent;
+                    border: none;
+                }
+
+                QWidget#PickerListContainer {
+                    background: transparent;
+                }
+
+                QScrollBar:vertical {
+                    background: transparent;
+                    width: 7px;
+                }
+
+                QScrollBar::handle:vertical {
+                    background: #BA9AD5;
+                    border-radius: 3px;
+                    min-height: 34px;
+                }
+
+                QPushButton#PlaylistChoiceButton {
+                    background: white;
+                    color: #3D304A;
+                    border: 1px solid #D9CEE5;
+                    border-radius: 13px;
+                    padding: 8px 14px;
                     text-align: left;
                     font-size: 12px;
                     font-weight: 650;
                 }
 
-                QPushButton:hover {
-                    background: #F5F0FA;
+                QPushButton#PlaylistChoiceButton:hover {
+                    background: #F2EAF8;
+                    color: #5D2E90;
+                    border: 1px solid #9A73CB;
+                }
+
+                QPushButton#CreateToggleButton {
+                    background: #F0E6FA;
+                    color: #6D37A8;
+                    border: 1px dashed #A782CF;
+                    border-radius: 13px;
+                    padding: 0 14px;
+                    text-align: left;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+
+                QPushButton#CreateToggleButton:hover {
+                    background: #E9DCF5;
+                    border: 1px solid #8B5CF6;
+                }
+
+                QFrame#InlineCreatePanel {
+                    background: #F1EAF7;
+                    border: 1px solid #D7C9E4;
+                    border-radius: 15px;
+                }
+
+                QLabel#InlineCreateHeading {
+                    color: #40334D;
+                    font-size: 13px;
+                    font-weight: 750;
+                    background: transparent;
+                    border: none;
+                }
+
+                QLineEdit#InlinePlaylistName,
+                QLineEdit#InlinePlaylistDescription {
+                    background: white;
+                    color: #302744;
+                    border: 1px solid #D4C9E3;
+                    border-radius: 11px;
+                    padding: 0 12px;
+                    font-size: 12px;
+                    selection-background-color: #7C3AED;
+                }
+
+                QLineEdit#InlinePlaylistName:focus,
+                QLineEdit#InlinePlaylistDescription:focus {
                     border: 1px solid #7C3AED;
                 }
 
-                QDialogButtonBox QPushButton {
-                    background: #F3EEF8;
-                    color: #5B4D6B;
-                    border: 1px solid #D4C9E3;
+                QPushButton#InlineCancelButton,
+                QPushButton#PickerCancel {
+                    background: #EEE7F5;
+                    color: #665675;
+                    border: 1px solid #D4C8E2;
+                    border-radius: 10px;
+                    padding: 8px 15px;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+
+                QPushButton#InlineCreateAddButton {
+                    background: #7C3AED;
+                    color: white;
+                    border: none;
+                    border-radius: 10px;
+                    padding: 8px 16px;
+                    font-size: 11px;
+                    font-weight: 750;
+                }
+
+                QPushButton#InlineCreateAddButton:hover {
+                    background: #8B5CF6;
                 }
                 """
             )
@@ -2986,21 +3997,19 @@ class PlaylistScreen(QWidget):
         artist
     ):
 
-        if not self.playlists:
-
-            QMessageBox.information(
-                self,
-                "No Playlists",
-                "Create a playlist first."
-            )
-
-            return False
+        # Always refresh before opening the picker so newly-created
+        # playlists from any screen are immediately available.
+        self.playlists = (
+            self.store
+            .get_playlists()
+        )
 
         dialog = AddToPlaylistDialog(
             self.playlists,
             title,
             self,
-            self.current_is_dark
+            self.current_is_dark,
+            store=self.store,
         )
 
         result = dialog.exec()
@@ -3008,7 +4017,9 @@ class PlaylistScreen(QWidget):
         if result != QDialog.Accepted:
             return False
 
-        playlist_id = dialog.selected_id()
+        playlist_id = (
+            dialog.selected_id()
+        )
 
         if not playlist_id:
             return False
@@ -3022,13 +4033,16 @@ class PlaylistScreen(QWidget):
             )
         )
 
+        # The dialog itself may have created a brand-new playlist.
+        # Refresh our page state regardless of add result.
+        self.playlists = (
+            self.store
+            .get_playlists()
+        )
+
+        self.rebuild_playlist_cards()
+
         if success:
-
-            self.playlists = (
-                self.store.get_playlists()
-            )
-
-            self.rebuild_playlist_cards()
 
             self.song_added_to_playlist.emit(
                 title,
@@ -3037,7 +4051,7 @@ class PlaylistScreen(QWidget):
 
             QMessageBox.information(
                 self,
-                "Added",
+                "Added to Playlist",
                 message
             )
 

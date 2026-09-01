@@ -1469,14 +1469,81 @@ class NowPlaying(QWidget):
             or ""
         )
 
-        audio_url = str(
-            getattr(
+        # ====================================================
+        # DAY 21 - UNIFIED ONLINE PLAYABLE URL
+        # ====================================================
+        #
+        # Jamendo songs normally expose:
+        #     song.audio_url
+        #
+        # iTunes songs normally expose:
+        #     song.preview_url
+        #
+        # Provider Song objects may expose:
+        #     song.playable_url()
+        #
+        # IMPORTANT:
+        # A song clicked directly in Discover was already normalized
+        # by AppWindow. Songs selected later from Next Up / Next /
+        # Previous were not, so iTunes queue items could have an
+        # empty audio_url even though preview_url was valid. Resolve
+        # the playable source here as the final playback boundary.
+        # ====================================================
+
+        audio_url = ""
+
+        try:
+
+            if hasattr(
                 song,
-                "audio_url",
-                ""
+                "playable_url"
+            ):
+
+                audio_url = str(
+                    song.playable_url()
+                    or ""
+                ).strip()
+
+        except Exception as error:
+
+            print(
+                "NowPlaying playable URL resolve error:",
+                error
             )
-            or ""
-        )
+
+            audio_url = ""
+
+        if not audio_url:
+
+            audio_url = str(
+                getattr(
+                    song,
+                    "audio_url",
+                    ""
+                )
+                or
+                getattr(
+                    song,
+                    "preview_url",
+                    ""
+                )
+                or
+                ""
+            ).strip()
+
+        # Keep the currently selected queue item compatible with
+        # the older Day 19 playback layer.
+        if audio_url:
+
+            try:
+
+                song.audio_url = (
+                    audio_url
+                )
+
+            except Exception:
+
+                pass
 
         duration_seconds = int(
             getattr(

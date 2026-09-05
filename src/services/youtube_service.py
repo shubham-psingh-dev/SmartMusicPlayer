@@ -1,6 +1,6 @@
 # ============================================================
 # LYRx
-# DAY 21 - YT BOX
+# DAY 22 - YT BOX
 #
 # FILE 1
 # youtube_service.py
@@ -8,26 +8,28 @@
 # PURPOSE
 # ------------------------------------------------------------
 #
-# YouTube discovery/search service for LYRx.
+# YouTube discovery/search metadata service for LYRx.
 #
-# CURRENT CAPABILITIES:
+# FEATURES
+# ------------------------------------------------------------
 #
-#   - Search YouTube dynamically
-#   - Song/video title
+#   - YouTube metadata search
+#   - Title
 #   - Channel / artist
-#   - Thumbnail
 #   - Duration
 #   - Video ID
 #   - Official YouTube URL
-#   - Metadata ready for Favorites / Playlists
+#   - Reliable thumbnail fallback URLs
+#   - Favorites / Playlists metadata support
+#   - Day 22 playback capability metadata
 #
 # IMPORTANT
 # ------------------------------------------------------------
 #
-# This service does NOT download/extract copyrighted audio.
-# yt-dlp is used only as a metadata/search resolver.
+# yt-dlp is used here only for search/catalog metadata.
 #
-# Playback integration will be added separately.
+# This service does NOT download media files and does NOT
+# resolve direct copyrighted media stream URLs.
 # ============================================================
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ from dataclasses import (
     asdict,
 )
 
+import re
 import webbrowser
 
 from typing import (
@@ -45,6 +48,19 @@ from typing import (
 )
 
 import yt_dlp
+
+
+# ============================================================
+# YOUTUBE CONSTANTS
+# ============================================================
+
+YOUTUBE_WATCH_BASE = (
+    "https://www.youtube.com/watch?v="
+)
+
+YOUTUBE_THUMB_BASE = (
+    "https://i.ytimg.com/vi/"
+)
 
 
 # ============================================================
@@ -86,6 +102,25 @@ class YouTubeTrack:
 
     provider: str = "youtube"
 
+    # --------------------------------------------------------
+    # DAY 22 PLAYBACK METADATA
+    # --------------------------------------------------------
+    #
+    # Current stable route:
+    #
+    #     official_external
+    #
+    # Tracks returned by search can later be attempted with an
+    # official embedded playback route:
+    #
+    #     official_embed_candidate
+    #
+    # --------------------------------------------------------
+
+    playback_mode: str = (
+        "official_external"
+    )
+
     # ========================================================
     # DISPLAY TITLE
     # ========================================================
@@ -94,11 +129,16 @@ class YouTubeTrack:
         self
     ) -> str:
 
-        return (
+        title = str(
             self.title
-            if self.title
-            else "Unknown Video"
-        )
+            or ""
+        ).strip()
+
+        if title:
+
+            return title
+
+        return "Unknown Video"
 
     # ========================================================
     # DISPLAY ARTIST
@@ -108,11 +148,16 @@ class YouTubeTrack:
         self
     ) -> str:
 
-        return (
+        channel = str(
             self.channel
-            if self.channel
-            else "YouTube"
-        )
+            or ""
+        ).strip()
+
+        if channel:
+
+            return channel
+
+        return "YouTube"
 
     # ========================================================
     # DURATION TEXT
@@ -131,7 +176,7 @@ class YouTubeTrack:
 
         except (
             TypeError,
-            ValueError
+            ValueError,
         ):
 
             seconds = 0
@@ -165,18 +210,105 @@ class YouTubeTrack:
         self
     ) -> str:
 
-        if self.webpage_url:
+        webpage_url = str(
+            self.webpage_url
+            or ""
+        ).strip()
 
-            return self.webpage_url
+        if webpage_url.startswith(
+            (
+                "http://",
+                "https://",
+            )
+        ):
 
-        if self.video_id:
+            return webpage_url
+
+        video_id = str(
+            self.video_id
+            or ""
+        ).strip()
+
+        if video_id:
 
             return (
-                "https://www.youtube.com/watch?v="
-                f"{self.video_id}"
+                YOUTUBE_WATCH_BASE
+                +
+                video_id
             )
 
         return ""
+
+    # ========================================================
+    # THUMBNAIL CANDIDATES
+    # ========================================================
+
+    def thumbnail_candidates(
+        self
+    ) -> List[str]:
+
+        """
+        Returns thumbnails in fallback order.
+
+        Example:
+
+            metadata thumbnail
+            maxresdefault
+            hqdefault
+            mqdefault
+            default
+        """
+
+        candidates = []
+
+        current_thumbnail = str(
+            self.thumbnail_url
+            or ""
+        ).strip()
+
+        if current_thumbnail:
+
+            candidates.append(
+                current_thumbnail
+            )
+
+        video_id = str(
+            self.video_id
+            or ""
+        ).strip()
+
+        if video_id:
+
+            names = (
+
+                "maxresdefault.jpg",
+
+                "hqdefault.jpg",
+
+                "mqdefault.jpg",
+
+                "default.jpg",
+            )
+
+            for name in names:
+
+                url = (
+                    YOUTUBE_THUMB_BASE
+                    +
+                    video_id
+                    +
+                    "/"
+                    +
+                    name
+                )
+
+                if url not in candidates:
+
+                    candidates.append(
+                        url
+                    )
+
+        return candidates
 
     # ========================================================
     # UNIQUE KEY
@@ -187,7 +319,9 @@ class YouTubeTrack:
     ):
 
         return (
+
             "youtube",
+
             str(
                 self.video_id
                 or ""
@@ -222,9 +356,38 @@ class YouTubeTrack:
         ):
 
             return cls(
+
                 video_id="",
-                title="Unknown Video",
+
+                title=(
+                    "Unknown Video"
+                ),
             )
+
+        # ----------------------------------------------------
+        # DURATION
+        # ----------------------------------------------------
+
+        try:
+
+            duration = int(
+                data.get(
+                    "duration",
+                    0
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            duration = 0
+
+        # ----------------------------------------------------
+        # OBJECT
+        # ----------------------------------------------------
 
         return cls(
 
@@ -234,7 +397,7 @@ class YouTubeTrack:
                     ""
                 )
                 or ""
-            ),
+            ).strip(),
 
             title=str(
                 data.get(
@@ -243,7 +406,7 @@ class YouTubeTrack:
                 )
                 or
                 "Unknown Video"
-            ),
+            ).strip(),
 
             channel=str(
                 data.get(
@@ -251,7 +414,7 @@ class YouTubeTrack:
                     ""
                 )
                 or ""
-            ),
+            ).strip(),
 
             thumbnail_url=str(
                 data.get(
@@ -259,15 +422,9 @@ class YouTubeTrack:
                     ""
                 )
                 or ""
-            ),
+            ).strip(),
 
-            duration=int(
-                data.get(
-                    "duration",
-                    0
-                )
-                or 0
-            ),
+            duration=duration,
 
             webpage_url=str(
                 data.get(
@@ -275,7 +432,7 @@ class YouTubeTrack:
                     ""
                 )
                 or ""
-            ),
+            ).strip(),
 
             source=str(
                 data.get(
@@ -284,7 +441,7 @@ class YouTubeTrack:
                 )
                 or
                 "youtube"
-            ),
+            ).strip(),
 
             provider=str(
                 data.get(
@@ -293,7 +450,16 @@ class YouTubeTrack:
                 )
                 or
                 "youtube"
-            ),
+            ).strip(),
+
+            playback_mode=str(
+                data.get(
+                    "playback_mode",
+                    "official_external"
+                )
+                or
+                "official_external"
+            ).strip(),
         )
 
 
@@ -304,14 +470,14 @@ class YouTubeTrack:
 class YouTubeService:
 
     """
-    LYRx YT BOX search service.
+    LYRx YouTube metadata/search service.
 
-    yt-dlp is deliberately configured with:
+    yt-dlp configuration:
 
         skip_download=True
         extract_flat=True
 
-    We only need catalog metadata in this phase.
+    So search remains metadata-only.
     """
 
     # ========================================================
@@ -357,21 +523,17 @@ class YouTubeService:
         return {
 
             # ------------------------------------------------
-            # Do not download media.
+            # METADATA ONLY
             # ------------------------------------------------
 
             "skip_download":
                 True,
 
-            # ------------------------------------------------
-            # Fast metadata search.
-            # ------------------------------------------------
-
             "extract_flat":
                 True,
 
             # ------------------------------------------------
-            # Quiet terminal.
+            # TERMINAL
             # ------------------------------------------------
 
             "quiet":
@@ -381,7 +543,7 @@ class YouTubeService:
                 True,
 
             # ------------------------------------------------
-            # Do not create files.
+            # FILE CREATION DISABLED
             # ------------------------------------------------
 
             "writeinfojson":
@@ -397,10 +559,17 @@ class YouTubeService:
                 False,
 
             # ------------------------------------------------
-            # Ignore unavailable individual results.
+            # SEARCH RESILIENCE
             # ------------------------------------------------
 
             "ignoreerrors":
+                True,
+
+            # ------------------------------------------------
+            # RESULT SHOULD BE A SINGLE VIDEO REFERENCE
+            # ------------------------------------------------
+
+            "noplaylist":
                 True,
         }
 
@@ -421,16 +590,283 @@ class YouTubeService:
 
         except (
             TypeError,
-            ValueError
+            ValueError,
         ):
 
             limit = 10
 
         return max(
+
             1,
+
             min(
                 limit,
                 30
+            )
+        )
+
+    # ========================================================
+    # NORMALIZE VIDEO ID
+    # ========================================================
+
+    @staticmethod
+    def normalize_video_id(
+        value
+    ) -> str:
+
+        """
+        Accepts:
+
+            Umqb9KENgmk
+
+            https://youtube.com/watch?v=Umqb9KENgmk
+
+            https://youtu.be/Umqb9KENgmk
+
+            /shorts/...
+            /embed/...
+            /live/...
+        """
+
+        value = str(
+            value
+            or ""
+        ).strip()
+
+        if not value:
+
+            return ""
+
+        # ----------------------------------------------------
+        # RAW VIDEO ID
+        # ----------------------------------------------------
+
+        if re.fullmatch(
+            r"[A-Za-z0-9_-]{6,20}",
+            value
+        ):
+
+            return value
+
+        # ----------------------------------------------------
+        # WATCH URL
+        # ----------------------------------------------------
+
+        watch_match = re.search(
+
+            r"(?:[?&]v=)"
+            r"([A-Za-z0-9_-]{6,20})",
+
+            value,
+        )
+
+        if watch_match:
+
+            return (
+                watch_match.group(
+                    1
+                )
+            )
+
+        # ----------------------------------------------------
+        # SHORT / EMBED / LIVE
+        # ----------------------------------------------------
+
+        path_match = re.search(
+
+            r"(?:youtu\.be/|embed/|shorts/|live/)"
+            r"([A-Za-z0-9_-]{6,20})",
+
+            value,
+        )
+
+        if path_match:
+
+            return (
+                path_match.group(
+                    1
+                )
+            )
+
+        return ""
+
+    # ========================================================
+    # BUILD WATCH URL
+    # ========================================================
+
+    @classmethod
+    def build_watch_url(
+        cls,
+        video_id
+    ) -> str:
+
+        video_id = (
+            cls.normalize_video_id(
+                video_id
+            )
+        )
+
+        if not video_id:
+
+            return ""
+
+        return (
+            YOUTUBE_WATCH_BASE
+            +
+            video_id
+        )
+
+    # ========================================================
+    # BUILD THUMBNAIL
+    # ========================================================
+
+    @classmethod
+    def build_thumbnail_url(
+        cls,
+        video_id,
+        quality="hqdefault"
+    ) -> str:
+
+        video_id = (
+            cls.normalize_video_id(
+                video_id
+            )
+        )
+
+        if not video_id:
+
+            return ""
+
+        allowed_quality = {
+
+            "maxresdefault",
+
+            "hqdefault",
+
+            "mqdefault",
+
+            "default",
+        }
+
+        quality = str(
+            quality
+            or
+            "hqdefault"
+        ).strip()
+
+        if quality not in allowed_quality:
+
+            quality = (
+                "hqdefault"
+            )
+
+        return (
+
+            YOUTUBE_THUMB_BASE
+
+            +
+
+            video_id
+
+            +
+
+            "/"
+
+            +
+
+            quality
+
+            +
+
+            ".jpg"
+        )
+
+    # ========================================================
+    # GET THUMBNAIL FROM ENTRY
+    # ========================================================
+
+    def _thumbnail_from_entry(
+        self,
+        entry,
+        video_id
+    ) -> str:
+
+        # ----------------------------------------------------
+        # DIRECT THUMBNAIL
+        # ----------------------------------------------------
+
+        thumbnail_url = str(
+            entry.get(
+                "thumbnail",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if thumbnail_url.startswith(
+            (
+                "http://",
+                "https://",
+            )
+        ):
+
+            return thumbnail_url
+
+        # ----------------------------------------------------
+        # THUMBNAILS ARRAY
+        # ----------------------------------------------------
+
+        thumbnails = (
+            entry.get(
+                "thumbnails",
+                []
+            )
+            or []
+        )
+
+        if isinstance(
+            thumbnails,
+            list
+        ):
+
+            # Usually later entries are larger/better.
+
+            for thumbnail in reversed(
+                thumbnails
+            ):
+
+                if not isinstance(
+                    thumbnail,
+                    dict
+                ):
+
+                    continue
+
+                candidate = str(
+                    thumbnail.get(
+                        "url",
+                        ""
+                    )
+                    or ""
+                ).strip()
+
+                if candidate.startswith(
+                    (
+                        "http://",
+                        "https://",
+                    )
+                ):
+
+                    return candidate
+
+        # ----------------------------------------------------
+        # DETERMINISTIC FALLBACK
+        # ----------------------------------------------------
+
+        return (
+            self.build_thumbnail_url(
+                video_id,
+                "hqdefault"
             )
         )
 
@@ -454,13 +890,29 @@ class YouTubeService:
         # VIDEO ID
         # ====================================================
 
-        video_id = str(
-            entry.get(
-                "id",
-                ""
+        video_id = (
+            self.normalize_video_id(
+                entry.get(
+                    "id",
+                    ""
+                )
             )
-            or ""
-        ).strip()
+        )
+
+        # ----------------------------------------------------
+        # Some flat results may expose ID in url.
+        # ----------------------------------------------------
+
+        if not video_id:
+
+            video_id = (
+                self.normalize_video_id(
+                    entry.get(
+                        "url",
+                        ""
+                    )
+                )
+            )
 
         if not video_id:
 
@@ -531,7 +983,7 @@ class YouTubeService:
 
         except (
             TypeError,
-            ValueError
+            ValueError,
         ):
 
             duration = 0
@@ -540,75 +992,42 @@ class YouTubeService:
         # THUMBNAIL
         # ====================================================
 
-        thumbnail_url = str(
+        thumbnail_url = (
+            self._thumbnail_from_entry(
+
+                entry,
+
+                video_id,
+            )
+        )
+
+        # ====================================================
+        # OFFICIAL WEBPAGE URL
+        # ====================================================
+
+        webpage_url = str(
             entry.get(
-                "thumbnail",
+                "webpage_url",
                 ""
             )
             or ""
         ).strip()
 
-        # ----------------------------------------------------
-        # Flat results may not expose thumbnail directly.
-        # YouTube standard thumbnail can be derived safely
-        # from the public video ID.
-        # ----------------------------------------------------
-
-        if not thumbnail_url:
-
-            thumbnail_url = (
-                "https://i.ytimg.com/vi/"
-                f"{video_id}/hqdefault.jpg"
-            )
-
-        # ====================================================
-        # WEBPAGE URL
-        # ====================================================
-
-        webpage_url = str(
-
-            entry.get(
-                "webpage_url",
-                ""
-            )
-
-            or
-
-            entry.get(
-                "url",
-                ""
-            )
-
-            or
-
-            ""
-
-        ).strip()
-
-        # ----------------------------------------------------
-        # extract_flat may return just the video ID as URL.
-        # ----------------------------------------------------
-
-        if (
-            not webpage_url
-            or
-            webpage_url == video_id
-            or
-            not webpage_url.startswith(
-                (
-                    "http://",
-                    "https://"
-                )
+        if not webpage_url.startswith(
+            (
+                "http://",
+                "https://",
             )
         ):
 
             webpage_url = (
-                "https://www.youtube.com/watch?v="
-                f"{video_id}"
+                self.build_watch_url(
+                    video_id
+                )
             )
 
         # ====================================================
-        # MODEL
+        # TRACK
         # ====================================================
 
         return YouTubeTrack(
@@ -628,6 +1047,10 @@ class YouTubeService:
             source="youtube",
 
             provider="youtube",
+
+            playback_mode=(
+                "official_embed_candidate"
+            ),
         )
 
     # ========================================================
@@ -655,12 +1078,9 @@ class YouTubeService:
             )
         )
 
-        # ====================================================
-        # SEARCH EXPRESSION
-        # ====================================================
-
         search_expression = (
-            f"ytsearch{limit}:{query}"
+            f"ytsearch{limit}:"
+            f"{query}"
         )
 
         print()
@@ -714,7 +1134,7 @@ class YouTubeService:
             return []
 
         # ====================================================
-        # RESULTS
+        # RESULT ROOT
         # ====================================================
 
         if not isinstance(
@@ -731,6 +1151,10 @@ class YouTubeService:
             )
             or []
         )
+
+        # ====================================================
+        # BUILD RESULT TRACKS
+        # ====================================================
 
         tracks = []
 
@@ -776,6 +1200,10 @@ class YouTubeService:
 
         self.clear_error()
 
+        # ====================================================
+        # DEBUG
+        # ====================================================
+
         print(
             "YT BOX results:",
             len(
@@ -787,14 +1215,17 @@ class YouTubeService:
             index,
             track
         ) in enumerate(
+
             tracks[:5],
-            start=1
+
+            start=1,
         ):
 
             print(
                 f"{index}. "
                 f"{track.title} "
-                f"- {track.channel}"
+                f"- "
+                f"{track.channel}"
             )
 
         print("=" * 60)
@@ -878,6 +1309,32 @@ class YouTubeService:
         )
 
     # ========================================================
+    # OFFICIAL EMBED CAPABILITY
+    # ========================================================
+
+    @staticmethod
+    def can_attempt_official_embed(
+        track: YouTubeTrack
+    ) -> bool:
+
+        if track is None:
+
+            return False
+
+        video_id = str(
+            getattr(
+                track,
+                "video_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        return bool(
+            video_id
+        )
+
+    # ========================================================
     # OPEN TRACK
     # ========================================================
 
@@ -885,6 +1342,13 @@ class YouTubeService:
     def open_track(
         track: YouTubeTrack
     ) -> bool:
+
+        """
+        Stable browser fallback.
+
+        Day 22 internal playback routing will be handled
+        separately from this metadata service.
+        """
 
         if track is None:
 
@@ -963,8 +1427,26 @@ class YouTubeService:
         )
 
         print(
+            "Thumbnail candidates:"
+        )
+
+        for thumbnail in (
+            track.thumbnail_candidates()
+        ):
+
+            print(
+                " -",
+                thumbnail
+            )
+
+        print(
             "URL:",
             track.youtube_url()
+        )
+
+        print(
+            "Playback mode:",
+            track.playback_mode
         )
 
         print("=" * 60)

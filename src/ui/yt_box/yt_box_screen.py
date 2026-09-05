@@ -1,6 +1,6 @@
 # ============================================================
 # LYRx
-# DAY 21 - YT BOX
+# DAY 22 - YT BOX
 #
 # FILE 2
 # yt_box_screen.py
@@ -10,33 +10,26 @@
 #
 # Dedicated YouTube discovery screen for LYRx.
 #
-# FEATURES
+# DAY 22 FEATURES
 # ------------------------------------------------------------
 #
-#   - Same LYRx dark/purple UI blueprint
-#   - YouTube search bar
-#   - Search button
-#   - Enter-to-search
-#   - Dynamic yt-dlp metadata search
-#   - Thumbnail loading
-#   - Title
-#   - Channel / artist
-#   - Duration
-#   - Play / Open button
-#   - Favorite button UI
-#   - Add-to-playlist button UI
-#   - Loading state
-#   - Empty state
-#   - Error state
+#   - YouTube metadata search
+#   - Background search worker
 #   - Responsive result grid
+#   - Reliable asynchronous thumbnail loading
+#   - Multiple thumbnail fallbacks
+#   - Play request
+#   - Favorite request
+#   - Add-to-playlist request
+#   - Dark / Light theme
+#   - Loading / empty / error states
 #
 # IMPORTANT
 # ------------------------------------------------------------
 #
-# This screen does NOT download/extract YouTube audio.
+# This screen does NOT download or extract YouTube audio.
 #
-# Playback/open routing will be connected through AppWindow
-# in the next integration files.
+# Actual playback routing is handled by AppWindow.
 # ============================================================
 
 from __future__ import annotations
@@ -60,7 +53,6 @@ from PySide6.QtGui import (
     QPainter,
     QPixmap,
 )
-
 
 from PySide6.QtNetwork import (
     QNetworkAccessManager,
@@ -92,10 +84,6 @@ from services.youtube_service import (
 # ============================================================
 
 class YouTubeSearchWorker(QObject):
-
-    # --------------------------------------------------------
-    # SIGNALS
-    # --------------------------------------------------------
 
     finished = Signal(
         list
@@ -134,9 +122,8 @@ class YouTubeSearchWorker(QObject):
 
         try:
 
-            # ------------------------------------------------
-            # Create service inside worker thread.
-            # ------------------------------------------------
+            # Service is deliberately created inside worker
+            # thread so yt-dlp work remains outside UI thread.
 
             service = (
                 YouTubeService()
@@ -144,9 +131,7 @@ class YouTubeSearchWorker(QObject):
 
             tracks = (
                 service.search(
-
                     self.query,
-
                     limit=self.limit,
                 )
             )
@@ -184,10 +169,6 @@ class YouTubeResultCard(
     QFrame
 ):
 
-    # --------------------------------------------------------
-    # SIGNALS
-    # --------------------------------------------------------
-
     play_requested = Signal(
         object
     )
@@ -221,15 +202,27 @@ class YouTubeResultCard(
             is_dark
         )
 
+        # ----------------------------------------------------
+        # Thumbnail state
+        # ----------------------------------------------------
+
         self.thumbnail_pixmap = None
 
-        self.thumbnail_network = QNetworkAccessManager(
-            self
+        self.thumbnail_network = (
+            QNetworkAccessManager(
+                self
+            )
         )
 
         self.thumbnail_reply = None
 
-        self.thumbnail_fallback_used = False
+        self.thumbnail_urls = []
+
+        self.thumbnail_index = -1
+
+        # ----------------------------------------------------
+        # Card
+        # ----------------------------------------------------
 
         self.setObjectName(
             "YouTubeResultCard"
@@ -284,7 +277,7 @@ class YouTubeResultCard(
         )
 
         # ====================================================
-        # THUMBNAIL AREA
+        # THUMBNAIL
         # ====================================================
 
         self.thumbnail_frame = QFrame()
@@ -308,10 +301,6 @@ class YouTubeResultCard(
             0
         )
 
-        # ----------------------------------------------------
-        # IMAGE
-        # ----------------------------------------------------
-
         self.thumbnail = QLabel(
             "▶"
         )
@@ -329,8 +318,16 @@ class YouTubeResultCard(
             QSizePolicy.Expanding
         )
 
+        self.thumbnail.setScaledContents(
+            False
+        )
+
         thumbnail_layout.addWidget(
             self.thumbnail
+        )
+
+        root.addWidget(
+            self.thumbnail_frame
         )
 
         # ====================================================
@@ -378,7 +375,7 @@ class YouTubeResultCard(
         )
 
         # ====================================================
-        # DURATION + SOURCE
+        # METADATA
         # ====================================================
 
         metadata_row = QHBoxLayout()
@@ -419,7 +416,7 @@ class YouTubeResultCard(
         root.addStretch()
 
         # ====================================================
-        # ACTION BUTTONS
+        # BUTTONS
         # ====================================================
 
         buttons = QHBoxLayout()
@@ -448,7 +445,7 @@ class YouTubeResultCard(
         )
 
         self.play_button.setToolTip(
-            "Open this track"
+            "Play this track"
         )
 
         self.play_button.clicked.connect(
@@ -559,14 +556,67 @@ class YouTubeResultCard(
         )
 
     # ========================================================
-    # LOAD THUMBNAIL
+    # BUILD THUMBNAIL LIST
     # ========================================================
 
-    def load_thumbnail(
+    def build_thumbnail_candidates(
         self
     ):
 
-        url = str(
+        candidates = []
+
+        # ----------------------------------------------------
+        # Day 22 YouTubeTrack method
+        # ----------------------------------------------------
+
+        try:
+
+            method = getattr(
+                self.track,
+                "thumbnail_candidates",
+                None
+            )
+
+            if callable(
+                method
+            ):
+
+                track_candidates = (
+                    method()
+                    or []
+                )
+
+                for candidate in (
+                    track_candidates
+                ):
+
+                    candidate = str(
+                        candidate
+                        or ""
+                    ).strip()
+
+                    if (
+                        candidate
+                        and
+                        candidate not in candidates
+                    ):
+
+                        candidates.append(
+                            candidate
+                        )
+
+        except Exception as error:
+
+            print(
+                "YT BOX thumbnail candidate error:",
+                error
+            )
+
+        # ----------------------------------------------------
+        # Direct metadata thumbnail
+        # ----------------------------------------------------
+
+        direct_url = str(
             getattr(
                 self.track,
                 "thumbnail_url",
@@ -575,33 +625,117 @@ class YouTubeResultCard(
             or ""
         ).strip()
 
-        # yt-dlp search metadata can occasionally return no usable
-        # thumbnail URL. YouTube's deterministic video thumbnail is
-        # a safe metadata/image fallback for the known video id.
-        if not url:
+        if (
+            direct_url
+            and
+            direct_url not in candidates
+        ):
 
-            video_id = str(
-                getattr(
-                    self.track,
-                    "video_id",
-                    ""
-                )
-                or ""
-            ).strip()
+            candidates.insert(
+                0,
+                direct_url
+            )
 
-            if video_id:
+        # ----------------------------------------------------
+        # Manual fallback list
+        # ----------------------------------------------------
+
+        video_id = str(
+            getattr(
+                self.track,
+                "video_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if video_id:
+
+            fallback_names = (
+
+                "maxresdefault.jpg",
+
+                "hqdefault.jpg",
+
+                "mqdefault.jpg",
+
+                "default.jpg",
+            )
+
+            for filename in (
+                fallback_names
+            ):
 
                 url = (
                     "https://i.ytimg.com/vi/"
-                    f"{video_id}/hqdefault.jpg"
+                    +
+                    video_id
+                    +
+                    "/"
+                    +
+                    filename
                 )
 
-        if not url:
+                if url not in candidates:
+
+                    candidates.append(
+                        url
+                    )
+
+        return candidates
+
+    # ========================================================
+    # LOAD THUMBNAIL
+    # ========================================================
+
+    def load_thumbnail(
+        self
+    ):
+
+        self.thumbnail_urls = (
+            self.build_thumbnail_candidates()
+        )
+
+        self.thumbnail_index = -1
+
+        if not self.thumbnail_urls:
+
+            self.show_thumbnail_placeholder()
 
             return
 
+        self.request_next_thumbnail()
+
+    # ========================================================
+    # NEXT THUMBNAIL
+    # ========================================================
+
+    def request_next_thumbnail(
+        self
+    ):
+
+        self.thumbnail_index += 1
+
+        if (
+            self.thumbnail_index
+            >=
+            len(
+                self.thumbnail_urls
+            )
+        ):
+
+            self.show_thumbnail_placeholder()
+
+            return
+
+        image_url = (
+            self.thumbnail_urls[
+                self.thumbnail_index
+            ]
+        )
+
         self.request_thumbnail(
-            url
+            image_url
         )
 
     # ========================================================
@@ -620,29 +754,24 @@ class YouTubeResultCard(
 
         if not image_url:
 
+            self.request_next_thumbnail()
+
             return
 
-        if self.thumbnail_reply is not None:
-
-            try:
-
-                if self.thumbnail_reply.isRunning():
-
-                    self.thumbnail_reply.abort()
-
-            except Exception:
-
-                pass
-
-            self.thumbnail_reply = None
-
-        url = QUrl.fromUserInput(
+        url = QUrl(
             image_url
         )
 
-        if not url.isValid():
+        if (
+            not url.isValid()
+            or
+            url.scheme() not in (
+                "http",
+                "https",
+            )
+        ):
 
-            self.try_thumbnail_fallback()
+            self.request_next_thumbnail()
 
             return
 
@@ -650,95 +779,126 @@ class YouTubeResultCard(
             url
         )
 
+        # ----------------------------------------------------
+        # Normal browser-like headers.
+        #
+        # We deliberately do not force a Referer here because
+        # i.ytimg.com thumbnails are public image resources and
+        # some environments behave better without it.
+        # ----------------------------------------------------
+
         request.setRawHeader(
             b"User-Agent",
-            b"Mozilla/5.0 LYRx/0.2"
+            (
+                b"Mozilla/5.0 "
+                b"(Windows NT 10.0; Win64; x64) "
+                b"AppleWebKit/537.36 "
+                b"Chrome/131.0 Safari/537.36"
+            )
         )
 
         request.setRawHeader(
             b"Accept",
-            b"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            (
+                b"image/avif,"
+                b"image/webp,"
+                b"image/apng,"
+                b"image/*,"
+                b"*/*;q=0.8"
+            )
         )
 
-        request.setRawHeader(
-            b"Referer",
-            b"https://www.youtube.com/"
-        )
-
-        self.thumbnail_reply = (
+        reply = (
             self.thumbnail_network
             .get(
                 request
             )
         )
 
-        self.thumbnail_reply.finished.connect(
-            self.thumbnail_loaded
+        self.thumbnail_reply = (
+            reply
+        )
+
+        reply.finished.connect(
+            lambda current_reply=reply:
+            self.thumbnail_loaded(
+                current_reply
+            )
         )
 
     # ========================================================
-    # THUMBNAIL LOADED
+    # THUMBNAIL RESPONSE
     # ========================================================
 
     def thumbnail_loaded(
-        self
+        self,
+        reply
     ):
 
-        reply = self.sender()
+        # ----------------------------------------------------
+        # Ignore an old/stale reply.
+        # ----------------------------------------------------
 
         if reply is None:
 
             return
 
+        is_current_reply = (
+            reply
+            is
+            self.thumbnail_reply
+        )
+
+        if is_current_reply:
+
+            self.thumbnail_reply = None
+
+        success = False
+
         try:
 
             if (
                 reply.error()
-                !=
+                ==
                 QNetworkReply.NetworkError.NoError
             ):
 
+                data = bytes(
+                    reply.readAll()
+                )
+
+                if data:
+
+                    pixmap = QPixmap()
+
+                    if pixmap.loadFromData(
+                        data
+                    ):
+
+                        self.thumbnail_pixmap = (
+                            pixmap
+                        )
+
+                        self.thumbnail.setText(
+                            ""
+                        )
+
+                        self.apply_thumbnail()
+
+                        success = True
+
+            else:
+
                 print(
-                    "YT BOX thumbnail network error:",
+                    "YT BOX thumbnail failed:",
                     self.track.display_title(),
                     "-",
                     reply.errorString()
                 )
 
-                self.try_thumbnail_fallback()
-
-                return
-
-            data = bytes(
-                reply.readAll()
-            )
-
-            pixmap = QPixmap()
-
-            if not pixmap.loadFromData(
-                data
-            ):
-
-                print(
-                    "YT BOX thumbnail decode failed:",
-                    self.track.display_title()
-                )
-
-                self.try_thumbnail_fallback()
-
-                return
-
-            self.thumbnail_pixmap = (
-                pixmap
-            )
-
-            self.thumbnail.clear()
-
-            self.apply_thumbnail()
-
         except RuntimeError:
 
-            pass
+            return
 
         except Exception as error:
 
@@ -748,8 +908,6 @@ class YouTubeResultCard(
                 "-",
                 error
             )
-
-            self.try_thumbnail_fallback()
 
         finally:
 
@@ -761,44 +919,34 @@ class YouTubeResultCard(
 
                 pass
 
-            if reply is self.thumbnail_reply:
+        # ----------------------------------------------------
+        # If this candidate failed, automatically try next.
+        # ----------------------------------------------------
 
-                self.thumbnail_reply = None
+        if (
+            is_current_reply
+            and
+            not success
+        ):
+
+            self.request_next_thumbnail()
 
     # ========================================================
-    # FALLBACK THUMBNAIL
+    # PLACEHOLDER
     # ========================================================
 
-    def try_thumbnail_fallback(
+    def show_thumbnail_placeholder(
         self
     ):
 
-        if self.thumbnail_fallback_used:
+        self.thumbnail_pixmap = None
 
-            return
-
-        video_id = str(
-            getattr(
-                self.track,
-                "video_id",
-                ""
-            )
-            or ""
-        ).strip()
-
-        if not video_id:
-
-            return
-
-        self.thumbnail_fallback_used = True
-
-        fallback_url = (
-            "https://i.ytimg.com/vi/"
-            f"{video_id}/hqdefault.jpg"
+        self.thumbnail.setPixmap(
+            QPixmap()
         )
 
-        self.request_thumbnail(
-            fallback_url
+        self.thumbnail.setText(
+            "▶"
         )
 
     # ========================================================
@@ -828,9 +976,11 @@ class YouTubeResultCard(
         )
 
         scaled = (
-            self.thumbnail_pixmap.scaled(
+            self.thumbnail_pixmap
+            .scaled(
 
                 width,
+
                 height,
 
                 Qt.KeepAspectRatioByExpanding,
@@ -839,8 +989,57 @@ class YouTubeResultCard(
             )
         )
 
+        # ----------------------------------------------------
+        # Crop image to exact card thumbnail dimensions.
+        # ----------------------------------------------------
+
+        if (
+            scaled.width() > width
+            or
+            scaled.height() > height
+        ):
+
+            x = max(
+                0,
+                (
+                    scaled.width()
+                    -
+                    width
+                )
+                //
+                2
+            )
+
+            y = max(
+                0,
+                (
+                    scaled.height()
+                    -
+                    height
+                )
+                //
+                2
+            )
+
+            scaled = scaled.copy(
+                x,
+                y,
+                min(
+                    width,
+                    scaled.width()
+                ),
+                min(
+                    height,
+                    scaled.height()
+                ),
+            )
+
         self.thumbnail.setPixmap(
             scaled
+        )
+
+        self.thumbnail.setText(
+            ""
         )
 
     # ========================================================
@@ -1041,10 +1240,6 @@ class YouTubeResultCard(
                 """
             )
 
-        # ====================================================
-        # BUTTONS
-        # ====================================================
-
         self.apply_button_theme()
 
     # ========================================================
@@ -1158,7 +1353,7 @@ class YTBoxScreen(
 ):
 
     # --------------------------------------------------------
-    # Signals forwarded to AppWindow.
+    # Forwarded to AppWindow
     # --------------------------------------------------------
 
     play_requested = Signal(
@@ -1203,7 +1398,7 @@ class YTBoxScreen(
         ] = []
 
         # ----------------------------------------------------
-        # Thread references
+        # Thread
         # ----------------------------------------------------
 
         self.search_thread: Optional[
@@ -1217,14 +1412,10 @@ class YTBoxScreen(
         self.search_in_progress = False
 
         # ----------------------------------------------------
-        # Responsive columns
+        # Grid
         # ----------------------------------------------------
 
         self.current_columns = 4
-
-        # ----------------------------------------------------
-        # Build
-        # ----------------------------------------------------
 
         self.build_ui()
 
@@ -1256,7 +1447,7 @@ class YTBoxScreen(
         )
 
         # ====================================================
-        # PAGE TITLE
+        # TITLE
         # ====================================================
 
         title_row = QHBoxLayout()
@@ -1326,10 +1517,6 @@ class YTBoxScreen(
         search_panel_layout.setSpacing(
             13
         )
-
-        # ----------------------------------------------------
-        # LABEL
-        # ----------------------------------------------------
 
         self.search_heading = QLabel(
             "Find Your Music"
@@ -1422,7 +1609,7 @@ class YTBoxScreen(
         )
 
         # ====================================================
-        # RESULTS HEADER
+        # RESULT HEADER
         # ====================================================
 
         results_header = QHBoxLayout()
@@ -1478,10 +1665,6 @@ class YTBoxScreen(
             Qt.ScrollBarAsNeeded
         )
 
-        # ----------------------------------------------------
-        # CONTENT
-        # ----------------------------------------------------
-
         self.scroll_content = QWidget()
 
         self.scroll_content.setSizePolicy(
@@ -1513,7 +1696,7 @@ class YTBoxScreen(
         )
 
         # ====================================================
-        # STATUS PANEL
+        # STATUS
         # ====================================================
 
         self.status_panel = QFrame()
@@ -1620,7 +1803,8 @@ class YTBoxScreen(
         )
 
         self.results_grid.setAlignment(
-            Qt.AlignTop |
+            Qt.AlignTop
+            |
             Qt.AlignLeft
         )
 
@@ -1655,7 +1839,9 @@ class YTBoxScreen(
 
                 icon="⌕",
 
-                title="Type something to search",
+                title=(
+                    "Type something to search"
+                ),
 
                 message=(
                     "Search by song, artist, album "
@@ -1665,17 +1851,11 @@ class YTBoxScreen(
 
             return
 
-        # ----------------------------------------------------
-        # Prevent duplicate click while worker is active.
-        # ----------------------------------------------------
-
         if self.search_in_progress:
 
             return
 
-        self.current_query = (
-            query
-        )
+        self.current_query = query
 
         self.search_in_progress = True
 
@@ -1701,7 +1881,9 @@ class YTBoxScreen(
 
             icon="◌",
 
-            title="Searching YouTube...",
+            title=(
+                "Searching YouTube..."
+            ),
 
             message=(
                 f'Finding results for "{query}"'
@@ -1729,33 +1911,17 @@ class YTBoxScreen(
             self.search_thread
         )
 
-        # ----------------------------------------------------
-        # START
-        # ----------------------------------------------------
-
         self.search_thread.started.connect(
             self.search_worker.run
         )
-
-        # ----------------------------------------------------
-        # SUCCESS
-        # ----------------------------------------------------
 
         self.search_worker.finished.connect(
             self.handle_search_results
         )
 
-        # ----------------------------------------------------
-        # ERROR
-        # ----------------------------------------------------
-
         self.search_worker.error.connect(
             self.handle_search_error
         )
-
-        # ----------------------------------------------------
-        # CLEANUP
-        # ----------------------------------------------------
 
         self.search_worker.finished.connect(
             self.search_thread.quit
@@ -1821,10 +1987,6 @@ class YTBoxScreen(
             or []
         )
 
-        # ----------------------------------------------------
-        # EMPTY
-        # ----------------------------------------------------
-
         if not self.current_tracks:
 
             self.results_count.setText(
@@ -1835,7 +1997,9 @@ class YTBoxScreen(
 
                 icon="♫",
 
-                title="No results found",
+                title=(
+                    "No results found"
+                ),
 
                 message=(
                     "Try another song, artist "
@@ -1844,10 +2008,6 @@ class YTBoxScreen(
             )
 
             return
-
-        # ----------------------------------------------------
-        # COUNT
-        # ----------------------------------------------------
 
         count = len(
             self.current_tracks
@@ -1862,10 +2022,6 @@ class YTBoxScreen(
         self.results_count.setText(
             f"{count} {word}"
         )
-
-        # ----------------------------------------------------
-        # DISPLAY
-        # ----------------------------------------------------
 
         self.status_panel.hide()
 
@@ -1906,7 +2062,9 @@ class YTBoxScreen(
 
             icon="⚠",
 
-            title="YouTube search unavailable",
+            title=(
+                "YouTube search unavailable"
+            ),
 
             message=(
                 "LYRx couldn't load YouTube results.\n\n"
@@ -1949,11 +2107,13 @@ class YTBoxScreen(
         self
     ):
 
+        old_cards = list(
+            self.result_cards
+        )
+
         self.result_cards = []
 
-        while (
-            self.results_grid.count()
-        ):
+        while self.results_grid.count():
 
             item = (
                 self.results_grid
@@ -1962,16 +2122,23 @@ class YTBoxScreen(
                 )
             )
 
-            widget = (
-                item.widget()
-            )
+            widget = item.widget()
 
             if widget is not None:
 
+                widget.setParent(
+                    None
+                )
+
                 widget.deleteLater()
 
+        # Keep explicit reference until deleteLater has
+        # been scheduled for every old card.
+
+        old_cards.clear()
+
     # ========================================================
-    # CALCULATE COLUMNS
+    # COLUMNS
     # ========================================================
 
     def calculate_columns(
@@ -1979,12 +2146,10 @@ class YTBoxScreen(
     ) -> int:
 
         width = (
-            self.scroll.viewport().width()
+            self.scroll
+            .viewport()
+            .width()
         )
-
-        # ----------------------------------------------------
-        # Keep cards comfortable at different app sizes.
-        # ----------------------------------------------------
 
         if width >= 1150:
 
@@ -2016,19 +2181,11 @@ class YTBoxScreen(
 
             return
 
-        # ----------------------------------------------------
-        # Delete existing cards.
-        # ----------------------------------------------------
-
         self.clear_results()
 
         self.current_columns = (
             self.calculate_columns()
         )
-
-        # ====================================================
-        # CREATE CARDS
-        # ====================================================
 
         for (
             index,
@@ -2048,25 +2205,13 @@ class YTBoxScreen(
                 )
             )
 
-            # ------------------------------------------------
-            # PLAY
-            # ------------------------------------------------
-
             card.play_requested.connect(
                 self.handle_play_requested
             )
 
-            # ------------------------------------------------
-            # FAVORITE
-            # ------------------------------------------------
-
             card.favorite_requested.connect(
                 self.handle_favorite_requested
             )
-
-            # ------------------------------------------------
-            # PLAYLIST
-            # ------------------------------------------------
 
             card.playlist_requested.connect(
                 self.handle_playlist_requested
@@ -2097,10 +2242,6 @@ class YTBoxScreen(
                 card
             )
 
-        # ----------------------------------------------------
-        # Stretch unused horizontal space.
-        # ----------------------------------------------------
-
         for column in range(
             self.current_columns
         ):
@@ -2128,17 +2269,31 @@ class YTBoxScreen(
 
         print(
             "Title:",
-            track.title
+            track.display_title()
         )
 
         print(
             "Channel:",
-            track.channel
+            track.display_artist()
+        )
+
+        print(
+            "Video ID:",
+            track.video_id
         )
 
         print(
             "URL:",
             track.youtube_url()
+        )
+
+        print(
+            "Playback:",
+            getattr(
+                track,
+                "playback_mode",
+                "official_external"
+            )
         )
 
         print("=" * 60)
@@ -2149,7 +2304,7 @@ class YTBoxScreen(
         )
 
     # ========================================================
-    # FAVORITE REQUEST
+    # FAVORITE
     # ========================================================
 
     def handle_favorite_requested(
@@ -2159,7 +2314,7 @@ class YTBoxScreen(
 
         print(
             "YT BOX favorite requested:",
-            track.title
+            track.display_title()
         )
 
         self.favorite_requested.emit(
@@ -2167,7 +2322,7 @@ class YTBoxScreen(
         )
 
     # ========================================================
-    # PLAYLIST REQUEST
+    # PLAYLIST
     # ========================================================
 
     def handle_playlist_requested(
@@ -2177,7 +2332,7 @@ class YTBoxScreen(
 
         print(
             "YT BOX playlist requested:",
-            track.title
+            track.display_title()
         )
 
         self.playlist_requested.emit(
@@ -2419,7 +2574,7 @@ class YTBoxScreen(
         )
 
         # ====================================================
-        # RESULTS HEADER
+        # RESULTS
         # ====================================================
 
         self.results_title.setStyleSheet(
@@ -2529,7 +2684,7 @@ class YTBoxScreen(
         )
 
         # ====================================================
-        # SCROLLBAR
+        # SCROLL
         # ====================================================
 
         self.scroll.setStyleSheet(
@@ -2624,7 +2779,7 @@ class YTBoxScreen(
             self.rebuild_grid()
 
     # ========================================================
-    # PAINT EVENT
+    # PAINT
     # ========================================================
 
     def paintEvent(
@@ -2723,9 +2878,11 @@ class YTBoxScreen(
                 124,
                 58,
                 237,
-                22
-                if self.current_is_dark
-                else 10
+                (
+                    22
+                    if self.current_is_dark
+                    else 10
+                )
             )
         )
 

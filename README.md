@@ -163,4 +163,6 @@ These commands are connected to the actual LYRx audio player.
 - Fixed iTunes Next Up direct-click playback
 - Improved Next / Previous behavior for online songs
 
+- [x] Day 22 - Finalize YT Box discovery and official playback fallback
+
 Version: LYRx Alpha 1.0

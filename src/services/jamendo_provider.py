@@ -242,7 +242,7 @@ class JamendoProvider(MusicProvider):
 
             album=album,
 
-            artwork_url=image_url,
+            image_url=image_url,
 
             audio_url=audio_url,
 
@@ -250,15 +250,25 @@ class JamendoProvider(MusicProvider):
 
             duration=duration,
 
-            genre="",
+            provider="jamendo",
 
-            release_date="",
+            downloadable=downloadable,
+
+            download_url=download_url,
+
+            share_url=share_url,
+
+            external_url=share_url,
+
+            genre="",
 
             language="",
 
-            provider="jamendo",
+            release_date="",
 
-            provider_url=share_url,
+            full_playback=bool(audio_url),
+
+            preview_available=False,
 
             metadata={
 
@@ -304,15 +314,23 @@ class JamendoProvider(MusicProvider):
                 )
 
                 if song is None:
-
                     continue
 
-                if not song.is_valid():
+                # Unified Day-20 Song model does not have is_valid().
+                # A converted Jamendo result is usable when it has a title.
+                if not str(
+                    getattr(
+                        song,
+                        "title",
+                        ""
+                    )
+                    or ""
+                ).strip():
 
                     continue
 
                 converted.append(
-                    song
+                song
                 )
 
             except Exception as error:

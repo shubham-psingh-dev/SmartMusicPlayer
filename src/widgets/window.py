@@ -2456,10 +2456,28 @@ class AppWindow(QMainWindow):
         track
     ):
 
+        """
+        DAY 22 stable YT BOX playback.
+
+        YT BOX remains a YouTube discovery/search surface.
+        The selected exact YouTube result is opened through the
+        official YouTube URL.
+
+        IMPORTANT:
+            - No iTunes/Jamendo resolver substitution.
+            - No 30-second preview pretending to be the YT track.
+            - No mixed provider Next/Previous queue.
+            - Existing Discover/Library playback remains untouched.
+        """
+
+        if track is None:
+            return
+
         try:
 
-            if track is None:
-                return
+            # =================================================
+            # TRACK DATA
+            # =================================================
 
             title = str(
                 getattr(
@@ -2476,54 +2494,51 @@ class AppWindow(QMainWindow):
                     "channel",
                     ""
                 )
+                or getattr(
+                    track,
+                    "artist",
+                    ""
+                )
                 or "YouTube"
             )
 
-            thumbnail_url = str(
-                getattr(
-                    track,
-                    "thumbnail_url",
-                    ""
-                )
-                or ""
-            )
+            # =================================================
+            # STOP NATIVE LYRx AUDIO
+            # =================================================
+            #
+            # If iTunes/Jamendo/local playback was active before
+            # the user selected a YT BOX result, stop it so LYRx
+            # does not keep unrelated audio running underneath
+            # YouTube.
+            # =================================================
 
-            # --------------------------------------------
-            # Floating metadata
-            # --------------------------------------------
-
-            self.floating_player.set_song(
-                thumbnail_url,
-                title,
-                channel
-            )
-
-            self.floating_player.set_playing(
-                False
-            )
-
-            # --------------------------------------------
-            # Official YouTube playback
-            # --------------------------------------------
-
-            opened = (
-                youtube_service.open_track(
-                    track
-                )
-            )
-
-            if not opened:
-
+            try:
+                self.home.now_playing.audio_player.stop()
+            except Exception as error:
                 print(
-                    "YT BOX could not open:",
-                    title
+                    "YT BOX native player stop warning:",
+                    error
                 )
 
-                return
+            # =================================================
+            # CLEAR ONLINE QUEUE
+            # =================================================
+            #
+            # This prevents floating-player Next/Previous from
+            # continuing an old Discover/iTunes/Jamendo queue.
+            # =================================================
 
-            # --------------------------------------------
-            # Stay on YT BOX
-            # --------------------------------------------
+            try:
+                self.home.now_playing.set_online_queue(
+                    [],
+                    current_song=None
+                )
+            except Exception:
+                pass
+
+            # =================================================
+            # KEEP USER ON YT BOX
+            # =================================================
 
             self.pages.setCurrentWidget(
                 self.yt_box
@@ -2533,24 +2548,45 @@ class AppWindow(QMainWindow):
                 "YT BOX"
             )
 
-            self.update_floating_visibility()
+            # YT BOX browser playback is not controlled by LYRx's
+            # QMediaPlayer, so the floating player must not pretend
+            # it can pause/seek/next that YouTube playback.
+            self.floating_player.hide()
 
-            self.position_floating_player()
+            # =================================================
+            # OPEN EXACT SELECTED YOUTUBE RESULT
+            # =================================================
 
-            print(
-                "YT BOX opened on YouTube:",
-                title
+            print()
+            print("=" * 60)
+            print("YT BOX OFFICIAL PLAYBACK")
+            print("Title:", title)
+            print("Channel:", channel)
+
+            opened = youtube_service.open_track(
+                track
             )
+
+            if opened:
+                print("Opened selected YouTube result.")
+            else:
+                print("Could not open selected YouTube result.")
+
+            print("=" * 60)
+            print()
 
         except Exception as error:
 
-            print(
-                "YT BOX PLAY ERROR:",
-                error
-            )
+            print()
+            print("=" * 60)
+            print("YT BOX PLAY ERROR")
+            print("Type:", type(error).__name__)
+            print("Error:", error)
+            print("=" * 60)
+            print()
 
     # ========================================================
-    # DAY 21 - YT BOX REQUEST ROUTERS
+    # DAY 21 - YT BOX PLAY ROUTER
     # ========================================================
 
     def handle_yt_box_play_requested(self, track):
@@ -3733,8 +3769,7 @@ class AppWindow(QMainWindow):
         if current not in (
             self.discover,
             self.favorites,
-            self.library,
-            self.yt_box
+            self.library
         ):
 
             return

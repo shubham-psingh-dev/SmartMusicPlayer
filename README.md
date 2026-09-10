@@ -164,5 +164,6 @@ These commands are connected to the actual LYRx audio player.
 - Improved Next / Previous behavior for online songs
 
 - [x] Day 22 - Finalize YT Box discovery and official playback fallback
+- [x] Day 23 - Add Firebase authentication and Google sign-in
 
 Version: LYRx Alpha 1.0

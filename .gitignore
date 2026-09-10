@@ -3,5 +3,10 @@ dist/
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 user_data/
 .lyrx/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1413,6 +1413,18 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 23 - HOME HERO NAVIGATION
+        # ====================================================
+
+        self.home.explore_music_requested.connect(
+            self.open_discover_from_home
+        )
+
+        self.home.library_requested.connect(
+            self.open_library_from_home
+        )
+
+        # ====================================================
         # DAY 21 - YT BOX SIGNALS
         # ====================================================
         #
@@ -1822,6 +1834,26 @@ class AppWindow(QMainWindow):
                 "DiscoverScreen.search_online_music() "
                 "is not added yet. Apply File 4 next."
             )
+
+    # ========================================================
+    # DAY 23 - HOME HERO NAVIGATION
+    # ========================================================
+
+    def open_discover_from_home(
+        self
+    ):
+
+        self.handle_page_change(
+            "Discover"
+        )
+
+    def open_library_from_home(
+        self
+    ):
+
+        self.handle_page_change(
+            "Library"
+        )
 
     # ========================================================
     # PAGE NAVIGATION

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -40,8 +40,17 @@ HEADPHONE_PATH = (
 
 class HeroBanner(QWidget):
 
+    # =====================================================
+    # DAY 23 - NAVIGATION SIGNALS
+    # =====================================================
+
+    explore_requested = Signal()
+    library_requested = Signal()
+
     def __init__(self):
         super().__init__()
+
+        self.current_is_dark = True
 
         self.setMinimumHeight(300)
         self.setMaximumHeight(320)
@@ -84,32 +93,22 @@ class HeroBanner(QWidget):
         # SMALL LABEL
         # -------------------------------------------------
 
-        eyebrow = QLabel(
+        self.eyebrow = QLabel(
             "YOUR SOUND • YOUR MOMENT"
         )
-
-        eyebrow.setStyleSheet("""
-        QLabel {
-            color: #CDBBFF;
-            background: transparent;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        """)
 
         # -------------------------------------------------
         # MAIN TITLE
         # -------------------------------------------------
 
-        title = QLabel(
+        self.title = QLabel(
             "What do you want\n"
             "to hear today?"
         )
 
-        title.setWordWrap(True)
+        self.title.setWordWrap(True)
 
-        title.setFont(
+        self.title.setFont(
             QFont(
                 "Segoe UI",
                 30,
@@ -117,50 +116,24 @@ class HeroBanner(QWidget):
             )
         )
 
-        title.setStyleSheet("""
-        QLabel {
-            color: white;
-            background: transparent;
-            line-height: 115%;
-        }
-        """)
-
         # -------------------------------------------------
         # FREQUENCY LINE
         # -------------------------------------------------
 
-        frequency = QLabel(
+        self.frequency = QLabel(
             "Find Your Frequency  ✦"
         )
-
-        frequency.setStyleSheet("""
-        QLabel {
-            color: #B993FF;
-            background: transparent;
-            font-size: 14px;
-            font-weight: 700;
-        }
-        """)
 
         # -------------------------------------------------
         # SUBTITLE
         # -------------------------------------------------
 
-        subtitle = QLabel(
+        self.subtitle = QLabel(
             "Discover your soul,\n"
             "Millions of beats, one experience."
         )
 
-        subtitle.setWordWrap(True)
-
-        subtitle.setStyleSheet("""
-        QLabel {
-            color: #D7D0E9;
-            background: transparent;
-            font-size: 13px;
-            line-height: 150%;
-        }
-        """)
+        self.subtitle.setWordWrap(True)
 
         # =================================================
         # BUTTONS
@@ -181,122 +154,44 @@ class HeroBanner(QWidget):
         # EXPLORE BUTTON
         # -------------------------------------------------
 
-        explore = QPushButton(
+        self.explore_button = QPushButton(
             "Explore Music  →"
         )
 
-        explore.setCursor(
+        self.explore_button.setCursor(
             Qt.PointingHandCursor
         )
 
-        explore.setFixedHeight(44)
+        self.explore_button.setFixedHeight(44)
 
-        explore.setStyleSheet("""
-        QPushButton {
-
-            color: white;
-
-            background:
-                qlineargradient(
-                    x1:0,
-                    y1:0,
-                    x2:1,
-                    y2:1,
-                    stop:0 #A66BFF,
-                    stop:0.45 #8B5CF6,
-                    stop:1 #7138D4
-                );
-
-            border: 1px solid rgba(214,190,255,120);
-
-            border-radius: 13px;
-
-            padding: 0 22px;
-
-            font-size: 13px;
-
-            font-weight: 700;
-
-        }
-
-        QPushButton:hover {
-
-            background:
-                qlineargradient(
-                    x1:0,
-                    y1:0,
-                    x2:1,
-                    y2:1,
-                    stop:0 #B985FF,
-                    stop:0.5 #9F67FF,
-                    stop:1 #7C3AED
-                );
-
-            border: 1px solid rgba(235,220,255,180);
-
-        }
-
-        QPushButton:pressed {
-
-            background: #6D35C9;
-
-        }
-        """)
+        self.explore_button.clicked.connect(
+            self.explore_requested.emit
+        )
 
         # -------------------------------------------------
         # LIBRARY BUTTON
         # -------------------------------------------------
 
-        library = QPushButton(
+        self.library_button = QPushButton(
             "Open Library"
         )
 
-        library.setCursor(
+        self.library_button.setCursor(
             Qt.PointingHandCursor
         )
 
-        library.setFixedHeight(44)
+        self.library_button.setFixedHeight(44)
 
-        library.setStyleSheet("""
-        QPushButton {
-
-            color: #F3EEFF;
-
-            background: rgba(255,255,255,18);
-
-            border: 1px solid rgba(210,190,255,65);
-
-            border-radius: 13px;
-
-            padding: 0 22px;
-
-            font-size: 13px;
-
-            font-weight: 700;
-
-        }
-
-        QPushButton:hover {
-
-            background: rgba(155,110,255,35);
-
-            border: 1px solid rgba(190,155,255,120);
-
-        }
-
-        QPushButton:pressed {
-
-            background: rgba(120,75,210,45);
-
-        }
-        """)
-
-        buttons.addWidget(
-            explore
+        self.library_button.clicked.connect(
+            self.library_requested.emit
         )
 
         buttons.addWidget(
-            library
+            self.explore_button
+        )
+
+        buttons.addWidget(
+            self.library_button
         )
 
         buttons.addStretch()
@@ -306,25 +201,25 @@ class HeroBanner(QWidget):
         # =================================================
 
         left.addWidget(
-            eyebrow
+            self.eyebrow
         )
 
         left.addSpacing(6)
 
         left.addWidget(
-            title
+            self.title
         )
 
         left.addSpacing(2)
 
         left.addWidget(
-            frequency
+            self.frequency
         )
 
         left.addSpacing(2)
 
         left.addWidget(
-            subtitle
+            self.subtitle
         )
 
         left.addSpacing(12)
@@ -357,10 +252,6 @@ class HeroBanner(QWidget):
             Qt.AlignCenter
         )
 
-        # -------------------------------------------------
-        # IMAGE
-        # -------------------------------------------------
-
         self.image = QLabel()
 
         self.image.setAlignment(
@@ -372,12 +263,14 @@ class HeroBanner(QWidget):
             230
         )
 
-        self.image.setStyleSheet("""
-        QLabel {
-            background: transparent;
-            border: none;
-        }
-        """)
+        self.image.setStyleSheet(
+            """
+            QLabel {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
 
         if HEADPHONE_PATH.exists():
 
@@ -406,6 +299,201 @@ class HeroBanner(QWidget):
             2
         )
 
+        self.apply_theme()
+
+    # =====================================================
+    # THEME
+    # =====================================================
+
+    def set_theme_state(
+        self,
+        is_dark
+    ):
+
+        self.current_is_dark = bool(
+            is_dark
+        )
+
+        self.apply_theme()
+        self.update()
+
+    def apply_theme(self):
+
+        if self.current_is_dark:
+
+            self.eyebrow.setStyleSheet(
+                """
+                QLabel {
+                    color: #CDBBFF;
+                    background: transparent;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                }
+                """
+            )
+
+            self.title.setStyleSheet(
+                """
+                QLabel {
+                    color: white;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.frequency.setStyleSheet(
+                """
+                QLabel {
+                    color: #B993FF;
+                    background: transparent;
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+                """
+            )
+
+            self.subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #D7D0E9;
+                    background: transparent;
+                    font-size: 13px;
+                }
+                """
+            )
+
+            self.library_button.setStyleSheet(
+                """
+                QPushButton {
+                    color: #F3EEFF;
+                    background: rgba(255,255,255,18);
+                    border: 1px solid rgba(210,190,255,65);
+                    border-radius: 13px;
+                    padding: 0 22px;
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+
+                QPushButton:hover {
+                    background: rgba(155,110,255,35);
+                    border: 1px solid rgba(190,155,255,120);
+                }
+
+                QPushButton:pressed {
+                    background: rgba(120,75,210,45);
+                }
+                """
+            )
+
+        else:
+
+            self.eyebrow.setStyleSheet(
+                """
+                QLabel {
+                    color: #6D3EB3;
+                    background: transparent;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                }
+                """
+            )
+
+            self.title.setStyleSheet(
+                """
+                QLabel {
+                    color: #2D2140;
+                    background: transparent;
+                }
+                """
+            )
+
+            self.frequency.setStyleSheet(
+                """
+                QLabel {
+                    color: #6D3EB3;
+                    background: transparent;
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+                """
+            )
+
+            self.subtitle.setStyleSheet(
+                """
+                QLabel {
+                    color: #655B73;
+                    background: transparent;
+                    font-size: 13px;
+                }
+                """
+            )
+
+            self.library_button.setStyleSheet(
+                """
+                QPushButton {
+                    color: #4D3568;
+                    background: rgba(255,255,255,150);
+                    border: 1px solid rgba(104,64,160,65);
+                    border-radius: 13px;
+                    padding: 0 22px;
+                    font-size: 13px;
+                    font-weight: 700;
+                }
+
+                QPushButton:hover {
+                    background: rgba(255,255,255,210);
+                    border: 1px solid rgba(124,58,237,120);
+                }
+
+                QPushButton:pressed {
+                    background: rgba(235,226,246,235);
+                }
+                """
+            )
+
+        self.explore_button.setStyleSheet(
+            """
+            QPushButton {
+                color: white;
+                background:
+                    qlineargradient(
+                        x1:0,
+                        y1:0,
+                        x2:1,
+                        y2:1,
+                        stop:0 #A66BFF,
+                        stop:0.45 #8B5CF6,
+                        stop:1 #7138D4
+                    );
+                border: 1px solid rgba(214,190,255,120);
+                border-radius: 13px;
+                padding: 0 22px;
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            QPushButton:hover {
+                background:
+                    qlineargradient(
+                        x1:0,
+                        y1:0,
+                        x2:1,
+                        y2:1,
+                        stop:0 #B985FF,
+                        stop:0.5 #9F67FF,
+                        stop:1 #7C3AED
+                    );
+                border: 1px solid rgba(235,220,255,180);
+            }
+
+            QPushButton:pressed {
+                background: #6D35C9;
+            }
+            """
+        )
+
     # =====================================================
     # PAINT
     # =====================================================
@@ -419,10 +507,6 @@ class HeroBanner(QWidget):
         )
 
         rect = self.rect()
-
-        # =================================================
-        # MAIN HERO SHAPE
-        # =================================================
 
         hero_rect = rect.adjusted(
             1,
@@ -439,10 +523,6 @@ class HeroBanner(QWidget):
             28
         )
 
-        # =================================================
-        # PREMIUM BACKGROUND
-        # =================================================
-
         gradient = QLinearGradient(
             0,
             0,
@@ -450,34 +530,34 @@ class HeroBanner(QWidget):
             rect.height()
         )
 
-        gradient.setColorAt(
-            0.0,
-            QColor("#171128")
-        )
+        if self.current_is_dark:
 
-        gradient.setColorAt(
-            0.35,
-            QColor("#241642")
-        )
+            colors = [
+                (0.0, QColor("#171128")),
+                (0.35, QColor("#241642")),
+                (0.72, QColor("#432477")),
+                (1.0, QColor("#642CC1")),
+            ]
 
-        gradient.setColorAt(
-            0.72,
-            QColor("#432477")
-        )
+        else:
 
-        gradient.setColorAt(
-            1.0,
-            QColor("#642CC1")
-        )
+            colors = [
+                (0.0, QColor("#F3ECFA")),
+                (0.35, QColor("#E9DDF8")),
+                (0.72, QColor("#D7C2F1")),
+                (1.0, QColor("#C49CEB")),
+            ]
+
+        for stop, color in colors:
+            gradient.setColorAt(
+                stop,
+                color
+            )
 
         painter.fillPath(
             path,
             gradient
         )
-
-        # =================================================
-        # SOFT INNER GLOW
-        # =================================================
 
         painter.setPen(
             Qt.NoPen
@@ -498,10 +578,6 @@ class HeroBanner(QWidget):
             400,
             390
         )
-
-        # =================================================
-        # LIGHT GREY / LAVENDER IMAGE BACKDROP
-        # =================================================
 
         image_glow = QLinearGradient(
             rect.width() - 360,
@@ -551,10 +627,6 @@ class HeroBanner(QWidget):
             275
         )
 
-        # =================================================
-        # INNER PURPLE IMAGE RING
-        # =================================================
-
         painter.setBrush(
             QColor(
                 133,
@@ -570,10 +642,6 @@ class HeroBanner(QWidget):
             220,
             220
         )
-
-        # =================================================
-        # SOUND WAVES
-        # =================================================
 
         painter.setBrush(
             Qt.NoBrush
@@ -639,10 +707,6 @@ class HeroBanner(QWidget):
                 wave
             )
 
-        # =================================================
-        # SMALL SOUND WAVES
-        # =================================================
-
         for y, alpha in [
             (74, 55),
             (228, 45),
@@ -695,10 +759,6 @@ class HeroBanner(QWidget):
                 wave
             )
 
-        # =================================================
-        # MUSIC NOTES
-        # =================================================
-
         painter.setPen(
             QColor(
                 235,
@@ -740,10 +800,6 @@ class HeroBanner(QWidget):
             215,
             "♪"
         )
-
-        # =================================================
-        # PREMIUM BORDER
-        # =================================================
 
         border_pen = QPen(
             QColor(

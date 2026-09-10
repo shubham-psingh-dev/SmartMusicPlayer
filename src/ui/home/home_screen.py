@@ -60,6 +60,13 @@ class HomeScreen(QWidget):
     #
     online_search_requested = Signal(str)
 
+    # =========================================================
+    # DAY 23 - HERO NAVIGATION
+    # =========================================================
+
+    explore_music_requested = Signal()
+    library_requested = Signal()
+
     def __init__(self):
 
         super().__init__()
@@ -500,9 +507,75 @@ class HomeScreen(QWidget):
             QSizePolicy.Fixed
         )
 
+        # ==================================================
+        # DAY 23 - HERO NAVIGATION
+        # ==================================================
+
+        self.hero.explore_requested.connect(
+            self.explore_music_requested.emit
+        )
+
+        self.hero.library_requested.connect(
+            self.library_requested.emit
+        )
+
         self.content_layout.addWidget(
             self.hero
         )
+
+        # ==================================================
+        # HEADER
+        # ==================================================
+
+        if hasattr(
+            self,
+            "header"
+        ):
+
+            try:
+
+                if hasattr(
+                    self.header,
+                    "set_theme_state"
+                ):
+
+                    self.header.set_theme_state(
+                        self.current_is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "Header theme error:",
+                    error
+                )
+
+        # ==================================================
+        # HERO
+        # ==================================================
+
+        if hasattr(
+            self,
+            "hero"
+        ):
+
+            try:
+
+                if hasattr(
+                    self.hero,
+                    "set_theme_state"
+                ):
+
+                    self.hero.set_theme_state(
+                        self.current_is_dark
+                    )
+
+            except Exception as error:
+
+                print(
+                    "Hero theme error:",
+                    error
+                )
 
         # ==================================================
         # NOW PLAYING

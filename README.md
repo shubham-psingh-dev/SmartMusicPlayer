@@ -165,5 +165,7 @@ These commands are connected to the actual LYRx audio player.
 
 - [x] Day 22 - Finalize YT Box discovery and official playback fallback
 - [x] Day 23 - Add Firebase authentication and Google sign-in
+- [x] Day 24 - Firebase phone OTP authentication
+
 
 Version: LYRx Alpha 1.0

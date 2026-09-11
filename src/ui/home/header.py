@@ -10,6 +10,7 @@ from PySide6.QtCore import (
     Signal,
     QSettings,
     QSize,
+    QThread,
 )
 
 from PySide6.QtGui import (
@@ -41,7 +42,7 @@ from PySide6.QtWidgets import (
 
 # ============================================================
 # LYRx
-# DAY 23 - FIREBASE VERIFIED EMAIL + GOOGLE AUTH ACCOUNT HEADER
+# DAY 24 - FIREBASE EMAIL + GOOGLE + REAL PHONE OTP AUTH
 #
 # PATH:
 # src/ui/home/header.py
@@ -678,6 +679,52 @@ class LocalProfileStore:
         )
 
     # ========================================================
+    # REAL FIREBASE PHONE OTP
+    # ========================================================
+
+    def request_phone_otp(
+        self,
+        phone_number: str
+    ):
+
+        return self.auth.request_phone_otp(
+            phone_number
+        )
+
+    def verify_phone_otp(
+        self,
+        verification_id: str,
+        otp: str,
+        phone_number: str = ""
+    ):
+
+        result = self.auth.verify_phone_otp(
+            verification_id,
+            otp
+        )
+
+        if (
+            result.success
+            and
+            result.user
+        ):
+
+            # Phone-only Firebase accounts do not have an email/name by
+            # default, so give the desktop profile a clean fallback name.
+            self._ensure_user_profile(
+                preferred_name="LYRx User"
+            )
+
+            if phone_number:
+                self.settings.setValue(
+                    "profile/last_phone",
+                    str(phone_number).strip()
+                )
+                self.settings.sync()
+
+        return result
+
+    # ========================================================
     # SIGN OUT
     # ========================================================
 
@@ -901,6 +948,42 @@ class PasswordField(QWidget):
 
 
 # ============================================================
+# PHONE OTP BROWSER WORKER
+# ============================================================
+
+class PhoneOtpRequestWorker(QThread):
+
+    result_ready = Signal(object)
+
+    def __init__(
+        self,
+        store: LocalProfileStore,
+        phone_number: str,
+        parent=None
+    ):
+
+        super().__init__(parent)
+        self.store = store
+        self.phone_number = phone_number
+
+    def run(self):
+
+        try:
+            result = self.store.request_phone_otp(
+                self.phone_number
+            )
+        except Exception as exc:
+            from services.auth.phone_auth import PhoneVerificationResult
+
+            result = PhoneVerificationResult(
+                False,
+                f"Phone verification failed: {exc}"
+            )
+
+        self.result_ready.emit(result)
+
+
+# ============================================================
 # ACCOUNT DIALOG
 # ============================================================
 
@@ -926,6 +1009,9 @@ class AccountDialog(QDialog):
         )
 
         self.otp_requested = False
+        self.phone_verification_id = ""
+        self.pending_phone_number = ""
+        self.phone_worker = None
 
         # Pending Firebase email/password signup.
         # This stays in memory until the user verifies the email.
@@ -1588,8 +1674,8 @@ class AccountDialog(QDialog):
         )
 
         info = QLabel(
-            "Enter your mobile number. "
-            "OTP verification appears after Send OTP."
+            "Enter your mobile number. LYRx opens a secure browser "
+            "window for Firebase reCAPTCHA before requesting the OTP."
         )
 
         info.setObjectName(
@@ -2572,28 +2658,69 @@ class AccountDialog(QDialog):
             .split()[-1]
         )
 
-        full_number = (
-            f"{code}{digits}"
+        full_number = f"{code}{digits}"
+
+        self.pending_phone_number = full_number
+        self.phone_verification_id = ""
+        self.otp_requested = False
+        self.otp_container.hide()
+
+        self.send_otp_button.setEnabled(False)
+        self.send_otp_button.setText("Opening Firebase...")
+        self.phone_status.setText(
+            "Opening secure Firebase phone verification in your browser. "
+            "Complete the reCAPTCHA there, then return to LYRx."
         )
+
+        self.phone_worker = PhoneOtpRequestWorker(
+            self.store,
+            full_number,
+            self
+        )
+
+        self.phone_worker.result_ready.connect(
+            self._phone_otp_request_finished
+        )
+
+        self.phone_worker.finished.connect(
+            self.phone_worker.deleteLater
+        )
+
+        self.phone_worker.start()
+
+    def _phone_otp_request_finished(self, result):
+
+        self.send_otp_button.setEnabled(True)
+        self.send_otp_button.setText("Resend OTP")
+
+        if not result.success:
+            self.otp_requested = False
+            self.phone_verification_id = ""
+            self.otp_container.hide()
+            self.phone_status.setText(result.message)
+            return
+
+        self.phone_verification_id = str(
+            result.verification_id
+            or ""
+        ).strip()
+
+        if not self.phone_verification_id:
+            self.phone_status.setText(
+                "Firebase did not return a phone verification session."
+            )
+            return
 
         self.otp_requested = True
-
         self.otp_container.show()
-
-        self.send_otp_button.setText(
-            "Resend OTP"
-        )
+        self.stack.setMinimumHeight(420)
 
         self.phone_status.setText(
-            f"OTP step opened for {full_number}.\n"
-            "Real SMS delivery requires a configured "
-            "authentication provider."
+            f"Firebase accepted {self.pending_phone_number}. "
+            "Enter the 6-digit OTP to finish sign-in."
         )
 
-        self.stack.setMinimumHeight(
-            420
-        )
-
+        self.otp_input.clear()
         self.otp_input.setFocus()
 
         self.scroll.ensureWidgetVisible(
@@ -2613,27 +2740,59 @@ class AccountDialog(QDialog):
         if (
             not self.otp_requested
             or
+            not self.phone_verification_id
+            or
             len(otp) != 6
             or
             not otp.isdigit()
         ):
 
             self.phone_status.setText(
-                "Enter a valid 6-digit OTP."
+                "Enter a valid 6-digit OTP after requesting the code."
             )
-
             return
+
+        self.verify_otp_button.setEnabled(False)
+        self.verify_otp_button.setText("Verifying...")
+        self.phone_status.setText(
+            "Verifying OTP securely with Firebase..."
+        )
+
+        try:
+            result = self.store.verify_phone_otp(
+                self.phone_verification_id,
+                otp,
+                self.pending_phone_number
+            )
+        except Exception as exc:
+            self.verify_otp_button.setEnabled(True)
+            self.verify_otp_button.setText("Verify OTP")
+            self.phone_status.setText(
+                f"Phone verification error: {exc}"
+            )
+            return
+
+        self.verify_otp_button.setEnabled(True)
+        self.verify_otp_button.setText("Verify OTP")
+
+        if not result.success:
+            self.phone_status.setText(result.message)
+            return
+
+        self.phone_status.setText(
+            "Phone verified. Signed in to LYRx successfully."
+        )
+
+        self.refresh_account_state()
+        self.profile_changed.emit()
 
         QMessageBox.information(
             self,
             "LYRx Phone Verification",
-            (
-                "OTP interface is ready.\n\n"
-                "Real SMS verification will be enabled "
-                "after a production authentication provider "
-                "is connected."
-            )
+            "Phone verification successful. Welcome to LYRx."
         )
+
+        self.accept()
 
     # ========================================================
     # TABS

@@ -13,6 +13,7 @@ class SessionManager:
         self.settings.setValue("auth/email", user.email)
         self.settings.setValue("auth/display_name", user.display_name)
         self.settings.setValue("auth/photo_url", user.photo_url)
+        self.settings.setValue("auth/phone_number", user.phone_number)
         self.settings.setValue("auth/id_token", user.id_token)
         self.settings.setValue("auth/refresh_token", user.refresh_token)
         self.settings.setValue("auth/expires_in", user.expires_in)
@@ -36,6 +37,7 @@ class SessionManager:
             email=str(self.settings.value("auth/email", "") or ""),
             display_name=str(self.settings.value("auth/display_name", "") or ""),
             photo_url=str(self.settings.value("auth/photo_url", "") or ""),
+            phone_number=str(self.settings.value("auth/phone_number", "") or ""),
             id_token=str(self.settings.value("auth/id_token", "") or ""),
             refresh_token=str(self.settings.value("auth/refresh_token", "") or ""),
             expires_in=int(self.settings.value("auth/expires_in", 3600) or 3600),
@@ -51,6 +53,7 @@ class SessionManager:
             "auth/email",
             "auth/display_name",
             "auth/photo_url",
+            "auth/phone_number",
             "auth/id_token",
             "auth/refresh_token",
             "auth/expires_in",

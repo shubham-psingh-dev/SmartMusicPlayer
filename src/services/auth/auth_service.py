@@ -5,6 +5,7 @@ from typing import Optional
 from .auth_models import AuthResult, AuthUser
 from .firebase_auth import FirebaseAuthService
 from .google_auth import GoogleAuthService
+from .phone_auth import PhoneAuthService, PhoneVerificationResult
 from .session_manager import SessionManager
 
 
@@ -13,6 +14,7 @@ class AuthService:
     def __init__(self):
         self.firebase = FirebaseAuthService()
         self.google = GoogleAuthService()
+        self.phone = PhoneAuthService()
         self.session = SessionManager()
 
     # =========================================================
@@ -47,9 +49,6 @@ class AuthService:
                 result.user,
             )
 
-        # IMPORTANT:
-        # Do not create an active LYRx session yet. The account becomes
-        # active only after the user clicks the Firebase verification link.
         return AuthResult(
             True,
             "Account created. Verification email sent.",
@@ -67,7 +66,7 @@ class AuthService:
         return self.firebase.send_email_verification(user.id_token)
 
     # =========================================================
-    # CHECK VERIFICATION + ACTIVATE SESSION
+    # CHECK EMAIL VERIFICATION + ACTIVATE SESSION
     # =========================================================
 
     def check_email_verification(self, user: AuthUser) -> AuthResult:
@@ -79,10 +78,7 @@ class AuthService:
         if not result.success or not result.user:
             return result
 
-        result.user.display_name = (
-            user.display_name
-            or result.user.display_name
-        )
+        result.user.display_name = user.display_name or result.user.display_name
         result.user.refresh_token = user.refresh_token
         result.user.expires_in = user.expires_in
 
@@ -112,7 +108,6 @@ class AuthService:
             return result
 
         if not result.user.email_verified:
-            # Do not keep an unverified email/password account signed in.
             return AuthResult(
                 False,
                 "Your email is not verified yet. Verify it from your inbox, then sign in again.",
@@ -121,11 +116,7 @@ class AuthService:
 
         self.session.save_user(result.user)
 
-        return AuthResult(
-            True,
-            "Signed in successfully.",
-            result.user,
-        )
+        return AuthResult(True, "Signed in successfully.", result.user)
 
     # =========================================================
     # GOOGLE SIGN IN
@@ -144,7 +135,6 @@ class AuthService:
         if not firebase_result.success or not firebase_result.user:
             return firebase_result
 
-        # Google handles identity verification during OAuth.
         firebase_result.user.email_verified = True
         self.session.save_user(firebase_result.user)
 
@@ -152,6 +142,34 @@ class AuthService:
             True,
             "Google Sign-In successful.",
             firebase_result.user,
+        )
+
+    # =========================================================
+    # PHONE OTP SIGN IN
+    # =========================================================
+
+    def request_phone_otp(self, phone_number: str) -> PhoneVerificationResult:
+        return self.phone.start_verification(phone_number)
+
+    def verify_phone_otp(
+        self,
+        verification_id: str,
+        otp: str,
+    ) -> AuthResult:
+        result = self.firebase.sign_in_with_phone_number(
+            verification_id,
+            otp,
+        )
+
+        if not result.success or not result.user:
+            return result
+
+        self.session.save_user(result.user)
+
+        return AuthResult(
+            True,
+            "Phone verification successful.",
+            result.user,
         )
 
     # =========================================================

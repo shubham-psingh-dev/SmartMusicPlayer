@@ -199,6 +199,7 @@ class FirebaseAuthService:
             email=str(raw.get("email", "") or ""),
             display_name=str(raw.get("displayName", "") or provider_display_name),
             photo_url=str(raw.get("photoUrl", "") or provider_photo_url),
+            phone_number=str(raw.get("phoneNumber", "") or ""),
             id_token=id_token,
             refresh_token="",
             expires_in=3600,
@@ -233,6 +234,53 @@ class FirebaseAuthService:
         return AuthResult(True, "Password reset email sent.")
 
     # =========================================================
+    # PHONE OTP -> FIREBASE
+    # =========================================================
+
+    def sign_in_with_phone_number(
+        self,
+        session_info: str,
+        code: str,
+    ) -> AuthResult:
+        session_info = str(session_info or "").strip()
+        code = str(code or "").strip()
+
+        if not session_info:
+            return AuthResult(False, "Phone verification session is missing.")
+
+        if len(code) != 6 or not code.isdigit():
+            return AuthResult(False, "Enter a valid 6-digit OTP.")
+
+        result = self._auth_request(
+            endpoint="accounts:signInWithPhoneNumber",
+            payload={
+                "sessionInfo": session_info,
+                "code": code,
+            },
+            success_message="Phone verified successfully.",
+        )
+
+        if not result.success or not result.user:
+            return result
+
+        lookup = self.lookup_account(result.user.id_token)
+
+        if lookup.success and lookup.user:
+            lookup.user.refresh_token = result.user.refresh_token
+            lookup.user.expires_in = result.user.expires_in
+            lookup.user.phone_number = (
+                lookup.user.phone_number
+                or result.user.phone_number
+            )
+            return AuthResult(
+                True,
+                "Phone verified successfully.",
+                lookup.user,
+            )
+
+        return result
+
+    # =========================================================
     # REFRESH FIREBASE TOKEN
     # =========================================================
 
@@ -265,6 +313,7 @@ class FirebaseAuthService:
             email="",
             display_name="",
             photo_url="",
+            phone_number="",
             id_token=str(data.get("id_token", "") or ""),
             refresh_token=str(data.get("refresh_token", refresh_token) or refresh_token),
             expires_in=int(data.get("expires_in", 3600) or 3600),
@@ -305,6 +354,7 @@ class FirebaseAuthService:
             email=str(data.get("email", "") or ""),
             display_name=str(data.get("displayName", "") or ""),
             photo_url=str(data.get("photoUrl", "") or ""),
+            phone_number=str(data.get("phoneNumber", "") or ""),
             id_token=str(data.get("idToken", "") or ""),
             refresh_token=str(data.get("refreshToken", "") or ""),
             expires_in=int(data.get("expiresIn", 3600) or 3600),
@@ -340,6 +390,15 @@ class FirebaseAuthService:
             "FEDERATED_USER_ID_ALREADY_LINKED": "This Google account is already linked to another user.",
             "INVALID_IDP_RESPONSE": "Google authentication could not be verified.",
             "INVALID_PENDING_TOKEN": "Google authentication could not be verified.",
+            "INVALID_PHONE_NUMBER": "Enter a valid phone number with country code.",
+            "MISSING_PHONE_NUMBER": "Enter your phone number.",
+            "INVALID_CODE": "The OTP is incorrect. Please try again.",
+            "MISSING_CODE": "Enter the 6-digit OTP.",
+            "SESSION_EXPIRED": "This OTP session expired. Request a new OTP.",
+            "INVALID_SESSION_INFO": "This phone verification session is invalid. Request a new OTP.",
+            "MISSING_SESSION_INFO": "Phone verification session is missing.",
+            "QUOTA_EXCEEDED": "Firebase SMS quota has been exceeded. Try again later.",
+            "CAPTCHA_CHECK_FAILED": "Firebase reCAPTCHA verification failed. Please try again.",
         }
 
         return friendly.get(code, raw_message.replace("_", " ").capitalize())

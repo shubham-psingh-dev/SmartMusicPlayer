@@ -1,8 +1,10 @@
 <p align="center">
-<img src="assets/icons/logo/LYRx.png" width="170">
+<img src="assets/icons/logo/LYRx_symbol.png" width="170">
 </p>
 
-<h1 align="center">🎵 LYRx</h1>
+<h1 align="center">
+<img src="assets/icons/logo/LYRx_wordmark.png" width="170">
+</h1>
 
 <p align="center">
 A futuristic offline desktop music player built with Python & PySide6.
@@ -166,6 +168,52 @@ These commands are connected to the actual LYRx audio player.
 - [x] Day 22 - Finalize YT Box discovery and official playback fallback
 - [x] Day 23 - Add Firebase authentication and Google sign-in
 - [x] Day 24 - Firebase phone OTP authentication
+- [x] Day 25 - Professional Settings & Personalization
+
+### Implemented
+
+- Category-based Settings dashboard with dedicated detail pages and back navigation
+- Firebase-aware Profile & Account screen
+- Editable first name, last name, date of birth, gender and profile photo
+- Per-user local profile persistence using Firebase UID
+- Change/remove profile photo with LYRx-styled confirmation dialogs
+- Dark/light appearance controls with animated custom toggle switches
+- Compact-layout preference persistence
+- Playback preferences connected to the real player:
+  - Autoplay
+  - Gapless transition behavior
+  - Crossfade-style fade transitions
+  - Volume-normalization preference groundwork
+- Audio/network preferences:
+  - Streaming quality preference
+  - Data Saver mode
+  - Provider-aware source selection where supported
+  - Reduced online artwork fetching in Data Saver mode
+- Downloads & Storage groundwork:
+  - Configurable download directory
+  - Open download directory
+  - Real cache directory
+  - Cache-size reporting
+  - Clear-cache action
+- Privacy & Security:
+  - Private listening preference
+  - Firebase account-security shortcut
+  - Privacy Policy link
+- Notifications:
+  - Music recommendation preference
+  - Application update preference
+  - Windows desktop test notification
+- Language & Region:
+  - English current UI
+  - Persistent region preference
+  - Internationalization-ready roadmap
+- Accessibility:
+  - Reduce Motion behavior
+  - Larger Settings text
+- About LYRx:
+  - Version/build information
+  - Technology information
+  - Website, Privacy Policy and Terms links
 
 
 Version: LYRx Alpha 1.0

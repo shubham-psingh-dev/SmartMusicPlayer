@@ -53,6 +53,9 @@ from PySide6.QtWidgets import (
 # LOCAL PROFILE STORE
 # ============================================================
 
+AVATAR_REMOVED_SENTINEL = "__LYRX_AVATAR_REMOVED__"
+
+
 class LocalProfileStore:
     """
     UI/profile adapter for LYRx.
@@ -348,13 +351,18 @@ class LocalProfileStore:
         if not key:
             return ""
 
-        return str(
+        value = str(
             self.settings.value(
                 key,
                 ""
             )
             or ""
         ).strip()
+
+        if value == AVATAR_REMOVED_SENTINEL:
+            return ""
+
+        return value
 
     def set_avatar_path(
         self,
@@ -381,6 +389,16 @@ class LocalProfileStore:
             avatar_path
         )
 
+        removed_key = self._user_key(
+            "avatar_removed"
+        )
+
+        if removed_key:
+            self.settings.setValue(
+                removed_key,
+                False
+            )
+
         self.settings.sync()
 
     def remove_avatar(self):
@@ -395,10 +413,23 @@ class LocalProfileStore:
         if not key:
             return
 
+        # Store an explicit sentinel instead of an empty value.
+        # Empty used to trigger legacy-avatar migration again, which
+        # made a removed photo instantly reappear.
         self.settings.setValue(
             key,
-            ""
+            AVATAR_REMOVED_SENTINEL
         )
+
+        removed_key = self._user_key(
+            "avatar_removed"
+        )
+
+        if removed_key:
+            self.settings.setValue(
+                removed_key,
+                True
+            )
 
         self.settings.sync()
 

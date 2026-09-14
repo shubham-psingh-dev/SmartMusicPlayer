@@ -2,6 +2,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
     QUrl,
+    QSettings,
 )
 
 from PySide6.QtGui import (
@@ -43,6 +44,7 @@ from ui.yt_box.yt_box_screen import YTBoxScreen
 from widgets.sidebar import Sidebar
 from data.playlist_store import playlist_store
 from services.youtube_service import youtube_service
+from ui.settings.settings_screen import SettingsScreen
 
 from core.theme_manager import ThemeManager
 
@@ -1332,17 +1334,40 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
-        # SETTINGS
+        # DAY 25 - SETTINGS
         # ====================================================
 
-        self.settings = BasicPage(
-            "Settings",
-            "Customize your LYRx experience.",
-            "⚙"
+        self.settings = SettingsScreen()
+
+        self.settings.account_requested.connect(
+            self.open_settings_account
+        )
+
+        self.settings.theme_requested.connect(
+            self.set_theme_from_settings
+        )
+
+        # Settings profile editor -> refresh shared Home header
+        # and the Settings profile card immediately.
+        self.settings.profile_updated.connect(
+            self.sync_profile_from_settings
+        )
+
+        # DAY 25 - Playback settings become live immediately.
+        self.settings.settings_changed.connect(
+            self.apply_playback_settings
         )
 
         self.pages.addWidget(
             self.settings
+        )
+
+        # ====================================================
+        # DAY 25 - LIVE PROFILE SYNC
+        # ====================================================
+
+        self.home.header.profile_changed.connect(
+            self.sync_settings_profile
         )
 
         # ====================================================
@@ -1576,6 +1601,12 @@ class AppWindow(QMainWindow):
             )
 
         # ====================================================
+        # DAY 25 - APPLY SAVED PLAYBACK SETTINGS
+        # ====================================================
+
+        self.apply_playback_settings()
+
+        # ====================================================
         # START HOME
         # ====================================================
 
@@ -1592,6 +1623,108 @@ class AppWindow(QMainWindow):
         # ====================================================
 
         self.apply_theme()
+
+    # ========================================================
+    # DAY 25 - LIVE PLAYBACK SETTINGS
+    # ========================================================
+
+    def apply_playback_settings(
+        self,
+        *_
+    ):
+
+        try:
+
+            prefs = QSettings(
+                "LYRx",
+                "LYRxDesktop"
+            )
+
+            autoplay = prefs.value(
+                "settings/autoplay",
+                True,
+                type=bool
+            )
+
+            gapless = prefs.value(
+                "settings/gapless",
+                True,
+                type=bool
+            )
+
+            normalize_volume = prefs.value(
+                "settings/normalize_volume",
+                True,
+                type=bool
+            )
+
+            streaming_quality = str(
+                prefs.value(
+                    "settings/streaming_quality",
+                    "Automatic"
+                )
+                or "Automatic"
+            )
+
+            data_saver = prefs.value(
+                "settings/data_saver",
+                False,
+                type=bool
+            )
+
+            try:
+                crossfade = int(
+                    prefs.value(
+                        "settings/crossfade",
+                        0
+                    )
+                    or 0
+                )
+            except (TypeError, ValueError):
+                crossfade = 0
+
+            player = self.home.now_playing
+
+            if hasattr(
+                player,
+                "set_playback_preferences"
+            ):
+
+                player.set_playback_preferences(
+                    autoplay=autoplay,
+                    gapless=gapless,
+                    normalize_volume=normalize_volume,
+                    crossfade_seconds=crossfade,
+                )
+
+            if hasattr(
+                player,
+                "set_network_preferences"
+            ):
+
+                player.set_network_preferences(
+                    streaming_quality=streaming_quality,
+                    data_saver=data_saver,
+                )
+
+            print(
+                "LYRx live playback preferences applied:",
+                {
+                    "autoplay": autoplay,
+                    "gapless": gapless,
+                    "crossfade": crossfade,
+                    "normalize_volume": normalize_volume,
+                    "streaming_quality": streaming_quality,
+                    "data_saver": data_saver,
+                }
+            )
+
+        except Exception as error:
+
+            print(
+                "Playback settings apply error:",
+                error
+            )
 
     # ========================================================
     # THEME → ALL PAGES
@@ -1939,6 +2072,27 @@ class AppWindow(QMainWindow):
             except Exception:
 
                 pass
+
+        # ====================================================
+        # DAY 25 - SETTINGS REFRESH
+        # ====================================================
+
+        if page_name == "Settings":
+
+            try:
+
+                self.settings.refresh_profile()
+
+                self.settings.show_page(
+                    self.settings.MENU
+                )
+
+            except Exception as error:
+
+                print(
+                    "Settings refresh error:",
+                    error
+                )
 
         # ====================================================
         # CHANGE PAGE
@@ -3519,6 +3673,103 @@ class AppWindow(QMainWindow):
             except Exception:
 
                 pass
+
+    # ========================================================
+    # DAY 25 - SETTINGS ACCOUNT
+    # ========================================================
+
+    def open_settings_account(
+        self
+    ):
+
+        try:
+
+            # Use the SAME account dialog as the Home header.
+            # This avoids creating a second authentication/profile system.
+            self.home.header.open_account()
+
+            # Safety refresh after dialog closes.
+            self.home.header.refresh_profile()
+
+            self.settings.refresh_profile()
+
+        except Exception as error:
+
+            print(
+                "Settings account error:",
+                error
+            )
+
+    # ========================================================
+    # DAY 25 - SETTINGS THEME
+    # ========================================================
+
+    def set_theme_from_settings(
+        self,
+        is_dark: bool,
+    ):
+
+        try:
+
+            current_is_dark = (
+                self.theme_manager.current_theme
+                == ThemeManager.DARK
+            )
+
+            if current_is_dark != bool(is_dark):
+                self.theme_manager.toggle()
+
+        except Exception as error:
+
+            print(
+                "Settings theme error:",
+                error
+            )
+
+    # ========================================================
+    # DAY 25 - LIVE SETTINGS PROFILE SYNC
+    # ========================================================
+
+    def sync_settings_profile(
+        self,
+        *_,
+    ):
+
+        try:
+
+            self.settings.refresh_profile()
+
+        except Exception as error:
+
+            print(
+                "Settings live profile sync error:",
+                error
+            )
+
+    # ========================================================
+    # DAY 25 - SETTINGS -> HEADER PROFILE SYNC
+    # ========================================================
+
+    def sync_profile_from_settings(
+        self
+    ):
+
+        try:
+
+            # Header uses the same LocalProfileStore / QSettings
+            # keys, so one refresh is enough to pick up the new
+            # display name and avatar saved by Settings.
+            self.home.header.refresh_profile()
+
+            # Safety refresh for the Settings menu/profile card.
+            self.settings.refresh_profile()
+
+        except Exception as error:
+
+            print(
+                "Settings profile update sync error:",
+                error
+            )
 
     # ========================================================
     # FLOATING PLAY / PAUSE

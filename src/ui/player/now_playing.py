@@ -146,6 +146,31 @@ class NowPlaying(QWidget):
         self.is_shuffle = False
         self.is_repeat = False
 
+        # ========================================================
+        # DAY 25 - PLAYBACK SETTINGS
+        # ========================================================
+
+        self.autoplay_enabled = True
+        self.gapless_enabled = True
+        self.normalize_volume_enabled = True
+
+        # DAY 25 - ONLINE AUDIO / DATA SAVER SETTINGS
+        self.streaming_quality_preference = "Automatic"
+        self.data_saver_enabled = False
+
+        self.crossfade_seconds = 0
+
+        # User-selected output level. Crossfade transitions temporarily
+        # change QAudioOutput volume and then restore this value.
+        self.user_volume = 0.75
+
+        self._fade_mode = None
+        self._fade_step = 0
+        self._fade_total_steps = 1
+        self._fade_started_for_track = False
+        self._fade_in_pending = False
+        self._transition_in_progress = False
+
         self.current_image_path = ""
         self.current_title = ""
         self.current_artist = ""
@@ -185,7 +210,16 @@ class NowPlaying(QWidget):
         self.audio_player = QMediaPlayer(self)
         self.audio_output = QAudioOutput(self)
         self.audio_player.setAudioOutput(self.audio_output)
-        self.audio_output.setVolume(0.75)
+        self.audio_output.setVolume(self.user_volume)
+
+        # DAY 25 - one lightweight timer handles fade-out/fade-in.
+        # This gives LYRx a smooth crossfade-style transition while
+        # keeping the existing single QMediaPlayer architecture intact.
+        self.fade_timer = QTimer(self)
+        self.fade_timer.setInterval(40)
+        self.fade_timer.timeout.connect(
+            self._process_fade_step
+        )
 
         # ========================================================
         # ONLINE COVER ART NETWORK MANAGER
@@ -1223,6 +1257,9 @@ class NowPlaying(QWidget):
 
     def load_online_thumbnail(self, image_url, label):
 
+        if self.data_saver_enabled:
+            return
+
         image_url = str(image_url or "").strip()
         if not image_url:
             return
@@ -1287,6 +1324,16 @@ class NowPlaying(QWidget):
         self,
         image_url
     ):
+
+        if self.data_saver_enabled:
+
+            self.album.clear()
+
+            self.album.setText(
+                "♫"
+            )
+
+            return
 
         image_url = str(
             image_url or ""
@@ -1430,6 +1477,8 @@ class NowPlaying(QWidget):
 
             return
 
+        self._prepare_new_track_transition()
+
         # ====================================================
         # ONLINE MODE
         # ====================================================
@@ -1470,66 +1519,22 @@ class NowPlaying(QWidget):
         )
 
         # ====================================================
-        # DAY 21 - UNIFIED ONLINE PLAYABLE URL
+        # DAY 25 - PROVIDER-AWARE ONLINE STREAM SELECTION
         # ====================================================
         #
-        # Jamendo songs normally expose:
-        #     song.audio_url
+        # Streaming Quality:
+        #     uses provider quality variants when exposed.
         #
-        # iTunes songs normally expose:
-        #     song.preview_url
+        # Data Saver:
+        #     prefers preview / low-bandwidth variants when available.
         #
-        # Provider Song objects may expose:
-        #     song.playable_url()
-        #
-        # IMPORTANT:
-        # A song clicked directly in Discover was already normalized
-        # by AppWindow. Songs selected later from Next Up / Next /
-        # Previous were not, so iTunes queue items could have an
-        # empty audio_url even though preview_url was valid. Resolve
-        # the playable source here as the final playback boundary.
+        # Fallback:
+        #     existing playable_url / audio_url / preview_url.
         # ====================================================
 
-        audio_url = ""
-
-        try:
-
-            if hasattr(
-                song,
-                "playable_url"
-            ):
-
-                audio_url = str(
-                    song.playable_url()
-                    or ""
-                ).strip()
-
-        except Exception as error:
-
-            print(
-                "NowPlaying playable URL resolve error:",
-                error
-            )
-
-            audio_url = ""
-
-        if not audio_url:
-
-            audio_url = str(
-                getattr(
-                    song,
-                    "audio_url",
-                    ""
-                )
-                or
-                getattr(
-                    song,
-                    "preview_url",
-                    ""
-                )
-                or
-                ""
-            ).strip()
+        audio_url = self._preferred_online_audio_url(
+            song
+        )
 
         # Keep the currently selected queue item compatible with
         # the older Day 19 playback layer.
@@ -2030,6 +2035,12 @@ class NowPlaying(QWidget):
 
             self.online_retry_count = 0
 
+            # If the previous song faded out into this one, bring the
+            # new track smoothly back to the user's chosen volume.
+            if self._fade_in_pending:
+                self._fade_in_pending = False
+                self._start_fade_in()
+
         self.play_state_changed.emit(
             playing
         )
@@ -2044,6 +2055,8 @@ class NowPlaying(QWidget):
         title,
         artist
     ):
+
+        self._prepare_new_track_transition()
 
         self.playback_source = "local"
 
@@ -2207,20 +2220,36 @@ class NowPlaying(QWidget):
             False
         )
 
-        # ====================================================
-        # NEXT SONG BASED ON ACTIVE SOURCE
-        # ====================================================
+        # Autoplay OFF means the finished song simply stops.
+        if not self.autoplay_enabled:
+            self._cancel_fade(restore_volume=True)
+            return
 
-        if (
-            self.playback_source == "online"
-            and self.online_queue
-        ):
+        # If a fade-out was already running and the backend reached
+        # EndOfMedia first, finish the transition exactly once.
+        if self._fade_mode == "out":
+            self.fade_timer.stop()
+            self._fade_mode = None
+            self.audio_output.setVolume(0.0)
+            self._fade_in_pending = (
+                self.crossfade_seconds > 0
+            )
+            self._transition_in_progress = True
+            self._request_next_track()
+            return
 
-            self.play_online_next()
+        if self._transition_in_progress:
+            return
 
+        # Gapless ON advances immediately. With Gapless OFF we leave a
+        # small intentional pause so the setting has real audible effect.
+        if self.gapless_enabled:
+            self._request_next_track()
         else:
-
-            self.next_requested.emit()
+            QTimer.singleShot(
+                320,
+                self._request_next_track
+            )
 
     # ========================================================
     # PLAY / PAUSE
@@ -2346,6 +2375,11 @@ class NowPlaying(QWidget):
             total
         )
 
+        self._check_crossfade_transition(
+            position,
+            duration
+        )
+
     # ========================================================
     # SEEK AUDIO
     # ========================================================
@@ -2364,7 +2398,377 @@ class NowPlaying(QWidget):
     # ========================================================
 
     def change_volume(self, value):
-        self.audio_output.setVolume(value / 100)
+        self.user_volume = max(
+            0.0,
+            min(1.0, value / 100)
+        )
+
+        # Do not fight the fade timer while a transition is running.
+        if self._fade_mode is None:
+            self.audio_output.setVolume(
+                self.user_volume
+            )
+
+    # ========================================================
+    # DAY 25 - PLAYBACK SETTINGS API
+    # ========================================================
+
+    def set_playback_preferences(
+        self,
+        autoplay=True,
+        gapless=True,
+        normalize_volume=True,
+        crossfade_seconds=0,
+    ):
+        self.autoplay_enabled = bool(autoplay)
+        self.gapless_enabled = bool(gapless)
+        self.normalize_volume_enabled = bool(
+            normalize_volume
+        )
+
+        try:
+            seconds = int(crossfade_seconds)
+        except (TypeError, ValueError):
+            seconds = 0
+
+        self.crossfade_seconds = max(
+            0,
+            min(12, seconds)
+        )
+
+        if (
+            not self.autoplay_enabled
+            or self.crossfade_seconds <= 0
+        ):
+            self._cancel_fade(
+                restore_volume=True
+            )
+
+        print(
+            "LYRx playback settings:",
+            f"autoplay={self.autoplay_enabled}",
+            f"gapless={self.gapless_enabled}",
+            f"crossfade={self.crossfade_seconds}s",
+            f"normalize={self.normalize_volume_enabled}"
+        )
+
+    # ========================================================
+    # DAY 25 - ONLINE AUDIO / DATA SAVER SETTINGS
+    # ========================================================
+
+    def set_network_preferences(
+        self,
+        streaming_quality="Automatic",
+        data_saver=False,
+    ):
+        allowed = {
+            "Automatic",
+            "Low",
+            "Normal",
+            "High",
+            "Very High",
+        }
+
+        quality = str(
+            streaming_quality
+            or "Automatic"
+        ).strip()
+
+        if quality not in allowed:
+            quality = "Automatic"
+
+        self.streaming_quality_preference = quality
+        self.data_saver_enabled = bool(
+            data_saver
+        )
+
+        print(
+            "LYRx network settings:",
+            f"quality={self.streaming_quality_preference}",
+            f"data_saver={self.data_saver_enabled}",
+        )
+
+    def _song_value(
+        self,
+        song,
+        name,
+    ):
+        try:
+            if isinstance(
+                song,
+                dict
+            ):
+                return song.get(
+                    name,
+                    ""
+                )
+
+            return getattr(
+                song,
+                name,
+                ""
+            )
+        except Exception:
+            return ""
+
+    def _preferred_online_audio_url(
+        self,
+        song,
+    ):
+        """
+        Provider-aware stream selection.
+
+        Existing LYRx providers often expose one playable URL only.
+        If future/current Song objects expose quality variants, this
+        method immediately honours the selected quality without
+        changing the rest of the player.
+        """
+
+        quality = self.streaming_quality_preference
+
+        quality_fields = {
+            "Low": [
+                "audio_url_low",
+                "low_quality_url",
+                "preview_url",
+            ],
+            "Normal": [
+                "audio_url_normal",
+                "audio_url_medium",
+                "preview_url",
+            ],
+            "High": [
+                "audio_url_high",
+                "high_quality_url",
+            ],
+            "Very High": [
+                "audio_url_very_high",
+                "audio_url_lossless",
+                "lossless_url",
+            ],
+        }
+
+        # Data Saver always prefers the lightest / preview source
+        # when one is available.
+        if self.data_saver_enabled:
+            candidates = [
+                "audio_url_low",
+                "low_quality_url",
+                "preview_url",
+                "audio_url",
+            ]
+        else:
+            candidates = list(
+                quality_fields.get(
+                    quality,
+                    []
+                )
+            )
+
+        for field in candidates:
+            value = str(
+                self._song_value(
+                    song,
+                    field
+                )
+                or ""
+            ).strip()
+
+            if value:
+                return value
+
+        # Provider-defined playable_url remains the canonical fallback.
+        try:
+            if hasattr(
+                song,
+                "playable_url"
+            ):
+                value = str(
+                    song.playable_url()
+                    or ""
+                ).strip()
+
+                if value:
+                    return value
+        except Exception as error:
+            print(
+                "Preferred stream resolve error:",
+                error
+            )
+
+        return str(
+            self._song_value(
+                song,
+                "audio_url"
+            )
+            or
+            self._song_value(
+                song,
+                "preview_url"
+            )
+            or
+            ""
+        ).strip()
+
+    # ========================================================
+    # DAY 25 - CROSSFADE-STYLE TRANSITION
+    # ========================================================
+
+    def _prepare_new_track_transition(self):
+        # A manual song selection cancels any unfinished fade-out.
+        # If this track was requested by the fade engine, keep the pending
+        # fade-in flag so handle_playback_state() can restore volume smoothly.
+        pending_fade_in = self._fade_in_pending
+
+        self.fade_timer.stop()
+        self._fade_mode = None
+        self._fade_step = 0
+        self._fade_started_for_track = False
+        self._transition_in_progress = False
+        self._fade_in_pending = pending_fade_in
+
+        if pending_fade_in:
+            self.audio_output.setVolume(0.0)
+        else:
+            self.audio_output.setVolume(
+                self.user_volume
+            )
+
+    def _cancel_fade(
+        self,
+        restore_volume=True
+    ):
+        self.fade_timer.stop()
+        self._fade_mode = None
+        self._fade_step = 0
+        self._fade_started_for_track = False
+        self._fade_in_pending = False
+        self._transition_in_progress = False
+
+        if restore_volume:
+            self.audio_output.setVolume(
+                self.user_volume
+            )
+
+    def _check_crossfade_transition(
+        self,
+        position,
+        duration
+    ):
+        if not self.autoplay_enabled:
+            return
+
+        if self.is_repeat:
+            return
+
+        if self.crossfade_seconds <= 0:
+            return
+
+        if self._fade_started_for_track:
+            return
+
+        if self._transition_in_progress:
+            return
+
+        if duration <= 0:
+            return
+
+        remaining = duration - position
+        threshold = self.crossfade_seconds * 1000
+
+        if (
+            remaining > 0
+            and remaining <= threshold
+        ):
+            self._fade_started_for_track = True
+            self._start_fade_out()
+
+    def _start_fade_out(self):
+        duration_ms = max(
+            200,
+            self.crossfade_seconds * 1000
+        )
+
+        self._fade_mode = "out"
+        self._fade_step = 0
+        self._fade_total_steps = max(
+            1,
+            duration_ms // self.fade_timer.interval()
+        )
+        self.fade_timer.start()
+
+    def _start_fade_in(self):
+        duration_ms = max(
+            200,
+            self.crossfade_seconds * 1000
+        )
+
+        self._fade_mode = "in"
+        self._fade_step = 0
+        self._fade_total_steps = max(
+            1,
+            duration_ms // self.fade_timer.interval()
+        )
+        self.audio_output.setVolume(0.0)
+        self.fade_timer.start()
+
+    def _process_fade_step(self):
+        if self._fade_mode not in (
+            "out",
+            "in",
+        ):
+            self.fade_timer.stop()
+            return
+
+        self._fade_step += 1
+
+        ratio = min(
+            1.0,
+            self._fade_step / self._fade_total_steps
+        )
+
+        if self._fade_mode == "out":
+            volume = self.user_volume * (1.0 - ratio)
+        else:
+            volume = self.user_volume * ratio
+
+        self.audio_output.setVolume(
+            max(0.0, min(1.0, volume))
+        )
+
+        if ratio < 1.0:
+            return
+
+        mode = self._fade_mode
+        self.fade_timer.stop()
+        self._fade_mode = None
+
+        if mode == "out":
+            self.audio_output.setVolume(0.0)
+            self._fade_in_pending = True
+            self._transition_in_progress = True
+            self._request_next_track()
+        else:
+            self.audio_output.setVolume(
+                self.user_volume
+            )
+            self._transition_in_progress = False
+            self._fade_started_for_track = False
+
+    def _request_next_track(self):
+        if not self.autoplay_enabled:
+            self._cancel_fade(
+                restore_volume=True
+            )
+            return
+
+        if (
+            self.playback_source == "online"
+            and self.online_queue
+        ):
+            self.play_online_next()
+        else:
+            self.next_requested.emit()
 
     # ========================================================
     # SHUFFLE

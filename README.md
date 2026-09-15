@@ -215,5 +215,7 @@ These commands are connected to the actual LYRx audio player.
   - Technology information
   - Website, Privacy Policy and Terms links
 
+- [x] Day 26 - Offline downloads foundation
+
 
 Version: LYRx Alpha 1.0

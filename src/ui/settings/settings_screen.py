@@ -2310,6 +2310,29 @@ class SettingsScreen(QWidget):
             )
         )
 
+        offline_badge = QPushButton(
+            "COMING SOON"
+        )
+
+        offline_badge.setObjectName(
+            "SettingsActionButton"
+        )
+
+        offline_badge.setEnabled(
+            False
+        )
+
+        content.addWidget(
+            SettingRow(
+                "Offline Downloads",
+                (
+                    "Download music for offline listening when supported "
+                    "by your LYRx plan and licensed music catalog."
+                ),
+                offline_badge,
+            )
+        )
+
         self.cache_size_label = QLabel(
             "Calculating…"
         )

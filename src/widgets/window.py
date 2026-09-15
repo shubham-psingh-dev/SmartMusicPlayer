@@ -47,6 +47,8 @@ from services.youtube_service import youtube_service
 from ui.settings.settings_screen import SettingsScreen
 
 from core.theme_manager import ThemeManager
+from core.language_manager import language_manager
+from core.ui_translator import ui_translator
 
 
 # ============================================================
@@ -1362,6 +1364,12 @@ class AppWindow(QMainWindow):
             self.settings
         )
 
+        # DAY 27 PHASE 1.3 - translate the rest of the application live.
+        language_manager.language_changed.connect(
+            self.retranslate_application_ui
+        )
+        self.retranslate_application_ui()
+
         # ====================================================
         # DAY 25 - LIVE PROFILE SYNC
         # ====================================================
@@ -1989,6 +1997,26 @@ class AppWindow(QMainWindow):
         )
 
     # ========================================================
+    # ========================================================
+    # DAY 27 PHASE 1.3 - GLOBAL UI TRANSLATION
+    # ========================================================
+
+    def retranslate_application_ui(self, *_):
+        for page in (
+            self.home,
+            self.discover,
+            self.favorites,
+            self.library,
+            self.playlists,
+            self.assistant,
+            self.yt_box,
+            self.settings,
+        ):
+            ui_translator.translate_tree(page)
+
+        # Includes the floating player and any main-window-owned controls.
+        ui_translator.translate_tree(self)
+
     # PAGE NAVIGATION
     # ========================================================
 

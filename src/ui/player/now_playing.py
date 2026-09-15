@@ -1,17 +1,18 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, QUrl, QTimer
+from PySide6.QtCore import Qt, Signal, QUrl, QTimer, QRectF
 
 from PySide6.QtNetwork import (
     QNetworkAccessManager,
     QNetworkRequest,
 )
 
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QBrush, QFont, QDesktopServices
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from core.language_manager import language_manager
 from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QSlider, QScrollArea, QFrame, QSizePolicy
+    QSlider, QScrollArea, QFrame, QSizePolicy, QGraphicsDropShadowEffect
 )
 
 
@@ -111,6 +112,292 @@ class DurationProbe:
             pass
 
 
+
+# ============================================================
+# DAY 27 - PREMIUM PLAYER CONTROLS
+# ============================================================
+
+class PlayerControlButton(QPushButton):
+    """Blueprint-style circular control with a crisp vector-painted icon."""
+
+    def __init__(self, kind, size=42, parent=None):
+        super().__init__(parent)
+        self.kind = kind
+        self.active = False
+        self.hovered = False
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFlat(True)
+        self.setStyleSheet("QPushButton { background: transparent; border: none; }")
+
+    def set_active(self, active):
+        self.active = bool(active)
+        self.update()
+
+    def enterEvent(self, event):
+        self.hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        r = QRectF(2.5, 2.5, self.width() - 5, self.height() - 5)
+
+        if self.active:
+            bg = QColor(111, 57, 190, 118)
+            border = QColor(173, 111, 255, 210)
+            icon = QColor("#F3E9FF")
+        elif self.hovered:
+            bg = QColor(139, 92, 246, 40)
+            border = QColor(139, 92, 246, 110)
+            icon = QColor("#FFFFFF")
+        else:
+            bg = QColor(24, 16, 42, 125)
+            border = QColor(111, 83, 151, 105)
+            icon = QColor("#D8CCF5")
+
+        painter.setPen(QPen(border, 1.0))
+        painter.setBrush(QBrush(bg))
+        painter.drawEllipse(r)
+
+        pen = QPen(icon, 2.0)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(QBrush(icon))
+
+        cx = self.width() / 2
+        cy = self.height() / 2
+
+        if self.kind == "previous":
+            painter.drawLine(cx - 8, cy - 8, cx - 8, cy + 8)
+            path = QPainterPath()
+            path.moveTo(cx + 7, cy - 9)
+            path.lineTo(cx - 5, cy)
+            path.lineTo(cx + 7, cy + 9)
+            path.closeSubpath()
+            painter.drawPath(path)
+
+        elif self.kind == "next":
+            painter.drawLine(cx + 8, cy - 8, cx + 8, cy + 8)
+            path = QPainterPath()
+            path.moveTo(cx - 7, cy - 9)
+            path.lineTo(cx + 5, cy)
+            path.lineTo(cx - 7, cy + 9)
+            path.closeSubpath()
+            painter.drawPath(path)
+
+        elif self.kind == "shuffle":
+            # Two clean crossing paths + arrow heads.
+            p1 = QPainterPath()
+            p1.moveTo(cx - 10, cy - 7)
+            p1.cubicTo(cx - 2, cy - 7, cx + 1, cy + 7, cx + 9, cy + 7)
+            painter.drawPath(p1)
+            painter.drawLine(cx + 5, cy + 3, cx + 10, cy + 7)
+            painter.drawLine(cx + 5, cy + 11, cx + 10, cy + 7)
+
+            p2 = QPainterPath()
+            p2.moveTo(cx - 10, cy + 7)
+            p2.cubicTo(cx - 2, cy + 7, cx + 1, cy - 7, cx + 9, cy - 7)
+            painter.drawPath(p2)
+            painter.drawLine(cx + 5, cy - 11, cx + 10, cy - 7)
+            painter.drawLine(cx + 5, cy - 3, cx + 10, cy - 7)
+
+        elif self.kind == "repeat":
+            p1 = QPainterPath()
+            p1.moveTo(cx - 9, cy - 5)
+            p1.cubicTo(cx - 4, cy - 11, cx + 6, cy - 10, cx + 9, cy - 4)
+            painter.drawPath(p1)
+            painter.drawLine(cx + 5, cy - 7, cx + 10, cy - 4)
+            painter.drawLine(cx + 8, cy + 1, cx + 10, cy - 4)
+
+            p2 = QPainterPath()
+            p2.moveTo(cx + 9, cy + 5)
+            p2.cubicTo(cx + 4, cy + 11, cx - 6, cy + 10, cx - 9, cy + 4)
+            painter.drawPath(p2)
+            painter.drawLine(cx - 5, cy + 7, cx - 10, cy + 4)
+            painter.drawLine(cx - 8, cy - 1, cx - 10, cy + 4)
+
+
+
+
+class MiniEqualizer(QWidget):
+    """Subtle LYRx equalizer: animates only while playback is active."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(28, 28)
+        self._phase = 0
+        self._playing = False
+        self._timer = QTimer(self)
+        self._timer.setInterval(115)
+        self._timer.timeout.connect(self._tick)
+
+    def set_playing(self, playing):
+        self._playing = bool(playing)
+        if self._playing:
+            if not self._timer.isActive():
+                self._timer.start()
+        else:
+            self._timer.stop()
+        self.update()
+
+    def _tick(self):
+        self._phase = (self._phase + 1) % 8
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        values = (8, 15, 22, 13, 19)
+        for i, base in enumerate(values):
+            if self._playing:
+                height = 7 + ((base + self._phase * (i + 2)) % 18)
+            else:
+                height = 7 + (i % 3) * 3
+            x = 3 + i * 5
+            y = (self.height() - height) / 2
+            gradient = QLinearGradient(0, y, 0, y + height)
+            gradient.setColorAt(0, QColor("#E879F9"))
+            gradient.setColorAt(1, QColor("#7C3AED"))
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(gradient))
+            painter.drawRoundedRect(QRectF(x, y, 3, height), 1.5, 1.5)
+
+
+class LabeledPlayerControl(QWidget):
+    """A premium circular player control with a small caption."""
+
+    clicked = Signal()
+
+    def __init__(self, kind, caption, size=44, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignCenter)
+
+        self.button = PlayerControlButton(kind, size, self)
+        self.caption = QLabel(caption)
+        self.caption.setAlignment(Qt.AlignCenter)
+        self.caption.setStyleSheet("""
+            QLabel {
+                color: #9F93BE;
+                font-size: 10px;
+                background: transparent;
+            }
+        """)
+
+        layout.addWidget(self.button, 0, Qt.AlignCenter)
+        layout.addWidget(self.caption)
+        self.button.clicked.connect(self.clicked.emit)
+
+    def set_active(self, active):
+        self.button.set_active(active)
+        self.caption.setStyleSheet("""
+            QLabel {
+                color: %s;
+                font-size: 10px;
+                font-weight: %s;
+                background: transparent;
+            }
+        """ % ("#CDA8FF" if active else "#9F93BE",
+               "700" if active else "400"))
+
+    def setToolTip(self, text):
+        super().setToolTip(text)
+        self.button.setToolTip(text)
+
+
+class GlowPlayButton(QPushButton):
+    """Large blueprint-style Play/Pause button with a neon purple glow."""
+
+    def __init__(self, size=62, parent=None):
+        super().__init__(parent)
+        self.playing = False
+        self.hovered = False
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFlat(True)
+        self.setStyleSheet("QPushButton { background: transparent; border: none; }")
+
+        glow = QGraphicsDropShadowEffect(self)
+        glow.setBlurRadius(30)
+        glow.setOffset(0, 0)
+        glow.setColor(QColor(150, 75, 255, 205))
+        self.setGraphicsEffect(glow)
+
+    def set_playing(self, playing):
+        self.playing = bool(playing)
+        self.update()
+
+    # Compatibility with the existing player code, which historically
+    # changed the play button with setText("▶"/"Ⅱ").
+    def setText(self, text):
+        self.set_playing(str(text).strip() in {"Ⅱ", "II", "❚❚", "⏸"})
+
+    def enterEvent(self, event):
+        self.hovered = True
+        effect = self.graphicsEffect()
+        if effect:
+            effect.setBlurRadius(38)
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.hovered = False
+        effect = self.graphicsEffect()
+        if effect:
+            effect.setBlurRadius(30)
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        rect = QRectF(5, 5, self.width() - 10, self.height() - 10)
+
+        gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0.0, QColor("#B76CFF") if self.hovered else QColor("#9B5CF6"))
+        gradient.setColorAt(0.55, QColor("#7C3AED"))
+        gradient.setColorAt(1.0, QColor("#5B21B6"))
+
+        painter.setPen(QPen(QColor(220, 190, 255, 225), 1.7))
+        painter.setBrush(QBrush(gradient))
+        painter.drawEllipse(rect)
+
+        # Inner glossy highlight.
+        highlight = QPen(QColor(255, 255, 255, 82), 1.0)
+        painter.setPen(highlight)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawArc(QRectF(9, 9, self.width() - 18, self.height() - 18), 35 * 16, 110 * 16)
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#FFFFFF"))
+
+        cx = self.width() / 2
+        cy = self.height() / 2
+
+        if self.playing:
+            painter.drawRoundedRect(QRectF(cx - 8, cy - 10, 5, 20), 2, 2)
+            painter.drawRoundedRect(QRectF(cx + 3, cy - 10, 5, 20), 2, 2)
+        else:
+            path = QPainterPath()
+            path.moveTo(cx - 6, cy - 11)
+            path.lineTo(cx + 11, cy)
+            path.lineTo(cx - 6, cy + 11)
+            path.closeSubpath()
+            painter.drawPath(path)
+
+
 # ============================================================
 # NOW PLAYING
 # ============================================================
@@ -134,8 +421,8 @@ class NowPlaying(QWidget):
         super().__init__()
 
         self.setObjectName("NowPlaying")
-        self.setMinimumWidth(310)
-        self.setMaximumWidth(350)
+        self.setMinimumWidth(340)
+        self.setMaximumWidth(390)
         self.setMinimumHeight(620)
 
         # ========================================================
@@ -187,6 +474,8 @@ class NowPlaying(QWidget):
         self.online_queue_index = 0
 
         self.playback_source = "local"
+        if hasattr(self, "quality_badge"):
+            self.quality_badge.setText("♫  Local Audio  •  Offline")
 
         self.current_online_song = None
 
@@ -208,6 +497,9 @@ class NowPlaying(QWidget):
         # ========================================================
 
         self.audio_player = QMediaPlayer(self)
+        self.audio_player.playbackStateChanged.connect(
+            self._sync_premium_animation_state
+        )
         self.audio_output = QAudioOutput(self)
         self.audio_player.setAudioOutput(self.audio_output)
         self.audio_output.setVolume(self.user_volume)
@@ -265,68 +557,94 @@ class NowPlaying(QWidget):
 
     def build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(18, 18, 18, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(16, 14, 16, 14)
+        root.setSpacing(8)
 
         # ====================================================
-        # TOP HEADER
+        # BLUEPRINT HEADER
         # ====================================================
-
         header = QHBoxLayout()
-        header.setContentsMargins(2, 0, 2, 0)
+        header.setSpacing(8)
 
-        heading = QLabel("NOW PLAYING")
-        heading.setStyleSheet("""
-        QLabel {
-            color: #CDBEFF;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            background: transparent;
-        }
+        self.header_equalizer = MiniEqualizer(self)
+        header.addWidget(self.header_equalizer)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(0)
+
+        self.now_playing_heading = QLabel("NOW PLAYING")
+        self.now_playing_heading.setStyleSheet("""
+            QLabel {
+                color: #F2ECFF;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 1px;
+                background: transparent;
+            }
         """)
-        header.addWidget(heading)
+
+        subtitle = QLabel("")
+        subtitle.setStyleSheet("""
+            QLabel {
+                color: #8E82AE;
+                font-size: 10px;
+                background: transparent;
+            }
+        """)
+
+        title_box.addWidget(self.now_playing_heading)
+        title_box.addWidget(subtitle)
+        header.addLayout(title_box)
         header.addStretch()
 
-        live = QLabel("●  LIVE")
-        live.setStyleSheet("""
-        QLabel {
-            color: #9B7AFF;
-            font-size: 10px;
-            font-weight: 700;
-            background: transparent;
-        }
+        self.live_badge = QLabel("●  LIVE")
+        self.live_badge.setAlignment(Qt.AlignCenter)
+        self.live_badge.setStyleSheet("""
+            QLabel {
+                color: #C77DFF;
+                font-size: 10px;
+                font-weight: 800;
+                background: rgba(126, 34, 206, 42);
+                border: 1px solid rgba(168, 85, 247, 60);
+                border-radius: 12px;
+                padding: 5px 9px;
+            }
         """)
-        header.addWidget(live)
+        header.addWidget(self.live_badge)
         root.addLayout(header)
 
         # ====================================================
-        # ALBUM ART
+        # ALBUM ART - BLUEPRINT FRAME + SOFT GLOW
         # ====================================================
-
         self.album_frame = QFrame()
-        self.album_frame.setFixedSize(238, 238)
+        self.album_frame.setFixedSize(212, 212)
         self.album_frame.setObjectName("AlbumFrame")
         self.album_frame.setStyleSheet("""
-        QFrame#AlbumFrame {
-            background: #211633;
-            border: 1px solid rgba(139,92,246,80);
-            border-radius: 22px;
-        }
+            QFrame#AlbumFrame {
+                background: #171126;
+                border: 1px solid #7C3AED;
+                border-radius: 18px;
+            }
         """)
+
+        album_glow = QGraphicsDropShadowEffect(self.album_frame)
+        album_glow.setBlurRadius(22)
+        album_glow.setOffset(0, 0)
+        album_glow.setColor(QColor(124, 58, 237, 80))
+        self.album_frame.setGraphicsEffect(album_glow)
 
         album_layout = QVBoxLayout(self.album_frame)
         album_layout.setContentsMargins(3, 3, 3, 3)
         album_layout.setSpacing(0)
 
         self.album = QLabel()
-        self.album.setFixedSize(232, 232)
+        self.album.setFixedSize(206, 206)
         self.album.setAlignment(Qt.AlignCenter)
         self.album.setStyleSheet("""
-        QLabel {
-            background: #211633;
-            border-radius: 19px;
-        }
+            QLabel {
+                background: #171126;
+                border-radius: 15px;
+            }
         """)
 
         default_art = find_asset("assets/album_art/believer.jpg")
@@ -334,95 +652,74 @@ class NowPlaying(QWidget):
             pix = QPixmap(str(default_art))
             if not pix.isNull():
                 scaled_local_cover = pix.scaled(
-                    232,
-                    232,
+                    206, 206,
                     Qt.KeepAspectRatioByExpanding,
                     Qt.SmoothTransformation
                 )
-
-                self.album.setPixmap(
-                    scaled_local_cover
-                )
-
-                self.cover_pixmap_changed.emit(
-                    scaled_local_cover
-                )
+                self.album.setPixmap(scaled_local_cover)
+                self.cover_pixmap_changed.emit(scaled_local_cover)
 
         album_layout.addWidget(self.album)
-        root.addWidget(self.album_frame, alignment=Qt.AlignCenter)
+        root.addWidget(self.album_frame, 0, Qt.AlignHCenter)
+        root.addSpacing(8)
 
         # ====================================================
         # SONG INFO
         # ====================================================
-
         self.song = QLabel("Believer")
         self.song.setAlignment(Qt.AlignCenter)
         self.song.setStyleSheet("""
-        QLabel {
-            color: white;
-            font-size: 19px;
-            font-weight: 700;
-            background: transparent;
-        }
+            QLabel {
+                color: #FFFFFF;
+                font-size: 20px;
+                font-weight: 800;
+                background: transparent;
+            }
         """)
         root.addWidget(self.song)
 
         self.artist = QLabel("Imagine Dragons")
         self.artist.setAlignment(Qt.AlignCenter)
         self.artist.setStyleSheet("""
-        QLabel {
-            color: #AFA3CF;
-            font-size: 13px;
-            background: transparent;
-        }
+            QLabel {
+                color: #B8A9DC;
+                font-size: 12px;
+                background: transparent;
+            }
         """)
         root.addWidget(self.artist)
 
-        # ====================================================
-        # PROGRESS
-        # ====================================================
-
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 100)
-        self.slider.setValue(0)
-        self.slider.setStyleSheet("""
-        QSlider::groove:horizontal {
-            height: 4px;
-            background: #3C305A;
-            border-radius: 2px;
-        }
-        QSlider::sub-page:horizontal {
-            background: #8B5CF6;
-            border-radius: 2px;
-        }
-        QSlider::handle:horizontal {
-            width: 12px;
-            height: 12px;
-            margin: -4px 0;
-            border-radius: 6px;
-            background: white;
-        }
-        QSlider::handle:horizontal:hover {
-            background: #B58AFF;
-        }
+        self.quality_badge = QLabel("♫  Online Audio")
+        self.quality_badge.setAlignment(Qt.AlignCenter)
+        self.quality_badge.setStyleSheet("""
+            QLabel {
+                color: #C084FC;
+                font-size: 10px;
+                font-weight: 700;
+                background: rgba(126, 34, 206, 35);
+                border: 1px solid rgba(168, 85, 247, 75);
+                border-radius: 11px;
+                padding: 4px 10px;
+            }
         """)
-        root.addWidget(self.slider)
+        root.addWidget(self.quality_badge, 0, Qt.AlignHCenter)
 
         # ====================================================
-        # TIME
+        # PROGRESS + TIME
         # ====================================================
-
         time_layout = QHBoxLayout()
+        time_layout.setContentsMargins(1, 0, 1, 0)
+
         self.current_time = QLabel("0:00")
         self.total_time = QLabel("0:00")
 
         for label in (self.current_time, self.total_time):
             label.setStyleSheet("""
-            QLabel {
-                color: #82779F;
-                font-size: 10px;
-                background: transparent;
-            }
+                QLabel {
+                    color: #A99BC9;
+                    font-size: 10px;
+                    background: transparent;
+                }
             """)
 
         time_layout.addWidget(self.current_time)
@@ -430,23 +727,80 @@ class NowPlaying(QWidget):
         time_layout.addWidget(self.total_time)
         root.addLayout(time_layout)
 
-        # ====================================================
-        # CONTROLS
-        # ====================================================
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(0, 100)
+        self.slider.setValue(0)
+        self.slider.setFixedHeight(16)
+        self.slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                height: 5px;
+                background: #302747;
+                border-radius: 2px;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #7C3AED,
+                    stop:0.55 #A855F7,
+                    stop:1 #E879F9
+                );
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                width: 13px;
+                height: 13px;
+                margin: -4px 0;
+                border-radius: 6px;
+                background: white;
+                border: 1px solid #E9D5FF;
+            }
+        """)
+        root.addWidget(self.slider)
 
+        # ====================================================
+        # PREMIUM LABELED CONTROLS
+        # ====================================================
         controls = QHBoxLayout()
-        controls.setSpacing(8)
+        controls.setContentsMargins(0, 1, 0, 1)
+        controls.setSpacing(4)
         controls.setAlignment(Qt.AlignCenter)
 
-        self.shuffle_btn = self.create_control_button("⤨", 38)
-        self.prev_btn = self.create_control_button("⏮", 40)
-        self.play_btn = self.create_control_button("▶", 54, primary=True)
-        self.next_btn = self.create_control_button("⏭", 40)
-        self.repeat_btn = self.create_control_button("↻", 38)
+        self.shuffle_btn = LabeledPlayerControl("shuffle", "Shuffle", 40, self)
+        self.prev_btn = LabeledPlayerControl("previous", "Previous", 42, self)
+
+        play_wrap = QWidget()
+        play_layout = QVBoxLayout(play_wrap)
+        play_layout.setContentsMargins(0, 0, 0, 0)
+        play_layout.setSpacing(2)
+        play_layout.setAlignment(Qt.AlignCenter)
+
+        self.play_btn = GlowPlayButton(64, self)
+
+        # Soft breathing glow. It is intentionally subtle and does not
+        # interfere with playback state or button clicks.
+        self._play_glow_growing = True
+        self._play_glow_timer = QTimer(self)
+        self._play_glow_timer.setInterval(90)
+        self._play_glow_timer.timeout.connect(self._animate_play_glow)
+        self.play_caption = QLabel("Pause")
+        self.play_caption.setAlignment(Qt.AlignCenter)
+        self.play_caption.setStyleSheet("""
+            QLabel {
+                color: #CDBEFF;
+                font-size: 9px;
+                font-weight: 700;
+                background: transparent;
+            }
+        """)
+        play_layout.addWidget(self.play_btn, 0, Qt.AlignCenter)
+        play_layout.addWidget(self.play_caption)
+
+        self.next_btn = LabeledPlayerControl("next", "Next", 42, self)
+        self.repeat_btn = LabeledPlayerControl("repeat", "Repeat", 40, self)
 
         controls.addWidget(self.shuffle_btn)
         controls.addWidget(self.prev_btn)
-        controls.addWidget(self.play_btn)
+        controls.addWidget(play_wrap)
         controls.addWidget(self.next_btn)
         controls.addWidget(self.repeat_btn)
         root.addLayout(controls)
@@ -460,93 +814,155 @@ class NowPlaying(QWidget):
         # ====================================================
         # VOLUME
         # ====================================================
-
         volume_layout = QHBoxLayout()
+        volume_layout.setContentsMargins(3, 0, 3, 0)
         volume_layout.setSpacing(8)
 
-        volume_icon = QLabel("🔊")
-        volume_icon.setFixedWidth(22)
+        volume_icon = QLabel("♪")
+        volume_icon.setFixedWidth(18)
         volume_icon.setAlignment(Qt.AlignCenter)
         volume_icon.setStyleSheet("""
-        QLabel {
-            color: #BBADE0;
-            font-size: 14px;
-            background: transparent;
-        }
+            QLabel {
+                color: #D8CCF5;
+                font-size: 15px;
+                font-weight: 800;
+                background: transparent;
+            }
         """)
 
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(75)
         self.volume_slider.setStyleSheet("""
-        QSlider::groove:horizontal {
-            height: 3px;
-            background: #3C305A;
-            border-radius: 2px;
-        }
-        QSlider::sub-page:horizontal {
-            background: #7250C9;
-            border-radius: 2px;
-        }
-        QSlider::handle:horizontal {
-            width: 10px;
-            height: 10px;
-            margin: -4px 0;
-            border-radius: 5px;
-            background: #D8CCFF;
-        }
+            QSlider::groove:horizontal {
+                height: 4px;
+                background: #302747;
+                border-radius: 2px;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #7C3AED,
+                    stop:1 #C084FC
+                );
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                width: 11px;
+                height: 11px;
+                margin: -4px 0;
+                border-radius: 5px;
+                background: #F3E8FF;
+            }
         """)
 
+        self.volume_value = QLabel("75%")
+        self.volume_value.setFixedWidth(30)
+        self.volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.volume_value.setStyleSheet("""
+            QLabel {
+                color: #A99BC9;
+                font-size: 9px;
+                background: transparent;
+            }
+        """)
+        self.volume_slider.valueChanged.connect(
+            lambda value: self.volume_value.setText(f"{value}%")
+        )
+
         volume_layout.addWidget(volume_icon)
-        volume_layout.addWidget(self.volume_slider)
+        volume_layout.addWidget(self.volume_slider, 1)
+        volume_layout.addWidget(self.volume_value)
         root.addLayout(volume_layout)
 
         # ====================================================
-        # DIVIDER
+        # QUICK ACTIONS
         # ====================================================
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 3, 0, 3)
+        actions.setSpacing(6)
+
+        self.queue_action_btn = QPushButton("☷  Queue")
+        self.playlist_action_btn = QPushButton("♫  Playlist")
+        self.share_action_btn = QPushButton("↗  Share")
+        self.more_action_btn = QPushButton("•••")
+
+        for action_btn in (
+            self.queue_action_btn,
+            self.playlist_action_btn,
+            self.share_action_btn,
+            self.more_action_btn,
+        ):
+            action_btn.setCursor(Qt.PointingHandCursor)
+            action_btn.setMinimumHeight(34)
+            action_btn.setStyleSheet("""
+                QPushButton {
+                    color: #BFB2DB;
+                    background: rgba(45, 32, 69, 150);
+                    border: 1px solid rgba(139, 92, 246, 65);
+                    border-radius: 10px;
+                    padding: 5px 7px;
+                    font-size: 9px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    color: #FFFFFF;
+                    background: rgba(124, 58, 237, 65);
+                    border: 1px solid rgba(192, 132, 252, 130);
+                }
+                QPushButton:pressed {
+                    background: rgba(109, 40, 217, 95);
+                }
+            """)
+
+        self.queue_action_btn.clicked.connect(self._request_add_to_queue)
+        self.playlist_action_btn.clicked.connect(self._request_add_to_playlist)
+        self.share_action_btn.clicked.connect(self._share_current_song)
+        self.more_action_btn.clicked.connect(self._show_more_hint)
+
+        actions.addWidget(self.queue_action_btn, 1)
+        actions.addWidget(self.playlist_action_btn, 1)
+        actions.addWidget(self.share_action_btn, 1)
+        actions.addWidget(self.more_action_btn, 0)
+
+        root.addLayout(actions)
 
         divider = QFrame()
         divider.setFixedHeight(1)
-        divider.setStyleSheet("""
-        QFrame {
-            background: rgba(255,255,255,15);
-        }
-        """)
+        divider.setStyleSheet(
+            "QFrame { background: rgba(151, 105, 255, 45); }"
+        )
         root.addWidget(divider)
 
         # ====================================================
-        # NEXT UP HEADER
+        # NEXT UP
         # ====================================================
-
         next_header = QHBoxLayout()
+        next_header.setContentsMargins(1, 0, 1, 0)
 
-        next_title = QLabel("NEXT UP")
-        next_title.setStyleSheet("""
-        QLabel {
-            color: #CDBEFF;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            background: transparent;
-        }
+        self.next_up_title = QLabel("☷  NEXT UP")
+        self.next_up_title.setStyleSheet("""
+            QLabel {
+                color: #E0D5FF;
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: 1px;
+                background: transparent;
+            }
         """)
-        next_header.addWidget(next_title)
+        next_header.addWidget(self.next_up_title)
         next_header.addStretch()
 
         self.queue_count = QLabel("0 songs")
         self.queue_count.setStyleSheet("""
-        QLabel {
-            color: #756A91;
-            font-size: 10px;
-            background: transparent;
-        }
+            QLabel {
+                color: #8E82AE;
+                font-size: 9px;
+                background: transparent;
+            }
         """)
         next_header.addWidget(self.queue_count)
         root.addLayout(next_header)
-
-        # ====================================================
-        # NEXT UP SCROLL
-        # ====================================================
 
         self.next_scroll = QScrollArea()
         self.next_scroll.setWidgetResizable(True)
@@ -554,50 +970,301 @@ class NowPlaying(QWidget):
         self.next_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.next_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.next_scroll.setStyleSheet("""
-        QScrollArea {
-            background: transparent;
-            border: none;
-        }
-        QScrollArea > QWidget > QWidget {
-            background: transparent;
-        }
-        QScrollBar:vertical {
-            width: 6px;
-            background: transparent;
-        }
-        QScrollBar::handle:vertical {
-            background: #6243A6;
-            border-radius: 3px;
-            min-height: 30px;
-        }
-        QScrollBar::handle:vertical:hover {
-            background: #8B5CF6;
-        }
-        QScrollBar::add-line:vertical,
-        QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-        QScrollBar::add-page:vertical,
-        QScrollBar::sub-page:vertical {
-            background: transparent;
-        }
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                width: 5px;
+                background: transparent;
+            }
+            QScrollBar::handle:vertical {
+                background: #6D45B7;
+                border-radius: 2px;
+                min-height: 28px;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
+                background: transparent;
+            }
         """)
 
         next_content = QWidget()
         next_content.setStyleSheet("QWidget { background: transparent; }")
 
         next_layout = QVBoxLayout(next_content)
-        next_layout.setContentsMargins(0, 0, 4, 4)
-        next_layout.setSpacing(7)
+        next_layout.setContentsMargins(0, 0, 3, 3)
+        next_layout.setSpacing(6)
         next_layout.addStretch()
 
         self.next_scroll.setWidget(next_content)
-        self.next_scroll.setMinimumHeight(135)
+        self.next_scroll.setMinimumHeight(105)
         self.next_scroll.setSizePolicy(
             QSizePolicy.Expanding,
             QSizePolicy.Expanding
         )
         root.addWidget(self.next_scroll, 1)
+
+        # Day 27: Now Playing participates in the same live EN/HI/FR
+        # language system as the rest of LYRx.
+        language_manager.language_changed.connect(
+            self.retranslate_ui
+        )
+        self.retranslate_ui()
+
+    # ========================================================
+    # DAY 27 - NOW PLAYING LIVE LANGUAGE
+    # ========================================================
+
+    def _tr_literal(self, english_text):
+        return language_manager.translate_literal(
+            english_text
+        )
+
+    def _translated_queue_count(self, count):
+        try:
+            count = int(count)
+        except (TypeError, ValueError):
+            count = 0
+
+        if language_manager.language == "hi":
+            return (
+                "1 गाना"
+                if count == 1
+                else f"{count} गाने"
+            )
+
+        if language_manager.language == "fr":
+            return (
+                "1 morceau"
+                if count == 1
+                else f"{count} morceaux"
+            )
+
+        return (
+            "1 song"
+            if count == 1
+            else f"{count} songs"
+        )
+
+    def retranslate_ui(self, *_):
+        """Refresh all static and dynamic Now Playing chrome live."""
+        if hasattr(self, "now_playing_heading"):
+            self.now_playing_heading.setText(
+                self._tr_literal("NOW PLAYING")
+            )
+
+        if hasattr(self, "live_badge"):
+            self.live_badge.setText(
+                self._tr_literal("●  LIVE")
+            )
+
+        if hasattr(self, "quality_badge"):
+            online = (
+                self.playback_source == "online"
+                or self.current_online_song is not None
+            )
+            self.quality_badge.setText(
+                self._tr_literal(
+                    "♫  Online Audio"
+                    if online
+                    else "♫  Local Audio  •  Offline"
+                )
+            )
+
+        captions = (
+            ("shuffle_btn", "Shuffle"),
+            ("prev_btn", "Previous"),
+            ("next_btn", "Next"),
+            ("repeat_btn", "Repeat"),
+        )
+
+        for attr_name, source_text in captions:
+            control = getattr(self, attr_name, None)
+            if control is not None and hasattr(control, "caption"):
+                control.caption.setText(
+                    self._tr_literal(source_text)
+                )
+
+        if hasattr(self, "play_caption"):
+            playing = (
+                getattr(self, "audio_player", None) is not None
+                and self.audio_player.playbackState()
+                == QMediaPlayer.PlaybackState.PlayingState
+            )
+            self.play_caption.setText(
+                self._tr_literal(
+                    "Pause" if playing else "Play"
+                )
+            )
+
+        actions = (
+            ("queue_action_btn", "☷  Queue"),
+            ("playlist_action_btn", "♫  Playlist"),
+            ("share_action_btn", "↗  Share"),
+            ("more_action_btn", "•••"),
+        )
+
+        for attr_name, source_text in actions:
+            button = getattr(self, attr_name, None)
+            if button is not None:
+                button.setText(
+                    self._tr_literal(source_text)
+                )
+
+        if hasattr(self, "next_up_title"):
+            self.next_up_title.setText(
+                self._tr_literal("☷  NEXT UP")
+            )
+
+        if hasattr(self, "queue_count"):
+            count = len(
+                getattr(self, "online_queue", [])
+                or []
+            )
+            self.queue_count.setText(
+                self._translated_queue_count(count)
+            )
+
+    # ========================================================
+    # DAY 27 - PREMIUM MICRO INTERACTIONS / ACTIONS
+    # ========================================================
+
+    def _sync_premium_animation_state(self, state):
+        """Sync premium animations with the real audio playback state."""
+        playing = (
+            state == QMediaPlayer.PlaybackState.PlayingState
+        )
+
+        if hasattr(self, "header_equalizer"):
+            self.header_equalizer.set_playing(playing)
+
+        if hasattr(self, "play_btn"):
+            self.play_btn.set_playing(playing)
+
+        if hasattr(self, "play_caption"):
+            self.play_caption.setText(
+                self._tr_literal(
+                    "Pause" if playing else "Play"
+                )
+            )
+
+        if hasattr(self, "_play_glow_timer"):
+            if playing:
+                if not self._play_glow_timer.isActive():
+                    self._play_glow_timer.start()
+            else:
+                self._play_glow_timer.stop()
+
+                if hasattr(self, "play_btn"):
+                    effect = self.play_btn.graphicsEffect()
+                    if effect is not None:
+                        effect.setBlurRadius(24.0)
+
+    def _animate_play_glow(self):
+        """Softly pulse the Play/Pause glow without changing playback."""
+        if not hasattr(self, "play_btn"):
+            return
+
+        effect = self.play_btn.graphicsEffect()
+        if effect is None:
+            return
+
+        player = getattr(self, "audio_player", None)
+        if player is None:
+            return
+
+        is_playing = (
+            player.playbackState()
+            == QMediaPlayer.PlaybackState.PlayingState
+        )
+
+        # Glow must be static while paused/stopped.
+        if not is_playing:
+            effect.setBlurRadius(24.0)
+            return
+
+        low, high = (24.0, 38.0)
+        current = float(effect.blurRadius())
+
+        if getattr(self, "_play_glow_growing", True):
+            current += 1.4
+            if current >= high:
+                current = high
+                self._play_glow_growing = False
+        else:
+            current -= 1.4
+            if current <= low:
+                current = low
+                self._play_glow_growing = True
+
+        effect.setBlurRadius(current)
+
+    def _current_share_url(self):
+        song = self.current_online_song
+        if song is None:
+            return ""
+
+        for name in ("share_url", "shareurl", "web_url", "url"):
+            value = self._song_value(song, name)
+            if value:
+                return str(value).strip()
+
+        metadata = getattr(song, "metadata", None)
+        if isinstance(metadata, dict):
+            for name in ("share_url", "shareurl", "web_url", "url"):
+                value = metadata.get(name)
+                if value:
+                    return str(value).strip()
+
+        return ""
+
+    def _request_add_to_queue(self):
+        if self.current_online_song is None:
+            self.queue_action_btn.setToolTip("No online song selected")
+            return
+
+        self.add_current_to_queue_requested.emit(
+            self.current_online_song
+        )
+        self.queue_action_btn.setToolTip("Queue request sent")
+
+    def _request_add_to_playlist(self):
+        if self.current_online_song is None:
+            self.playlist_action_btn.setToolTip("No online song selected")
+            return
+
+        self.add_current_to_playlist_requested.emit(
+            self.current_online_song
+        )
+        self.playlist_action_btn.setToolTip("Playlist request sent")
+
+    def _share_current_song(self):
+        url = self._current_share_url()
+
+        if not url:
+            self.share_action_btn.setToolTip(
+                "This source does not provide a share link"
+            )
+            return
+
+        QDesktopServices.openUrl(
+            QUrl(url)
+        )
+
+    def _show_more_hint(self):
+        # Intentionally no fake menu. Provider/app actions can be
+        # connected here later when real actions are available.
+        self.more_action_btn.setToolTip(
+            "More track actions will appear here as providers support them"
+        )
 
     # ========================================================
     # SET QUEUE
@@ -969,50 +1636,6 @@ class NowPlaying(QWidget):
     # ========================================================
     # CONTROL BUTTON
     # ========================================================
-
-    def create_control_button(self, text, size, primary=False):
-        button = QPushButton(text)
-        button.setFixedSize(size, size)
-        button.setCursor(Qt.PointingHandCursor)
-
-        if primary:
-            button.setStyleSheet("""
-            QPushButton {
-                background: #8B5CF6;
-                color: white;
-                border: 2px solid rgba(255,255,255,40);
-                border-radius: 27px;
-                font-size: 19px;
-                font-weight: 700;
-            }
-            QPushButton:hover {
-                background: #A970FF;
-            }
-            QPushButton:pressed {
-                background: #6D28D9;
-            }
-            """)
-        else:
-            button.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #AFA3CF;
-                border: none;
-                border-radius: 19px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(139,92,246,35);
-                color: white;
-            }
-            QPushButton:pressed {
-                background: rgba(139,92,246,70);
-                color: white;
-            }
-            """)
-
-        return button
 
     # ========================================================
     # NEXT SONG ITEM
@@ -1486,6 +2109,8 @@ class NowPlaying(QWidget):
         self.playback_source = "online"
 
         self.current_online_song = song
+        if hasattr(self, "quality_badge"):
+            self.quality_badge.setText("♫  Online Audio")
 
         # ====================================================
         # BASIC DATA
@@ -2130,12 +2755,20 @@ class NowPlaying(QWidget):
 
             self.is_playing = True
             self.play_btn.setText("Ⅱ")
+            self.play_caption.setText("Pause")
+            if hasattr(self, "header_equalizer"):
+                self.header_equalizer.set_playing(True)
+            self.play_caption.setText("Pause")
             self.play_state_changed.emit(True)
             self.refresh_next_up()
 
         else:
             self.is_playing = False
             self.play_btn.setText("▶")
+            self.play_caption.setText("Play")
+            if hasattr(self, "header_equalizer"):
+                self.header_equalizer.set_playing(False)
+            self.play_caption.setText("Play")
             self.play_state_changed.emit(False)
             print(
                 "Audio file not found:",
@@ -2776,39 +3409,14 @@ class NowPlaying(QWidget):
 
     def toggle_shuffle(self):
         self.is_shuffle = not self.is_shuffle
-
-        if self.is_shuffle:
-            self.shuffle_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(139,92,246,65);
-                color: #CDBEFF;
-                border: 1px solid rgba(139,92,246,100);
-                border-radius: 19px;
-                font-size: 16px;
-                font-weight: 700;
-            }
-            QPushButton:hover {
-                background: rgba(139,92,246,100);
-                color: white;
-            }
-            """)
-            print("Shuffle: ON")
-        else:
-            self.shuffle_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #AFA3CF;
-                border: none;
-                border-radius: 19px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(139,92,246,35);
-                color: white;
-            }
-            """)
-            print("Shuffle: OFF")
+        self.shuffle_btn.set_active(self.is_shuffle)
+        self.shuffle_btn.setToolTip(
+            "Shuffle on" if self.is_shuffle else "Shuffle off"
+        )
+        print(
+            "Shuffle:",
+            "ON" if self.is_shuffle else "OFF"
+        )
 
     # ========================================================
     # REPEAT
@@ -2816,39 +3424,16 @@ class NowPlaying(QWidget):
 
     def toggle_repeat(self):
         self.is_repeat = not self.is_repeat
-
-        if self.is_repeat:
-            self.repeat_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(139,92,246,65);
-                color: #CDBEFF;
-                border: 1px solid rgba(139,92,246,100);
-                border-radius: 19px;
-                font-size: 16px;
-                font-weight: 700;
-            }
-            QPushButton:hover {
-                background: rgba(139,92,246,100);
-                color: white;
-            }
-            """)
-            print("Repeat: ON")
-        else:
-            self.repeat_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #AFA3CF;
-                border: none;
-                border-radius: 19px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: rgba(139,92,246,35);
-                color: white;
-            }
-            """)
-            print("Repeat: OFF")
+        self.repeat_btn.set_active(self.is_repeat)
+        self.repeat_btn.setToolTip(
+            "Repeat current track: on"
+            if self.is_repeat
+            else "Repeat current track: off"
+        )
+        print(
+            "Repeat current track:",
+            "ON" if self.is_repeat else "OFF"
+        )
 
     # ========================================================
     # PAINT

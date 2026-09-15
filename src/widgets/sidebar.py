@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from core.language_manager import language_manager, tr
+
 from PySide6.QtCore import (
     Qt,
     Signal,
@@ -358,6 +360,8 @@ class NavButton(QPushButton):
             text,
         )
 
+        # page_name remains the canonical English route key.
+        # Visible text may change language without breaking navigation.
         self.page_name = text
 
         # ----------------------------------------------------
@@ -608,6 +612,11 @@ class Sidebar(QWidget):
         # ----------------------------------------------------
 
         self.build_ui()
+
+        language_manager.language_changed.connect(
+            self.retranslate_ui
+        )
+        self.retranslate_ui()
 
         self.update_theme_ui(
             self.current_is_dark,
@@ -1147,11 +1156,11 @@ class Sidebar(QWidget):
         if is_dark:
 
             self.theme_title.setText(
-                "Dark Mode",
+                tr("theme.dark"),
             )
 
             self.theme_status.setText(
-                "On",
+                tr("theme.on"),
             )
 
             self.theme_icon.setText(
@@ -1274,11 +1283,11 @@ class Sidebar(QWidget):
         else:
 
             self.theme_title.setText(
-                "Light Mode",
+                tr("theme.light"),
             )
 
             self.theme_status.setText(
-                "On",
+                tr("theme.on"),
             )
 
             self.theme_icon.setText(
@@ -1450,6 +1459,32 @@ class Sidebar(QWidget):
         self.set_theme_state(
             is_dark,
         )
+
+    # ========================================================
+    # DAY 27 - LIVE LANGUAGE
+    # ========================================================
+
+    def retranslate_ui(self, *_):
+        self.subtitle.setText(tr("sidebar.tagline"))
+        self.menu_label.setText(tr("sidebar.menu"))
+        self.appearance_title.setText(tr("sidebar.appearance"))
+
+        keys = {
+            "Home": "nav.home",
+            "Discover": "nav.discover",
+            "Library": "nav.library",
+            "Favorites": "nav.favorites",
+            "Playlists": "nav.playlists",
+            "AI Assistant": "nav.assistant",
+            "YT BOX": "nav.ytbox",
+            "Settings": "nav.settings",
+        }
+        for button in self.buttons:
+            button.setText(tr(keys.get(button.page_name, button.page_name)))
+
+        # Theme wording is normally refreshed by update_theme_ui; calling it
+        # here keeps the visible label in sync immediately after language change.
+        self.update_theme_ui(self.current_is_dark)
 
     # ========================================================
     # NAVIGATION

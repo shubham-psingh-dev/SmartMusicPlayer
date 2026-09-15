@@ -216,6 +216,43 @@ These commands are connected to the actual LYRx audio player.
   - Website, Privacy Policy and Terms links
 
 - [x] Day 26 - Offline downloads foundation
+- [x] Day 27 - Multilingual UI & Premium Now Playing
+
+### 🌍 Multilingual Experience
+- Added centralized `LanguageManager`
+- Added reusable global `UITranslator`
+- Added live runtime language switching
+- Added English language support
+- Added Hindi (हिन्दी) language support
+- Added French (Français) language support
+- Language preference persists between sessions
+- Major LYRx screens now update without restarting the application
+- Song titles, artist names, user content, and provider metadata remain unchanged
+
+### 🎧 Premium Now Playing Experience
+- Redesigned Now Playing panel with a premium LYRx visual style
+- Added custom vector-based playback controls
+- Added dynamic Play / Pause button states
+- Added polished Previous and Next controls
+- Added functional Shuffle and Repeat active states
+- Added purple neon Play/Pause glow
+- Added playback-aware animated mini equalizer
+- Equalizer and glow animation react to actual playback state
+- Improved album artwork presentation and purple glow
+- Improved seek/progress and volume controls
+- Added dynamic volume percentage
+- Improved Next Up queue presentation
+- Added online/local audio status presentation
+- Added live English, Hindi, and French translations to Now Playing
+
+### 🎵 Future Playback Actions
+The Now Playing interface also includes UI foundations for:
+- Add to Queue
+- Add to Playlist
+- Share
+- More track actions
+
+These actions are intentionally reserved for deeper application/provider integration before the commercial release.
 
 
 Version: LYRx Alpha 1.0

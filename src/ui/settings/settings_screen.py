@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 )
 
 from widgets.sidebar import Sidebar
+from core.language_manager import language_manager, LANGUAGE_NAMES, tr
 
 
 # ============================================================
@@ -905,6 +906,9 @@ class SettingsScreen(QWidget):
     # DAY 25 - profile editor
     profile_updated = Signal()
 
+    # DAY 27 - emitted after the global interface language changes
+    language_updated = Signal(str)
+
     MENU = "menu"
 
     PROFILE = "profile"
@@ -952,6 +956,10 @@ class SettingsScreen(QWidget):
 
         self.build_ui()
 
+        language_manager.language_changed.connect(
+            self.retranslate_settings
+        )
+
         self.load_settings()
 
         self.refresh_profile()
@@ -959,6 +967,8 @@ class SettingsScreen(QWidget):
         self.set_theme_state(
             True
         )
+
+        self.retranslate_settings()
 
     # ========================================================
     # BUILD
@@ -2584,37 +2594,32 @@ class SettingsScreen(QWidget):
     ):
 
         page, content = self.create_page(
-            "Language & Region",
-            "Choose interface and regional preferences.",
+            tr("language.title"),
+            tr("language.subtitle"),
         )
 
-        # The current UI copy is English-only.
-        # Do not expose a fake Hindi translation switch.
+        self.language_page_title = page.findChild(QLabel, "SettingsPageTitle")
+        self.language_page_subtitle = page.findChild(QLabel, "SettingsPageSubtitle")
+
         self.language = QComboBox()
-
-        self.language.addItems(
-            [
-                "English",
-            ]
-        )
-
-        self.language.currentTextChanged.connect(
-            self.save_settings
-        )
-
-        content.addWidget(
-            SettingRow(
-                "Interface language",
-                (
-                    "English is the supported language in the current "
-                    "portfolio build. Hindi localization is planned."
-                ),
-                self.language,
+        for code in ("en", "hi", "fr"):
+            self.language.addItem(
+                LANGUAGE_NAMES[code],
+                code,
             )
+
+        self.language.currentIndexChanged.connect(
+            self.language_selection_changed
         )
+
+        self.language_row = SettingRow(
+            tr("language.interface"),
+            tr("language.desc"),
+            self.language,
+        )
+        content.addWidget(self.language_row)
 
         self.region = QComboBox()
-
         self.region.addItems(
             [
                 "India",
@@ -2625,39 +2630,106 @@ class SettingsScreen(QWidget):
                 "Other",
             ]
         )
-
         self.region.currentTextChanged.connect(
             self.region_changed
         )
 
-        content.addWidget(
-            SettingRow(
-                "Region",
-                (
-                    "Saved locally for future regional recommendations, "
-                    "content and account preferences."
-                ),
-                self.region,
-            )
+        self.region_row = SettingRow(
+            tr("language.region"),
+            tr("language.region_desc"),
+            self.region,
         )
+        content.addWidget(self.region_row)
 
-        self.language_status = QLabel(
-            "Current build language: English"
-        )
-
+        self.language_status = QLabel()
         self.language_status.setObjectName(
             "SettingsInfoText"
         )
-
-        content.addWidget(
-            self.language_status
-        )
-
+        content.addWidget(self.language_status)
         content.addStretch()
 
         self.register_page(
             self.LANGUAGE,
             page
+        )
+        self.retranslate_language_page()
+
+    def language_selection_changed(self, *_):
+        code = self.language.currentData() or "en"
+        language_manager.set_language(code)
+        self.retranslate_settings()
+        self.save_settings()
+        self.language_updated.emit(code)
+
+    def retranslate_language_page(self, *_):
+        if hasattr(self, "language_page_title") and self.language_page_title:
+            self.language_page_title.setText(tr("language.title"))
+        if hasattr(self, "language_page_subtitle") and self.language_page_subtitle:
+            self.language_page_subtitle.setText(tr("language.subtitle"))
+
+        # SettingRow owns its title/subtitle labels; discover them safely by order.
+        for row, title, subtitle in (
+            (getattr(self, "language_row", None), tr("language.interface"), tr("language.desc")),
+            (getattr(self, "region_row", None), tr("language.region"), tr("language.region_desc")),
+        ):
+            if row is not None:
+                labels = row.findChildren(QLabel)
+                if len(labels) >= 1:
+                    labels[0].setText(title)
+                if len(labels) >= 2:
+                    labels[1].setText(subtitle)
+
+        if hasattr(self, "language_status"):
+            name = LANGUAGE_NAMES.get(language_manager.language, "English")
+            self.language_status.setText(
+                tr("language.status", language=name)
+            )
+
+    def _translate_widget_text(self, widget):
+        """Translate static Settings text while preserving its English source."""
+        if not hasattr(widget, "text") or not hasattr(widget, "setText"):
+            return
+
+        try:
+            current = widget.text()
+        except Exception:
+            return
+
+        if not isinstance(current, str) or not current:
+            return
+
+        source = widget.property("_lyrx_i18n_source")
+
+        # Store only known English literals as translation sources.
+        if not source:
+            from core.language_manager import LITERAL_TRANSLATIONS
+            known = (
+                current in LITERAL_TRANSLATIONS.get("hi", {})
+                or current in LITERAL_TRANSLATIONS.get("fr", {})
+            )
+            if not known:
+                return
+            source = current
+            widget.setProperty("_lyrx_i18n_source", source)
+
+        widget.setText(
+            language_manager.translate_literal(source)
+        )
+
+    def retranslate_settings(self, *_):
+        """Live-retranslate every static Settings label/button/card."""
+        # Existing Language page uses key-based translations.
+        self.retranslate_language_page()
+
+        # Translate all static QLabel/QPushButton text across every internal page.
+        for widget_type in (QLabel, QPushButton):
+            for widget in self.findChildren(widget_type):
+                self._translate_widget_text(widget)
+
+        # Keep the window title localized too.
+        title = language_manager.translate_literal("Settings")
+        self.setWindowTitle(
+            f"🎵 LYRx - {title}"
         )
 
     # ========================================================
@@ -4384,22 +4456,11 @@ class SettingsScreen(QWidget):
         # LANGUAGE
         # ====================================================
 
-        language = str(
-            self.settings.value(
-                "settings/language",
-                "English",
-            )
-            or "English"
+        language_code = language_manager.language
+        language_index = self.language.findData(
+            language_code
         )
-
-        language_index = (
-            self.language.findText(
-                language
-            )
-        )
-
         if language_index >= 0:
-
             self.language.setCurrentIndex(
                 language_index
             )
@@ -4547,6 +4608,11 @@ class SettingsScreen(QWidget):
         self.settings.setValue(
             "settings/app_notifications",
             self.app_notifications.isChecked(),
+        )
+
+        self.settings.setValue(
+            "settings/language_code",
+            self.language.currentData() or "en",
         )
 
         self.settings.setValue(

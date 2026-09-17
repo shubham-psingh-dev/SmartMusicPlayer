@@ -254,5 +254,71 @@ The Now Playing interface also includes UI foundations for:
 
 These actions are intentionally reserved for deeper application/provider integration before the commercial release.
 
+- [x] Day 28 - LYRx Kids Mode
+
+LYRx now includes a dedicated Kids Mode designed as a separate,
+child-friendly experience inside the same desktop application.
+
+### ✨ Kids Mode Features
+
+- Dedicated Kids Mode home experience
+- Separate child-friendly sidebar and navigation
+- Custom LYRx Kids visual identity and hero experience
+- Kids-only content discovery
+- Kids Music
+- Audible Stories
+- Poems & Rhymes
+- Spiritual content
+- Persistent Kids Favorites
+- Search inside Kids content sections
+- Dedicated Kids mini/floating player
+- Main LYRx player isolated from Kids Mode
+- Kids-specific playback experience
+- Popular for Kids discovery shortcuts
+
+### 🎓 Study & Learn
+
+Kids Mode also introduces an interactive learning area with:
+
+- English Alphabets
+- Numbers from 1–100
+- Visual tens & ones number learning
+- Hindi वर्णमाला
+- French Alphabet
+- Colors & Shapes
+- Interactive Kids Math
+- Addition
+- Subtraction
+- Multiplication
+- Division
+
+Study & Learn uses category-based navigation so children can explore
+one learning activity at a time without overcrowding the interface.
+
+### 🛡️ Parental Controls & Kids Safety
+
+- Dedicated Kids Settings
+- Safe Search controls
+- Explicit-content filtering
+- Harmful-content filtering
+- Persistent parental preferences
+- Parent Exit PIN protection
+- Separate Kids Mode environment
+- Child-focused discovery filtering
+
+### 🎨 Kids UX
+
+- Dedicated Kids Mode theme
+- Child-friendly typography and spacing
+- Custom Kids banner artwork
+- LYRx Kids navigation icon
+- Larger visual learning elements
+- Dedicated window controls
+- Responsive scrollable learning grids
+- Separate Kids Mode navigation from the main LYRx interface
+
+> Kids Mode is being built around a simple principle:
+> **Listen • Learn • Imagine**
+
 
 Version: LYRx Alpha 1.0

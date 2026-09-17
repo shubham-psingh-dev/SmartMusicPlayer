@@ -821,6 +821,11 @@ class Sidebar(QWidget):
             ),
 
             (
+                "Kids Mode",
+                "kids.svg",
+            ),
+
+            (
                 "Settings",
                 "settings.svg",
             ),
@@ -1477,10 +1482,23 @@ class Sidebar(QWidget):
             "Playlists": "nav.playlists",
             "AI Assistant": "nav.assistant",
             "YT BOX": "nav.ytbox",
+            "Kids Mode": "nav.kids",
             "Settings": "nav.settings",
         }
         for button in self.buttons:
-            button.setText(tr(keys.get(button.page_name, button.page_name)))
+            key = keys.get(button.page_name, button.page_name)
+            translated = tr(key)
+
+            # Keep Kids Mode polished even when an older translation table
+            # does not yet contain nav.kids (which otherwise displays "nav.kids").
+            if button.page_name == "Kids Mode" and (
+                not translated
+                or translated == "nav.kids"
+                or translated == key
+            ):
+                translated = "Kids Mode"
+
+            button.setText(translated)
 
         # Theme wording is normally refreshed by update_theme_ui; calling it
         # here keeps the visible label in sync immediately after language change.

@@ -45,6 +45,7 @@ from widgets.sidebar import Sidebar
 from data.playlist_store import playlist_store
 from services.youtube_service import youtube_service
 from ui.settings.settings_screen import SettingsScreen
+from ui.kids.kids_mode_page import KidsModePage
 
 from core.theme_manager import ThemeManager
 from core.language_manager import language_manager
@@ -1336,6 +1337,21 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 28.1 - KIDS MODE FOUNDATION
+        # ====================================================
+
+        self.kids_mode = KidsModePage()
+        self.kids_mode.exit_requested.connect(
+            self.exit_kids_mode
+        )
+        self.kids_mode.minimize_requested.connect(self.showMinimized)
+        self.kids_mode.maximize_requested.connect(self.toggle_kids_max_restore)
+        self.kids_mode.close_requested.connect(self.close)
+        self.pages.addWidget(
+            self.kids_mode
+        )
+
+        # ====================================================
         # DAY 25 - SETTINGS
         # ====================================================
 
@@ -2041,6 +2057,8 @@ class AppWindow(QMainWindow):
 
             "YT BOX": self.yt_box,
 
+            "Kids Mode": self.kids_mode,
+
             "Settings": self.settings
         }
 
@@ -2140,6 +2158,24 @@ class AppWindow(QMainWindow):
 
         print(
             f"Page changed: {page_name}"
+        )
+
+    def toggle_kids_max_restore(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    # ========================================================
+    # DAY 28.1 - EXIT KIDS MODE
+    # ========================================================
+
+    def exit_kids_mode(self):
+        # Phase 28.1 deliberately returns to the standard LYRx Home.
+        # A parent PIN gate will be added when parental controls are
+        # implemented in the dedicated Day 28 safety phase.
+        self.handle_page_change(
+            "Home"
         )
 
     # ========================================================

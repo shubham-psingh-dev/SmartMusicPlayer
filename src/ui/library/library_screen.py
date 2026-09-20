@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSettings
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (
     QWidget,
@@ -13,10 +13,12 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QGridLayout,
+    QFileDialog,
 )
 
 from widgets.sidebar import Sidebar
 from widgets.cards.music_card import MusicCard
+from core.local_media import read_local_media, format_duration
 
 
 # ============================================================
@@ -40,6 +42,11 @@ class LibraryScreen(QWidget):
         str,
         str,
         str
+    )
+
+    # DAY 29.2 - full local file path + display metadata
+    local_song_requested = Signal(
+        str, str, str, str
     )
 
     # ========================================================
@@ -69,28 +76,41 @@ class LibraryScreen(QWidget):
         # MUSIC DATA
         # ----------------------------------------------------
 
+        self.settings = QSettings(
+            "LYRx",
+            "DesktopMusicPlayer"
+        )
+
+        # Each item:
+        # (cover_path, title, artist, local_audio_path_or_empty)
         self.library_songs = [
             (
                 "assets/album_art/believer.jpg",
                 "Believer",
                 "Imagine Dragons",
+                "",
             ),
             (
                 "assets/album_art/faded.jpg",
                 "Faded",
                 "Alan Walker",
+                "",
             ),
             (
                 "assets/album_art/arcade.jpg",
                 "Arcade",
                 "Duncan Laurence",
+                "",
             ),
             (
                 "assets/album_art/lethergo.jpg",
                 "Let Her Go",
                 "Passenger",
+                "",
             ),
         ]
+
+        self._load_local_library()
 
         self.music_cards = []
 
@@ -421,11 +441,11 @@ class LibraryScreen(QWidget):
         )
 
         # ----------------------------------------------------
-        # ALL SONGS BUTTON
+        # ADD LOCAL MUSIC BUTTON
         # ----------------------------------------------------
 
         self.all_button = QPushButton(
-            "All Songs"
+            "＋ Add Local Music"
         )
 
         self.all_button.setCursor(
@@ -437,7 +457,7 @@ class LibraryScreen(QWidget):
         )
 
         self.all_button.clicked.connect(
-            self.clear_search
+            self.add_local_music
         )
 
         toolbar.addWidget(
@@ -1115,11 +1135,9 @@ class LibraryScreen(QWidget):
 
         columns = 4
 
-        for index, (
-            image_path,
-            title,
-            artist
-        ) in enumerate(songs):
+        for index, song_data in enumerate(songs):
+
+            image_path,title,artist,local_audio_path,duration_seconds,album = self._normalize_library_item(song_data)
 
             card = MusicCard(
                 image_path,
@@ -1127,14 +1145,26 @@ class LibraryScreen(QWidget):
                 artist
             )
 
-            card.setSizePolicy(
-                QSizePolicy.Expanding,
-                QSizePolicy.Fixed
-            )
+            card.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Fixed)
+            if local_audio_path and duration_seconds:
+                for name in ("duration","duration_label","time_label"):
+                    label=getattr(card,name,None)
+                    if label is not None and hasattr(label,"setText"):
+                        label.setText(format_duration(duration_seconds)); break
 
-            card.play_requested.connect(
-                self.handle_song_request
-            )
+            if local_audio_path:
+                card.play_requested.connect(
+                    lambda _img, _title, _artist,
+                    audio=local_audio_path,
+                    display_title=title,
+                    display_artist=artist,
+                    cover=image_path:
+                    self.handle_local_song_request(audio,display_title,display_artist,cover)
+                )
+            else:
+                card.play_requested.connect(
+                    self.handle_song_request
+                )
 
             # ------------------------------------------------
             # APPLY CURRENT THEME TO NEW CARD
@@ -1231,11 +1261,8 @@ class LibraryScreen(QWidget):
 
         for song in self.library_songs:
 
-            image_path, title, artist = song
-
-            searchable = (
-                f"{title} {artist}"
-            ).lower()
+            image_path,title,artist,local_audio_path,duration_seconds,album = self._normalize_library_item(song)
+            searchable=f"{title} {artist} {album} {local_audio_path}".lower()
 
             if query in searchable:
 
@@ -1246,6 +1273,116 @@ class LibraryScreen(QWidget):
         self.populate_library(
             filtered
         )
+
+    # ========================================================
+    # DAY 29.2 - LOCAL MUSIC LIBRARY
+    # ========================================================
+
+    @staticmethod
+    def _normalize_library_item(song):
+        v=list(song)
+        while len(v)<6: v.append(0 if len(v)==4 else "")
+        try: duration=int(v[4] or 0)
+        except: duration=0
+        return v[0],v[1],v[2],v[3],duration,v[5]
+
+    def _load_local_library(self):
+        saved = self.settings.value(
+            "library/local_files",
+            [],
+        )
+
+        if isinstance(saved, str):
+            saved = [saved] if saved else []
+
+        seen = set()
+
+        for raw_path in saved or []:
+            audio_path = Path(str(raw_path))
+
+            if (
+                not audio_path.exists()
+                or not audio_path.is_file()
+            ):
+                continue
+
+            resolved = str(audio_path.resolve())
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+
+            self.library_songs.append(
+                self._library_item_from_file(
+                    audio_path
+                )
+            )
+
+    def _library_item_from_file(self, audio_path):
+        m=read_local_media(audio_path)
+        return (m["cover_path"],m["title"],m["artist"],m["path"],m["duration"],m["album"])
+
+    def _save_local_library(self):
+        local_files = []
+
+        for song in self.library_songs:
+            _,_,_,audio_path,_,_ = self._normalize_library_item(song)
+            if audio_path:
+                local_files.append(audio_path)
+
+        self.settings.setValue(
+            "library/local_files",
+            local_files,
+        )
+        self.settings.sync()
+
+    def add_local_music(self):
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Add music to LYRx",
+            str(Path.home() / "Music"),
+            (
+                "Audio Files "
+                "(*.mp3 *.wav *.flac *.m4a *.aac *.ogg *.wma);;"
+                "All Files (*)"
+            ),
+        )
+
+        if not files:
+            return
+
+        existing = {
+            self._normalize_library_item(song)[3]
+            for song in self.library_songs
+            if self._normalize_library_item(song)[3]
+        }
+
+        added = 0
+
+        for file_path in files:
+            audio_path = Path(file_path)
+
+            if not audio_path.exists():
+                continue
+
+            resolved = str(audio_path.resolve())
+            if resolved in existing:
+                continue
+
+            self.library_songs.append(
+                self._library_item_from_file(
+                    audio_path
+                )
+            )
+            existing.add(resolved)
+            added += 1
+
+        if added:
+            self._save_local_library()
+            self.search.clear()
+            self.populate_library()
+
+    def handle_local_song_request(self,audio_path,title,artist,cover_path):
+        self.local_song_requested.emit(str(audio_path),str(title),str(artist),str(cover_path or ""))
 
     # ========================================================
     # CLEAR SEARCH

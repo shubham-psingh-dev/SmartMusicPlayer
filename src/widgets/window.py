@@ -1,3 +1,9 @@
+import json
+import hashlib
+import urllib.request
+from pathlib import Path
+from types import SimpleNamespace
+
 from PySide6.QtCore import (
     Qt,
     Signal,
@@ -1297,6 +1303,10 @@ class AppWindow(QMainWindow):
             self.play_library_song
         )
 
+        self.library.local_song_requested.connect(
+            self.play_local_library_file
+        )
+
         self.pages.addWidget(
             self.library
         )
@@ -1321,6 +1331,7 @@ class AppWindow(QMainWindow):
         #
 
         self.assistant = AssistantScreen()
+        self._ai_pending_music_action = None
 
         self.pages.addWidget(
             self.assistant
@@ -1474,6 +1485,22 @@ class AppWindow(QMainWindow):
         )
 
         # ====================================================
+        # DAY 29 - HOME VIBES + PLAYLISTS
+        # ====================================================
+
+        self.home.mood_search_requested.connect(
+            self.open_mood_from_home
+        )
+
+        self.home.playlists_requested.connect(
+            self.open_playlists_from_home
+        )
+
+        self.home.playlist_open_requested.connect(
+            self.open_playlist_from_home
+        )
+
+        # ====================================================
         # DAY 21 - YT BOX SIGNALS
         # ====================================================
         #
@@ -1504,6 +1531,10 @@ class AppWindow(QMainWindow):
 
         self.favorites.youtube_play_requested.connect(
             self.play_youtube_favorite
+        )
+
+        self.favorites.item_play_requested.connect(
+            self.play_favorite_item
         )
 
         # ====================================================
@@ -1561,6 +1592,48 @@ class AppWindow(QMainWindow):
 
         self.assistant.create_playlist_requested.connect(
             self.create_assistant_playlist
+        )
+
+        # Day 29.5 - natural-language online music action bridge.
+        self.assistant.online_music_action_requested.connect(
+            self.handle_ai_online_music_action
+        )
+
+        self.assistant.online_playlist_requested.connect(
+            self.handle_ai_online_playlist
+        )
+
+        self.assistant.favorite_action_requested.connect(
+            self.handle_ai_favorite_action
+        )
+
+        self.playlists.online_add_requested.connect(
+            self.handle_playlist_online_add
+        )
+
+        # Day 29.6.3 - real Now Playing quick actions.
+        # Keep the originating player so Queue works on the player the
+        # user actually clicked (Home vs Playlist detail).
+        for player in (
+            self.home.now_playing,
+            self.playlists.now_playing,
+        ):
+            player.add_current_to_queue_requested.connect(
+                lambda song, source_player=player:
+                    self.handle_now_playing_queue(
+                        source_player,
+                        song
+                    )
+            )
+            player.add_current_to_playlist_requested.connect(
+                self.handle_now_playing_playlist
+            )
+            player.favorite_current_requested.connect(
+                self.handle_now_playing_favorite
+            )
+
+        self.discover.online_results_ready.connect(
+            self.handle_ai_online_results
         )
 
         # ====================================================
@@ -2012,6 +2085,33 @@ class AppWindow(QMainWindow):
             "Library"
         )
 
+    def open_mood_from_home(
+        self,
+        query: str
+    ):
+        query = (query or "").strip()
+        if not query:
+            return
+
+        self.handle_page_change("Discover")
+        self.discover.search_online_music(query)
+
+    def open_playlists_from_home(
+        self
+    ):
+        self.handle_page_change("Playlists")
+
+    def open_playlist_from_home(
+        self,
+        playlist
+    ):
+        self.handle_page_change("Playlists")
+
+        try:
+            self.playlists.open_playlist(playlist)
+        except Exception as error:
+            print("Home playlist open error:", error)
+
     # ========================================================
     # ========================================================
     # DAY 27 PHASE 1.3 - GLOBAL UI TRANSLATION
@@ -2290,7 +2390,8 @@ class AppWindow(QMainWindow):
 
     def play_online_discover_song(
         self,
-        song
+        song,
+        keep_current_page=False
     ):
 
         try:
@@ -2625,16 +2726,17 @@ class AppWindow(QMainWindow):
             )
 
             # ====================================================
-            # KEEP USER ON DISCOVER
+            # PAGE ROUTING
             # ====================================================
-
-            self.pages.setCurrentWidget(
-                self.discover
-            )
-
-            self.update_sidebar_states(
-                "Discover"
-            )
+            # Normal Discover clicks stay on Discover. AI playback can
+            # remain on the Assistant screen and play in the background.
+            if not keep_current_page:
+                self.pages.setCurrentWidget(
+                    self.discover
+                )
+                self.update_sidebar_states(
+                    "Discover"
+                )
 
             # ====================================================
             # FLOATING PLAYER IMMEDIATE SYNC
@@ -3082,6 +3184,169 @@ class AppWindow(QMainWindow):
     # FAVORITE SONG
     # ========================================================
 
+    def _cache_remote_artwork(self, image_value, category="favorites"):
+        image_value = str(image_value or "").strip()
+        if not image_value:
+            return ""
+
+        if not image_value.lower().startswith(("http://", "https://")):
+            return image_value
+
+        try:
+            cache_dir = Path.home() / ".lyrx" / f"{category}_covers"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+
+            suffix = Path(image_value.split("?", 1)[0]).suffix.lower()
+            if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+                suffix = ".jpg"
+
+            filename = hashlib.sha1(
+                image_value.encode("utf-8")
+            ).hexdigest() + suffix
+            cached = cache_dir / filename
+
+            if not cached.exists() or cached.stat().st_size < 512:
+                request = urllib.request.Request(
+                    image_value,
+                    headers={"User-Agent": "LYRx/0.1"},
+                )
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    data = response.read(5 * 1024 * 1024)
+                if data:
+                    cached.write_bytes(data)
+
+            if cached.exists() and cached.stat().st_size > 0:
+                return str(cached)
+        except Exception as error:
+            print("LYRx artwork cache error:", error)
+
+        return image_value
+
+    def play_favorite_item(self, item):
+        if not isinstance(item, dict):
+            return
+
+        audio_url = str(item.get("audio_url", "") or "").strip()
+        if audio_url:
+            song = SimpleNamespace(
+                id=item.get("id", ""),
+                title=item.get("title", "Unknown Track"),
+                artist=item.get("artist", "Unknown Artist"),
+                image_url=item.get("image_path", "") or item.get("image_url", ""),
+                audio_url=audio_url,
+                preview_url=item.get("preview_url", ""),
+                duration=item.get("duration", 0),
+                provider=item.get("provider", "Favorites"),
+            )
+            self.play_online_discover_song(song, keep_current_page=True)
+            return
+
+        self.play_favorite_song(
+            item.get("image_path", ""),
+            item.get("title", "Unknown Track"),
+            item.get("artist", "Unknown Artist"),
+        )
+
+    def handle_ai_favorite_action(self, action):
+        action = str(action or "").strip().lower()
+        favorites_path = Path(__file__).resolve().parents[2] / "favorites.json"
+
+        try:
+            if favorites_path.exists():
+                data = json.loads(favorites_path.read_text(encoding="utf-8"))
+                favorites = data if isinstance(data, list) else []
+            else:
+                favorites = []
+        except Exception:
+            favorites = []
+
+        if action == "play_random":
+            if not favorites:
+                self.assistant.add_ai_message(
+                    "Your Favorites section is empty right now. Add a song first. ♡"
+                )
+                return
+            import random
+            usable = [
+                item for item in favorites
+                if isinstance(item, dict) and str(item.get("title", "")).strip()
+            ]
+            if not usable:
+                self.assistant.add_ai_message(
+                    "I found no playable entries in your Favorites yet."
+                )
+                return
+
+            item = random.choice(usable)
+            self.play_favorite_item(item)
+            self.assistant.add_ai_message(
+                f'Playing "{item.get("title", "a favorite")}" from your actual Favorites. ♥'
+            )
+            return
+
+        if action == "add_current":
+            player = self.home.now_playing
+            title = str(getattr(player, "current_title", "") or "").strip()
+            artist = str(getattr(player, "current_artist", "") or "").strip()
+            original_image = str(
+                getattr(player, "current_image_path", "") or ""
+            ).strip()
+            image = self._cache_remote_artwork(
+                original_image,
+                "favorites",
+            )
+
+            if not title:
+                self.assistant.add_ai_message("There isn't a current song to favorite.")
+                return
+
+            item = {
+                "image_path": image,
+                "image_url": original_image if original_image.lower().startswith(("http://", "https://")) else "",
+                "title": title,
+                "artist": artist or "Unknown Artist",
+            }
+
+            online_song = getattr(player, "current_online_song", None)
+            if online_song is not None:
+                item.update({
+                    "id": str(getattr(online_song, "id", "") or ""),
+                    "audio_url": str(
+                        getattr(online_song, "audio_url", "")
+                        or getattr(online_song, "preview_url", "")
+                        or ""
+                    ),
+                    "preview_url": str(getattr(online_song, "preview_url", "") or ""),
+                    "duration": int(getattr(online_song, "duration", 0) or 0),
+                    "provider": str(getattr(online_song, "provider", "") or "Online"),
+                })
+
+            key = (title.lower(), artist.lower())
+            exists = any(
+                isinstance(x, dict)
+                and str(x.get("title", "")).lower() == key[0]
+                and str(x.get("artist", "")).lower() == key[1]
+                for x in favorites
+            )
+            if not exists:
+                favorites.append(item)
+                try:
+                    favorites_path.write_text(
+                        json.dumps(favorites, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                except Exception as error:
+                    print("AI favorite save error:", error)
+                    self.assistant.add_ai_message("I couldn't save that favorite.")
+                    return
+
+            self.favorites.reload_favorites()
+            self.assistant.add_ai_message(
+                f'Added "{title}" to your Favorites. ♥'
+                if not exists else
+                f'"{title}" is already in your Favorites. ♥'
+            )
+
     def play_favorite_song(
         self,
         image_path,
@@ -3153,8 +3418,368 @@ class AppWindow(QMainWindow):
         self.floating_player.raise_()
 
     # ========================================================
+    # DAY 29.2 - EXTERNAL LOCAL LIBRARY FILE
+    # ========================================================
+
+    def play_local_library_file(self,audio_path,title,artist,cover_path):
+        self.home.now_playing.play_local_file(audio_path,title,artist,cover_path)
+        self.floating_player.set_song(cover_path,title,artist)
+
+        self.pages.setCurrentWidget(
+            self.library
+        )
+        self.update_sidebar_states(
+            "Library"
+        )
+        self.update_floating_visibility()
+        self.position_floating_player()
+        self.floating_player.raise_()
+
+    # ========================================================
     # AI ASSISTANT - PLAY SONG
     # ========================================================
+
+    def handle_ai_online_music_action(self, action, query):
+        action = str(action or "").strip().lower()
+        query = str(query or "").strip()
+
+        if action not in {"play", "search"} or not query:
+            return
+
+        self._ai_pending_music_action = {
+            "action": action,
+            "query": query,
+        }
+
+        # Search Discover's provider layer silently. The user remains on
+        # LYRx AI; Discover is only opened for an explicit "search" action.
+        if action == "search":
+            self.pages.setCurrentWidget(self.discover)
+            self.update_sidebar_states("Discover")
+            self.update_floating_visibility()
+            self.position_floating_player()
+
+        try:
+            self.discover.search_online_music(query)
+        except Exception as error:
+            print("AI online music search error:", error)
+            self._ai_pending_music_action = None
+            self.assistant.add_ai_message(
+                "I couldn't start that online music search."
+            )
+
+    @staticmethod
+    def _provider_song_metadata(song):
+        if song is None:
+            return {}
+
+        def value(name, default=""):
+            if isinstance(song, dict):
+                return song.get(name, default)
+            return getattr(song, name, default)
+
+        audio_url = str(
+            value("audio_url", "")
+            or value("preview_url", "")
+            or ""
+        ).strip()
+
+        return {
+            "id": str(value("id", "") or ""),
+            "audio_url": audio_url,
+            "preview_url": str(value("preview_url", "") or ""),
+            "image_url": str(value("image_url", "") or ""),
+            "provider": str(value("provider", "") or value("source", "") or ""),
+            "source": str(value("source", "") or value("provider", "") or ""),
+            "duration": int(value("duration", 0) or 0),
+            "share_url": str(value("share_url", "") or ""),
+            "web_url": str(value("web_url", "") or value("url", "") or ""),
+        }
+
+    def handle_now_playing_playlist(self, song):
+        if song is None:
+            return
+
+        title = str(getattr(song, "title", "") or "Unknown Track")
+        artist = str(getattr(song, "artist", "") or "Unknown Artist")
+        image_url = str(getattr(song, "image_url", "") or "")
+        image = self._cache_remote_artwork(image_url, "playlist")
+
+        self.playlists.add_song_to_playlist(
+            image,
+            title,
+            artist,
+            song_data=song,
+        )
+
+    def handle_now_playing_favorite(self, song):
+        if song is None:
+            return
+
+        favorites_path = Path(__file__).resolve().parents[2] / "favorites.json"
+        try:
+            data = (
+                json.loads(favorites_path.read_text(encoding="utf-8"))
+                if favorites_path.exists()
+                else []
+            )
+            favorites = data if isinstance(data, list) else []
+        except Exception:
+            favorites = []
+
+        title = str(getattr(song, "title", "") or "Unknown Track")
+        artist = str(getattr(song, "artist", "") or "Unknown Artist")
+        image_url = str(getattr(song, "image_url", "") or "")
+        image = self._cache_remote_artwork(image_url, "favorites")
+        metadata = self._provider_song_metadata(song)
+
+        exists = any(
+            isinstance(item, dict)
+            and str(item.get("title", "")).strip().lower() == title.strip().lower()
+            and str(item.get("artist", "")).strip().lower() == artist.strip().lower()
+            for item in favorites
+        )
+
+        if not exists:
+            item = {
+                "image_path": image,
+                "image_url": image_url,
+                "title": title,
+                "artist": artist,
+                **metadata,
+            }
+            favorites.append(item)
+            favorites_path.write_text(
+                json.dumps(favorites, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+        self.favorites.reload_favorites()
+
+    def handle_now_playing_queue(
+        self,
+        player,
+        song
+    ):
+        if player is None or song is None:
+            return
+
+        queue = list(
+            getattr(
+                player,
+                "online_queue",
+                []
+            )
+            or []
+        )
+
+        current = (
+            getattr(
+                player,
+                "current_online_song",
+                None
+            )
+            or song
+        )
+
+        # "Add to Queue" means play it again later, so appending the
+        # current track is intentional even when it already exists in
+        # the provider/search/playlist queue.
+        queue.append(song)
+
+        player.set_online_queue(
+            queue,
+            current_song=current
+        )
+
+    def handle_playlist_online_add(self, playlist_id, query, count):
+        playlist_id = str(playlist_id or "").strip()
+        query = str(query or "").strip()
+        count = max(1, min(int(count or 5), 10))
+        if not playlist_id or not query:
+            return
+
+        self._ai_pending_music_action = {
+            "action": "playlist_add",
+            "query": query,
+            "count": count,
+            "playlist_id": playlist_id,
+        }
+
+        try:
+            self.discover.search_online_music(query)
+        except Exception as error:
+            print("Playlist add provider search error:", error)
+            self._ai_pending_music_action = None
+
+    def handle_ai_online_playlist(self, query, count, playlist_name):
+        query = str(query or "").strip()
+        playlist_name = str(playlist_name or "AI Mix").strip()
+        count = max(1, min(int(count or 10), 25))
+
+        if not query:
+            return
+
+        self._ai_pending_music_action = {
+            "action": "playlist",
+            "query": query,
+            "count": count,
+            "playlist_name": playlist_name,
+        }
+
+        # Provider search runs through Discover without changing pages.
+        try:
+            self.discover.search_online_music(query)
+        except Exception as error:
+            print("AI playlist provider search error:", error)
+            self._ai_pending_music_action = None
+            self.assistant.add_ai_message(
+                "I couldn't search the music providers for that playlist."
+            )
+
+    def handle_ai_online_results(self, songs, mode, query):
+        pending = self._ai_pending_music_action
+
+        if not pending:
+            return
+
+        if str(query).strip().lower() != str(
+            pending.get("query", "")
+        ).strip().lower():
+            return
+
+        self._ai_pending_music_action = None
+        songs = list(songs or [])
+
+        if not songs:
+            self.assistant.add_ai_message(
+                f'I could not find a playable result for "{query}".'
+            )
+            return
+
+        if pending.get("action") == "playlist_add":
+            playlist_id = str(pending.get("playlist_id", ""))
+            count = max(1, min(int(pending.get("count", 5)), 10))
+            added = 0
+
+            for song in songs[:count]:
+                title = str(getattr(song, "title", "") or "").strip()
+                artist = str(getattr(song, "artist", "") or "").strip()
+                image_url = str(getattr(song, "image_url", "") or "").strip()
+                image = self._cache_remote_artwork(
+                    image_url,
+                    "playlist",
+                )
+                if not title:
+                    continue
+                success, _ = playlist_store.add_song(
+                    playlist_id,
+                    image,
+                    title,
+                    artist,
+                    **self._provider_song_metadata(song),
+                )
+                if success:
+                    added += 1
+
+            self.playlists.refresh_current_playlist()
+            self.playlists.rebuild_playlist_cards()
+            return
+
+        if pending.get("action") == "playlist":
+            count = max(1, min(int(pending.get("count", 10)), 25))
+            selected = songs[:count]
+            playlist_name = str(
+                pending.get("playlist_name", "AI Mix")
+            ).strip() or "AI Mix"
+
+            real_songs = []
+            for song in selected:
+                title = str(getattr(song, "title", "") or "").strip()
+                artist = str(getattr(song, "artist", "") or "").strip()
+                image_url = str(getattr(song, "image_url", "") or "").strip()
+                image = self._cache_remote_artwork(
+                    image_url,
+                    "playlist",
+                )
+
+                if not title:
+                    continue
+
+                real_songs.append({
+                    "image": image,
+                    "title": title,
+                    "artist": artist or "Unknown Artist",
+                    **self._provider_song_metadata(song),
+                })
+
+            if not real_songs:
+                self.assistant.add_ai_message(
+                    f'I found no usable tracks for "{query}".'
+                )
+                return
+
+            self.create_assistant_playlist(
+                playlist_name,
+                f'Provider results for "{query}"',
+                real_songs,
+            )
+            return
+
+        if pending.get("action") == "search":
+            self.assistant.add_ai_message(
+                f'I found {len(songs)} result(s) for "{query}". '
+                "They are open in Discover."
+            )
+            return
+
+        playable = None
+
+        for song in songs:
+            try:
+                url = ""
+                if hasattr(song, "playable_url"):
+                    url = str(song.playable_url() or "").strip()
+                if not url:
+                    url = str(
+                        getattr(song, "audio_url", "")
+                        or getattr(song, "preview_url", "")
+                        or ""
+                    ).strip()
+                if url:
+                    playable = song
+                    break
+            except Exception:
+                continue
+
+        if playable is None:
+            self.assistant.add_ai_message(
+                f'I found results for "{query}", but none exposed a '
+                "playable audio URL through the current LYRx providers."
+            )
+            return
+
+        try:
+            self.play_online_discover_song(playable, keep_current_page=True)
+
+            title = str(
+                getattr(playable, "title", "")
+                or "the first result"
+            )
+            artist = str(
+                getattr(playable, "artist", "")
+                or ""
+            )
+
+            suffix = f" — {artist}" if artist else ""
+            self.assistant.add_ai_message(
+                f"Now playing: {title}{suffix} 🎵"
+            )
+        except Exception as error:
+            print("AI provider playback error:", error)
+            self.assistant.add_ai_message(
+                "I found the track, but LYRx couldn't start playback."
+            )
 
     def play_assistant_song(
         self,
@@ -3600,7 +4225,12 @@ class AppWindow(QMainWindow):
                         playlist_id,
                         image_path,
                         title,
-                        artist
+                        artist,
+                        **{
+                            key: value
+                            for key, value in song.items()
+                            if key not in ("image", "title", "artist")
+                        }
                     )
                 )
 

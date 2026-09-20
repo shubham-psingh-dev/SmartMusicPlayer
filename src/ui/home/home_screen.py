@@ -67,6 +67,11 @@ class HomeScreen(QWidget):
     explore_music_requested = Signal()
     library_requested = Signal()
 
+    # DAY 29 - functional Home discovery/navigation
+    mood_search_requested = Signal(str)
+    playlists_requested = Signal()
+    playlist_open_requested = Signal(object)
+
     def __init__(self):
 
         super().__init__()
@@ -836,6 +841,9 @@ class HomeScreen(QWidget):
             Qt.AlignRight |
             Qt.AlignVCenter
         )
+        self.playlist_more.setCursor(Qt.PointingHandCursor)
+        self.playlist_more.setToolTip("Open all playlists")
+        self.playlist_more.mousePressEvent = self._open_all_playlists
 
         playlist_header_layout.addWidget(
             self.playlist_more
@@ -999,6 +1007,13 @@ class HomeScreen(QWidget):
     ):
 
         card = QFrame()
+        card.setCursor(Qt.PointingHandCursor)
+        card.setToolTip(
+            f"Open {playlist.get('name', 'playlist')}"
+        )
+        card.mousePressEvent = (
+            lambda event, p=playlist: self._open_playlist_card(event, p)
+        )
 
         card.setMinimumWidth(
             180
@@ -1751,10 +1766,29 @@ class HomeScreen(QWidget):
         mood_name
     ):
 
-        print(
-            "Mood selected:",
-            mood_name
+        # Route mood discovery through AppWindow -> DiscoverScreen.
+        # No fake local playlist: provider-backed Discover handles the query.
+        query_map = {
+            "Chill": "chill music",
+            "Focus": "focus music",
+            "Happy": "happy songs",
+            "Workout": "workout music",
+            "Sleep": "sleep music",
+            "Rainy Day": "rainy day songs",
+            "Romantic": "romantic songs",
+            "Party": "party songs",
+            "Travel": "road trip songs",
+            "Acoustic": "acoustic songs",
+            "Motivation": "motivational songs",
+            "Peaceful": "peaceful music",
+        }
+
+        query = query_map.get(
+            mood_name,
+            f"{mood_name} music"
         )
+
+        self.mood_search_requested.emit(query)
 
     # =========================================================
     # MOOD SEE ALL
@@ -1763,10 +1797,17 @@ class HomeScreen(QWidget):
     def handle_mood_see_all(
         self
     ):
+        # MoodSection itself expands/collapses the extra mood row.
+        # This hook intentionally stays lightweight.
+        pass
 
-        print(
-            "See All moods clicked"
-        )
+    def _open_all_playlists(self, event):
+        if event.button() == Qt.LeftButton:
+            self.playlists_requested.emit()
+
+    def _open_playlist_card(self, event, playlist):
+        if event.button() == Qt.LeftButton:
+            self.playlist_open_requested.emit(playlist)
 
     # =========================================================
     # THEME STATE

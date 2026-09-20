@@ -18,6 +18,8 @@ from PySide6.QtGui import (
     QPixmap,
     QPainter,
     QPainterPath,
+    QColor,
+    QPen,
 )
 
 from PySide6.QtWidgets import (
@@ -37,6 +39,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QScrollArea,
     QSizePolicy,
+    QMenu,
 )
 
 
@@ -3450,6 +3453,38 @@ class AccountDialog(QDialog):
 # HEADER
 # ============================================================
 
+def glossy_bell_icon(is_dark=True):
+    """Vector bell icon: crisp on Windows, no emoji/font clipping."""
+    pix = QPixmap(30, 30)
+    pix.fill(Qt.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.Antialiasing)
+
+    glow = QColor("#C4B5FD" if is_dark else "#7C3AED")
+    pen = QPen(glow)
+    pen.setWidthF(2.0)
+    painter.setPen(pen)
+    painter.setBrush(QColor("#8B5CF6"))
+
+    # bell dome/body
+    path = QPainterPath()
+    path.moveTo(9, 20)
+    path.lineTo(11, 17)
+    path.lineTo(11, 12)
+    path.cubicTo(11, 7, 19, 7, 19, 12)
+    path.lineTo(19, 17)
+    path.lineTo(21, 20)
+    path.closeSubpath()
+    painter.drawPath(path)
+
+    # clapper + glossy highlight
+    painter.drawEllipse(13, 21, 4, 3)
+    painter.setPen(QPen(QColor(255, 255, 255, 185), 1.3))
+    painter.drawArc(12, 9, 6, 7, 35 * 16, 105 * 16)
+    painter.end()
+    return QIcon(pix)
+
+
 class Header(QWidget):
 
     search_changed = Signal(
@@ -3464,6 +3499,8 @@ class Header(QWidget):
         str,
         str
     )
+
+    notification_opened = Signal()
 
     def __init__(self):
 
@@ -3594,6 +3631,21 @@ class Header(QWidget):
         root.addWidget(
             self.profile
         )
+
+        # =====================================================
+        # DAY 29.5 - NOTIFICATIONS
+        # =====================================================
+
+        self.notification_button = QPushButton()
+        self.notification_button.setObjectName("NotificationButton")
+        self.notification_button.setFixedSize(44, 44)
+        self.notification_button.setIcon(glossy_bell_icon(True))
+        self.notification_button.setIconSize(QSize(30, 30))
+        self.notification_button.setCursor(Qt.PointingHandCursor)
+        self.notification_button.setToolTip("Notifications")
+        self.notification_button.clicked.connect(self.open_notifications)
+
+        root.addWidget(self.notification_button)
 
         # =====================================================
         # WINDOW CONTROLS
@@ -3779,6 +3831,64 @@ class Header(QWidget):
     # =========================================================
     # SEARCH
     # =========================================================
+
+    def open_notifications(self):
+        """Small real notification center anchored to the Home header."""
+        menu = QMenu(self)
+        menu.setObjectName("LYRxNotificationMenu")
+
+        title = menu.addAction("Notifications")
+        title.setEnabled(False)
+        menu.addSeparator()
+
+        notifications = self._notification_items()
+
+        for text in notifications:
+            action = menu.addAction(text)
+            action.setEnabled(False)
+
+        menu.addSeparator()
+
+        clear_action = menu.addAction("✓  Mark all as read")
+        selected = menu.exec(
+            self.notification_button.mapToGlobal(
+                self.notification_button.rect().bottomLeft()
+            )
+        )
+
+        if selected == clear_action:
+            self.profile_store.settings.setValue(
+                "notifications/home_seen",
+                True
+            )
+            self.profile_store.settings.sync()
+            self.notification_button.setToolTip(
+                "Notifications • All caught up"
+            )
+
+        self.notification_opened.emit()
+
+    def _notification_items(self):
+        seen = bool(
+            self.profile_store.settings.value(
+                "notifications/home_seen",
+                False,
+                type=bool,
+            )
+        )
+
+        items = [
+            "✨ LYRx AI is online and ready",
+            "🎵 Local Music supports your own audio files",
+            "🧒 Kids Mode is available from the sidebar",
+        ]
+
+        if not seen:
+            self.notification_button.setToolTip(
+                "Notifications • New updates"
+            )
+
+        return items
 
     def request_online_search(self):
 
@@ -4029,6 +4139,43 @@ class Header(QWidget):
                     border: 1px solid #FB7185;
                 }
             """
+
+        self.notification_button.setIcon(
+            glossy_bell_icon(self.current_is_dark)
+        )
+        if self.current_is_dark:
+            self.notification_button.setStyleSheet("""
+                QPushButton#NotificationButton {
+                    border-radius: 22px;
+                    border: 1px solid #4C3678;
+                    background: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #2B1B49, stop:0.55 #201531, stop:1 #171023
+                    );
+                }
+                QPushButton#NotificationButton:hover {
+                    border: 1px solid #A78BFA;
+                    background: #342057;
+                }
+                QPushButton#NotificationButton:pressed {
+                    background: #24153F;
+                }
+            """)
+        else:
+            self.notification_button.setStyleSheet("""
+                QPushButton#NotificationButton {
+                    border-radius: 22px;
+                    border: 1px solid #D8C8F5;
+                    background: qlineargradient(
+                        x1:0, y1:0, x2:1, y2:1,
+                        stop:0 #FFFFFF, stop:1 #F1E9FF
+                    );
+                }
+                QPushButton#NotificationButton:hover {
+                    border: 1px solid #8B5CF6;
+                    background: #F4EEFF;
+                }
+            """)
 
         for button in (
             self.btn_minimize,

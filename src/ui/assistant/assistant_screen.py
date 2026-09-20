@@ -1,4 +1,14 @@
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread, QTimer, QFile, QIODevice
+import re
+import os
+import base64
+import tempfile
+import wave
+import requests
+from pathlib import Path
+
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QPen
+from PySide6.QtMultimedia import QAudioSource, QAudioFormat, QMediaDevices
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -12,6 +22,116 @@ from PySide6.QtWidgets import (
 )
 
 from widgets.sidebar import Sidebar
+from core.ai_service import GeminiChatWorker
+
+
+def _microphone_icon():
+    """Draw a crisp microphone icon without depending on emoji fonts."""
+    pix = QPixmap(28, 28)
+    pix.fill(Qt.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.Antialiasing)
+    pen = QPen(QColor("#F4EEFF"))
+    pen.setWidthF(2.0)
+    painter.setPen(pen)
+    painter.setBrush(QColor("#8B5CF6"))
+    painter.drawRoundedRect(10, 4, 8, 13, 4, 4)
+    painter.setBrush(Qt.NoBrush)
+    painter.drawArc(7, 9, 14, 12, 180 * 16, 180 * 16)
+    painter.drawLine(14, 21, 14, 24)
+    painter.drawLine(10, 24, 18, 24)
+    painter.end()
+    return QIcon(pix)
+
+
+class VoiceTranscriptionWorker(QThread):
+    """Transcribe recorded LYRx voice audio using the configured Gemini API."""
+    recognized = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, wav_path, parent=None):
+        super().__init__(parent)
+        self.wav_path = str(wav_path)
+
+    def run(self):
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        model = os.getenv("LYRX_AI_MODEL", "gemini-3.6-flash").strip() or "gemini-3.6-flash"
+
+        if not api_key:
+            self.failed.emit("Voice needs the same GEMINI_API_KEY already used by LYRx AI.")
+            return
+
+        try:
+            audio_bytes = Path(self.wav_path).read_bytes()
+            if len(audio_bytes) < 1500:
+                self.failed.emit("I didn't receive enough microphone audio. Please try again.")
+                return
+
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent"
+            )
+            payload = {
+                "contents": [{
+                    "role": "user",
+                    "parts": [
+                        {"text": (
+                            "Transcribe this voice command exactly as spoken. "
+                            "The speaker may use English, Hindi, or Hinglish. "
+                            "Return ONLY the transcription, with no label, quotes, "
+                            "markdown or explanation."
+                        )},
+                        {"inlineData": {
+                            "mimeType": "audio/wav",
+                            "data": base64.b64encode(audio_bytes).decode("ascii"),
+                        }},
+                    ],
+                }],
+                "generationConfig": {"temperature": 0.0, "maxOutputTokens": 120},
+            }
+
+            response = requests.post(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": api_key,
+                },
+                json=payload,
+                timeout=45,
+            )
+
+            if response.status_code != 200:
+                try:
+                    detail = response.json().get("error", {}).get("message", "")
+                except Exception:
+                    detail = ""
+                self.failed.emit(
+                    "Voice transcription couldn't connect to LYRx AI."
+                    + (f" {detail[:140]}" if detail else "")
+                )
+                return
+
+            candidates = response.json().get("candidates") or []
+            if not candidates:
+                self.failed.emit("I couldn't understand that voice command. Please try again.")
+                return
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+            text = " ".join(
+                str(part.get("text", "")).strip()
+                for part in parts if part.get("text")
+            ).strip().strip("`").strip()
+            text = re.sub(r"(?i)^transcription\\s*:\\s*", "", text).strip()
+
+            if text:
+                self.recognized.emit(text)
+            else:
+                self.failed.emit("I couldn't understand that voice command. Please try again.")
+
+        except requests.RequestException:
+            self.failed.emit("Voice transcription needs an internet connection.")
+        except Exception as error:
+            self.failed.emit(f"Voice transcription error: {error}")
 
 
 # ============================================================
@@ -56,6 +176,15 @@ class AssistantScreen(QWidget):
         object
     )
 
+    # Day 29.5 - real online music action bridge.
+    # action: "play" or "search"; query: provider search text.
+    online_music_action_requested = Signal(str, str)
+
+    # Real provider-backed playlist request: query, count, playlist name.
+    online_playlist_requested = Signal(str, int, str)
+
+    favorite_action_requested = Signal(str)
+
     # ========================================================
     # INIT
     # ========================================================
@@ -65,6 +194,22 @@ class AssistantScreen(QWidget):
         super().__init__()
 
         self.current_is_dark = True
+
+        # Day 29.4 - real conversational AI state.
+        # App/player commands stay local and instant; normal conversation
+        # goes to Gemini in a background thread so the PySide UI never freezes.
+        self.ai_history = []
+        self.ai_worker = None
+        self.ai_busy = False
+        self.voice_worker = None
+        self.voice_busy = False
+        self.voice_audio_source = None
+        self.voice_raw_file = None
+        self.voice_raw_path = ""
+        self.voice_wav_path = ""
+        self.voice_timer = QTimer(self)
+        self.voice_timer.setSingleShot(True)
+        self.voice_timer.timeout.connect(self.stop_voice_input)
 
         self.setObjectName(
             "AssistantScreen"
@@ -536,6 +681,37 @@ class AssistantScreen(QWidget):
         )
 
         # ----------------------------------------------------
+        # VOICE INPUT
+        # ----------------------------------------------------
+
+        self.voice_button = QPushButton()
+        self.voice_button.setObjectName("AssistantVoiceButton")
+        self.voice_button.setIcon(_microphone_icon())
+        self.voice_button.setIconSize(QPixmap(28, 28).size())
+        self.voice_button.setFixedSize(50, 50)
+        self.voice_button.setCursor(Qt.PointingHandCursor)
+        self.voice_button.setToolTip("Voice input • Speak to LYRx AI")
+        self.voice_button.clicked.connect(self.start_voice_input)
+        self.voice_button.setStyleSheet("""
+            QPushButton#AssistantVoiceButton {
+                border-radius: 25px;
+                border: 1px solid rgba(167, 139, 250, 150);
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #9B6CFF, stop:0.52 #7C3AED, stop:1 #5B21B6
+                );
+            }
+            QPushButton#AssistantVoiceButton:hover {
+                border: 1px solid #D8B4FE;
+                background: #8B5CF6;
+            }
+            QPushButton#AssistantVoiceButton:pressed {
+                background: #6D28D9;
+            }
+        """)
+        input_layout.addWidget(self.voice_button)
+
+        # ----------------------------------------------------
         # SEND
         # ----------------------------------------------------
 
@@ -597,6 +773,9 @@ class AssistantScreen(QWidget):
     # ========================================================
 
     def clear_chat(self):
+
+        # Start a genuinely fresh AI conversation too.
+        self.ai_history = []
 
         # ====================================================
         # REMOVE EVERYTHING EXCEPT BOTTOM STRETCH
@@ -685,6 +864,152 @@ class AssistantScreen(QWidget):
                 )
 
     # ========================================================
+    # VOICE INPUT
+    # ========================================================
+
+    def start_voice_input(self):
+        if self.voice_busy or self.ai_busy:
+            return
+
+        device = QMediaDevices.defaultAudioInput()
+        if device.isNull():
+            self.add_ai_message(
+                "No microphone was detected. Enable a Windows microphone and try again."
+            )
+            return
+
+        audio_format = QAudioFormat()
+        audio_format.setSampleRate(16000)
+        audio_format.setChannelCount(1)
+        audio_format.setSampleFormat(QAudioFormat.SampleFormat.Int16)
+
+        if not device.isFormatSupported(audio_format):
+            self.add_ai_message(
+                "Your current microphone doesn't support the LYRx voice recording format."
+            )
+            return
+
+        temp_dir = Path(tempfile.gettempdir()) / "lyrx_voice"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        self.voice_raw_path = str(temp_dir / "command.raw")
+        self.voice_wav_path = str(temp_dir / "command.wav")
+
+        try:
+            Path(self.voice_raw_path).unlink(missing_ok=True)
+            Path(self.voice_wav_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        self.voice_raw_file = QFile(self.voice_raw_path)
+        if not self.voice_raw_file.open(QIODevice.OpenModeFlag.WriteOnly):
+            self.add_ai_message("LYRx couldn't open its temporary voice recording.")
+            self.voice_raw_file = None
+            return
+
+        self.voice_audio_source = QAudioSource(device, audio_format, self)
+        self.voice_audio_source.start(self.voice_raw_file)
+
+        self.voice_busy = True
+        self.voice_button.setEnabled(False)
+        self.voice_button.setToolTip("Listening…")
+        self.input_box.setPlaceholderText("Listening… speak now")
+        self.voice_button.setStyleSheet("""
+            QPushButton#AssistantVoiceButton {
+                border-radius: 25px;
+                border: 2px solid #F0ABFC;
+                background: #A855F7;
+            }
+        """)
+        self.voice_timer.start(6000)
+
+    def stop_voice_input(self):
+        if not self.voice_busy:
+            return
+
+        try:
+            if self.voice_audio_source is not None:
+                self.voice_audio_source.stop()
+            if self.voice_raw_file is not None:
+                self.voice_raw_file.close()
+        except Exception:
+            pass
+
+        self.voice_audio_source = None
+        self.voice_raw_file = None
+
+        try:
+            raw = Path(self.voice_raw_path).read_bytes()
+            if len(raw) < 1000:
+                self._voice_failed(
+                    "I couldn't hear enough audio. Check the Windows microphone input level."
+                )
+                self._voice_finished()
+                return
+
+            with wave.open(self.voice_wav_path, "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(16000)
+                wav_file.writeframes(raw)
+        except Exception as error:
+            self._voice_failed(f"LYRx couldn't prepare the voice recording: {error}")
+            self._voice_finished()
+            return
+
+        self.input_box.setPlaceholderText("Understanding your voice…")
+        self.voice_worker = VoiceTranscriptionWorker(self.voice_wav_path, self)
+        self.voice_worker.recognized.connect(self._voice_recognized)
+        self.voice_worker.failed.connect(self._voice_failed)
+        self.voice_worker.finished.connect(self._voice_finished)
+        self.voice_worker.start()
+
+    def _voice_recognized(self, text):
+        text = str(text or "").strip()
+        if not text:
+            return
+        self.input_box.setText(text)
+        self.send_message()
+
+    def _voice_failed(self, message):
+        self.add_ai_message(message)
+
+    def _voice_finished(self):
+        self.voice_timer.stop()
+        self.voice_busy = False
+        self.voice_button.setEnabled(True)
+        self.voice_button.setToolTip("Voice input • Speak to LYRx AI")
+        self.voice_button.setStyleSheet("""
+            QPushButton#AssistantVoiceButton {
+                border-radius: 25px;
+                border: 1px solid rgba(167, 139, 250, 150);
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #9B6CFF, stop:0.52 #7C3AED, stop:1 #5B21B6
+                );
+            }
+            QPushButton#AssistantVoiceButton:hover {
+                border: 1px solid #D8B4FE;
+                background: #8B5CF6;
+            }
+            QPushButton#AssistantVoiceButton:pressed {
+                background: #6D28D9;
+            }
+        """)
+        if not self.ai_busy:
+            self.input_box.setPlaceholderText("Ask LYRx AI anything...")
+
+        worker = self.voice_worker
+        self.voice_worker = None
+        if worker is not None:
+            worker.deleteLater()
+
+        try:
+            Path(self.voice_raw_path).unlink(missing_ok=True)
+            Path(self.voice_wav_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # ========================================================
     # QUICK PROMPT
     # ========================================================
 
@@ -705,51 +1030,337 @@ class AssistantScreen(QWidget):
 
     def send_message(self):
 
-        message = (
-            self.input_box
-            .text()
-            .strip()
-        )
+        message = self.input_box.text().strip()
 
-        if not message:
-
+        if not message or self.ai_busy:
             return
 
-        # ====================================================
-        # USER BUBBLE
-        # ====================================================
-
-        self.add_user_message(
-            message
-        )
-
+        self.add_user_message(message)
         self.input_box.clear()
 
-        # ====================================================
-        # COMMAND ENGINE
-        # ====================================================
+        favorite_action = self._extract_favorite_action(message)
+        if favorite_action is not None:
+            self.favorite_action_requested.emit(favorite_action)
+            return
 
-        response = self.handle_command(
-            message
+        # Day 29.5.1: provider-backed playlist creation must be
+        # resolved before the legacy hard-coded playlist command.
+        playlist_action = self._extract_online_playlist_action(message)
+
+        if playlist_action is not None:
+            query, count, playlist_name = playlist_action
+            self.online_playlist_requested.emit(query, count, playlist_name)
+            self.add_ai_message(
+                f'Building "{playlist_name}" from real LYRx provider '
+                f'results for "{query}"... 🎧'
+            )
+            return
+
+        # LYRx actions remain deterministic and local:
+        # pause/resume/next/previous/play known demo track/create playlist.
+        # Greetings, recommendations, knowledge questions and everything
+        # else are handled by the real online assistant.
+        if self._is_local_app_action(message):
+            response = self.handle_command(message)
+
+            if response:
+                self.add_ai_message(response)
+
+            self.message_sent.emit(message)
+            return
+
+        # Day 29.5: commands for songs/artists/moods that are not part
+        # of the old four-track local catalog are routed into LYRx Discover.
+        online_action = self._extract_online_music_action(message)
+
+        if online_action is not None:
+            action, query = online_action
+            self.online_music_action_requested.emit(action, query)
+
+            if action == "play":
+                self.add_ai_message(
+                    f'Searching LYRx providers for "{query}" and playing '
+                    "the first playable result... 🎵"
+                )
+            else:
+                self.add_ai_message(
+                    f'Searching LYRx providers for "{query}"... 🔎'
+                )
+            return
+
+        self.message_sent.emit(message)
+        self._ask_online_ai(message)
+
+    def _extract_favorite_action(self, message):
+        """Recognize natural English/Hinglish Favorites commands before Gemini chat."""
+        raw = str(message or "").strip()
+        text = re.sub(r"[^a-z0-9 ]+", " ", raw.lower())
+        text = re.sub(r"\\s+", " ", text).strip()
+
+        favorite_word = any(
+            word in text
+            for word in ("favorite", "favorites", "favourite", "favourites", "fav", "favs")
+        )
+        if not favorite_word:
+            return None
+
+        # Examples:
+        # add this song to my favorites
+        # add current track in favourites
+        # favorite this song
+        if (
+            ("add" in text and any(word in text for word in ("song", "track", "current", "this")))
+            or text.startswith("favorite this")
+            or text.startswith("favourite this")
+        ):
+            return "add_current"
+
+        # Examples:
+        # play a song from my favorites
+        # play from favourites
+        # play my fav songs
+        if "play" in text:
+            return "play_random"
+
+        return None
+
+    def _extract_online_playlist_action(self, message):
+        raw = str(message or "").strip()
+        text = raw.lower()
+
+        if "playlist" not in text:
+            return None
+
+        if not any(word in text for word in ("make", "create", "build")):
+            return None
+
+        count_match = re.search(r"\b(\d{1,2})\b", text)
+        count = int(count_match.group(1)) if count_match else 10
+        count = max(1, min(count, 25))
+
+        query = raw
+
+        patterns = [
+            r"(?i)^.*?playlist\s+(?:for|of|with)\s+",
+            r"(?i)^.*?playlist\s+",
+        ]
+        for pattern in patterns:
+            cleaned = re.sub(pattern, "", query, count=1).strip()
+            if cleaned != query:
+                query = cleaned
+                break
+
+        query = re.sub(r"(?i)\btop\s+\d+\s+(?:songs?|tracks?)\s+(?:of|by|from)\s+", "", query)
+        query = re.sub(r"(?i)\b\d+\s+(?:songs?|tracks?)\s+(?:of|by|from)\s+", "", query)
+        query = re.sub(r"(?i)\b(?:top\s+)?\d+\s+(?:songs?|tracks?)\b", "", query)
+        query = re.sub(r"(?i)\b(?:songs?|tracks?)\s+(?:of|by|from)\s+", "", query)
+        query = query.strip(" .!?-")
+
+        if not query:
+            query = "popular music"
+
+        nice = re.sub(r"(?i)\b(songs?|music|tracks?)\b", "", query).strip()
+        nice = " ".join(word.capitalize() for word in nice.split()) or "AI"
+        playlist_name = f"{nice} Mix"
+
+        return query, count, playlist_name
+
+    def _extract_online_music_action(self, message):
+        """Turn natural play/search wording into a real LYRx provider action."""
+        raw = str(message or "").strip()
+        text = raw.lower().strip()
+
+        if not text:
+            return None
+
+        # Playlist creation stays with the existing LYRx playlist engine.
+        if "playlist" in text:
+            return None
+
+        play_prefixes = (
+            "play me ",
+            "play some ",
+            "play ",
+            "listen to ",
+            "start ",
         )
 
-        # ====================================================
-        # AI BUBBLE
-        # ====================================================
+        search_prefixes = (
+            "search for ",
+            "search ",
+            "find songs by ",
+            "find music by ",
+            "find ",
+        )
 
-        if response:
+        for prefix in play_prefixes:
+            if text.startswith(prefix):
+                query = raw[len(prefix):].strip(" .!?")
+                if query and query.lower() not in {
+                    "music", "song", "songs"
+                }:
+                    return ("play", query)
 
-            self.add_ai_message(
-                response
+        # Natural mood wording: "play relaxing music", etc. is already
+        # captured above and becomes the provider query "relaxing music".
+
+        for prefix in search_prefixes:
+            if text.startswith(prefix):
+                query = raw[len(prefix):].strip(" .!?")
+                if query:
+                    return ("search", query)
+
+        return None
+
+    def _is_local_app_action(self, message):
+
+        text = message.strip().lower()
+
+        exact_actions = {
+            "stop", "stop song", "stop music", "stop the song",
+            "stop the music", "band karo", "music band karo",
+            "song band karo", "pause", "pause song", "pause music",
+            "pause the song", "pause the music", "music pause",
+            "song pause", "resume", "resume song", "resume music",
+            "continue", "continue song", "continue music",
+            "continue playing", "play again", "next", "next song",
+            "play next", "skip", "skip song", "skip this song",
+            "previous", "previous song", "play previous", "last song",
+            "go back song", "play", "play music", "play song",
+            "start music",
+        }
+
+        if text in exact_actions:
+            return True
+
+        # Preserve existing in-app playlist creation.
+        if (
+            ("playlist" in text or "make me" in text)
+            and any(
+                word in text
+                for word in ("create", "make", "build", "playlist")
+            )
+        ):
+            return True
+
+        # Preserve direct playback of tracks that the current LYRx command
+        # engine actually knows how to execute.
+        song = self.find_song_in_message(text)
+
+        if song is not None and any(
+            word in text
+            for word in ("play", "listen", "start")
+        ):
+            return True
+
+        return False
+
+    def _ask_online_ai(self, message):
+
+        self.ai_busy = True
+        self._set_ai_input_enabled(False)
+
+        self.ai_worker = GeminiChatWorker(
+            message=message,
+            history=list(self.ai_history),
+        )
+
+        self.ai_worker.reply_ready.connect(
+            self._handle_online_ai_reply
+        )
+
+        self.ai_worker.error_ready.connect(
+            self._handle_online_ai_error
+        )
+
+        self.ai_worker.finished.connect(
+            self._online_ai_finished
+        )
+
+        self.ai_worker.start()
+
+    def _handle_online_ai_reply(self, reply, sources):
+
+        reply = (reply or "").strip()
+
+        if not reply:
+            reply = (
+                "I received an empty response. Please try that again."
             )
 
-        # ====================================================
-        # MESSAGE SIGNAL
-        # ====================================================
+        # Keep a compact rolling context instead of sending an unlimited
+        # conversation back to the API.
+        self.ai_history.append({
+            "role": "user",
+            "text": getattr(self.ai_worker, "message", ""),
+        })
 
-        self.message_sent.emit(
-            message
-        )
+        self.ai_history.append({
+            "role": "model",
+            "text": reply,
+        })
+
+        self.ai_history = self.ai_history[-12:]
+
+        if sources:
+            source_lines = []
+            seen = set()
+
+            for source in sources[:4]:
+                title = str(source.get("title", "")).strip()
+                url = str(source.get("url", "")).strip()
+
+                if not url or url in seen:
+                    continue
+
+                seen.add(url)
+                source_lines.append(
+                    f"• {title or 'Web source'}\\n  {url}"
+                )
+
+            if source_lines:
+                reply += (
+                    "\\n\\nWeb sources:\\n"
+                    + "\\n".join(source_lines)
+                )
+
+        self.add_ai_message(reply)
+
+    def _handle_online_ai_error(self, message):
+
+        self.add_ai_message(message)
+
+    def _online_ai_finished(self):
+
+        self.ai_busy = False
+        self._set_ai_input_enabled(True)
+
+        worker = self.ai_worker
+        self.ai_worker = None
+
+        if worker is not None:
+            worker.deleteLater()
+
+        self.input_box.setFocus()
+
+    def _set_ai_input_enabled(self, enabled):
+
+        self.input_box.setEnabled(enabled)
+        self.send_button.setEnabled(enabled)
+
+        for button in getattr(self, "quick_buttons", []):
+            button.setEnabled(enabled)
+
+        if enabled:
+            self.input_box.setPlaceholderText(
+                "Ask LYRx AI anything..."
+            )
+            self.send_button.setText("Send")
+        else:
+            self.input_box.setPlaceholderText(
+                "LYRx AI is thinking..."
+            )
+            self.send_button.setText("...")
 
     # ========================================================
     # MAIN COMMAND ENGINE

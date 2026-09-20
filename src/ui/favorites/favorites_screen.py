@@ -66,6 +66,8 @@ class FavoritesScreen(QWidget):
     object
     )
 
+    item_play_requested = Signal(object)
+
     def __init__(self):
 
         super().__init__()
@@ -638,7 +640,8 @@ class FavoritesScreen(QWidget):
             )
 
             card.play_requested.connect(
-                self.handle_play_request
+                lambda _image, _title, _artist, favorite_item=dict(item):
+                self.item_play_requested.emit(favorite_item)
             )
 
             card.favorite_changed.connect(

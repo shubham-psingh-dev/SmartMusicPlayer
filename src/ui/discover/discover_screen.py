@@ -567,6 +567,9 @@ class DiscoverScreen(QWidget):
         object
     )
 
+    # Day 29.5 - lets AppWindow react after an AI-triggered provider search.
+    online_results_ready = Signal(object, str, str)
+
     # ========================================================
     # INIT
     # ========================================================
@@ -1750,6 +1753,12 @@ class DiscoverScreen(QWidget):
             or []
         )
 
+        self.online_results_ready.emit(
+            list(self.online_songs),
+            str(mode),
+            str(query),
+        )
+
         # ====================================================
         # CLEAR LOADING
         # ====================================================
@@ -1889,7 +1898,7 @@ class DiscoverScreen(QWidget):
                 # around Song objects.
                 # ------------------------------------------------
 
-                favorite_enabled=False,
+                favorite_enabled=True,
             )
 
             card.setSizePolicy(

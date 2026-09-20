@@ -663,8 +663,8 @@ class Sidebar(QWidget):
 
                 self.symbol.setPixmap(
                     pix.scaled(
-                        88,
-                        88,
+                        116,
+                        58,
                         Qt.KeepAspectRatio,
                         Qt.SmoothTransformation,
                     )
@@ -677,6 +677,8 @@ class Sidebar(QWidget):
             }
             """
         )
+
+        self.symbol.setFixedHeight(62)
 
         layout.addWidget(
             self.symbol,

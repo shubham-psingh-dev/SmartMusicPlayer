@@ -1,9 +1,12 @@
 from pathlib import Path
 import random
+import hashlib
+import urllib.request
 
 from PySide6.QtCore import (
     Qt,
     Signal,
+    QTimer,
 )
 
 from PySide6.QtGui import (
@@ -28,11 +31,13 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QMessageBox,
+    QSpinBox,
 )
 
 from widgets.sidebar import Sidebar
 from ui.player.now_playing import NowPlaying
 
+from services.music_provider import Song
 from data.playlist_store import (
     playlist_store,
     DEFAULT_QUEUE,
@@ -58,7 +63,40 @@ def find_asset(relative_path):
     if not relative_path:
         return None
 
-    relative_path = Path(relative_path)
+    raw_path = str(relative_path).strip()
+
+    # Provider playlists can contain remote artwork URLs. Cache them locally
+    # so QPixmap/MusicCard can display them exactly like normal LYRx assets.
+    if raw_path.lower().startswith(("http://", "https://")):
+        try:
+            cache_dir = Path.home() / ".lyrx" / "playlist_covers"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+
+            suffix = Path(raw_path.split("?", 1)[0]).suffix.lower()
+            if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+                suffix = ".jpg"
+
+            name = hashlib.sha1(raw_path.encode("utf-8")).hexdigest() + suffix
+            cached = cache_dir / name
+
+            if not cached.exists() or cached.stat().st_size < 512:
+                request = urllib.request.Request(
+                    raw_path,
+                    headers={"User-Agent": "LYRx/0.1"},
+                )
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    data = response.read(5 * 1024 * 1024)
+                if data:
+                    cached.write_bytes(data)
+
+            if cached.exists() and cached.stat().st_size > 0:
+                return cached
+        except Exception as error:
+            print("Playlist artwork cache error:", error)
+
+        return None
+
+    relative_path = Path(raw_path)
 
     candidates = [
 
@@ -149,6 +187,141 @@ def find_asset(relative_path):
 # ============================================================
 # CREATE PLAYLIST DIALOG
 # ============================================================
+
+class LYRxNoticeDialog(QDialog):
+    """Small modern LYRx confirmation/notice instead of native OS message boxes."""
+
+    def __init__(
+        self,
+        parent,
+        title,
+        message,
+        *,
+        success=True,
+        auto_close_ms=1900,
+    ):
+        super().__init__(parent)
+
+        self.setModal(True)
+        self.setWindowTitle(title)
+        self.setFixedWidth(390)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setWindowFlags(
+            Qt.Dialog
+            | Qt.FramelessWindowHint
+        )
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        card = QFrame()
+        card.setObjectName("lyrxNoticeCard")
+        root.addWidget(card)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(22, 18, 22, 18)
+        card_layout.setSpacing(12)
+
+        top = QHBoxLayout()
+        top.setSpacing(12)
+
+        icon = QLabel("✓" if success else "♪")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(42, 42)
+        icon.setObjectName("lyrxNoticeIcon")
+        top.addWidget(icon)
+
+        text_box = QVBoxLayout()
+        text_box.setSpacing(4)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("lyrxNoticeTitle")
+        text_box.addWidget(title_label)
+
+        message_label = QLabel(message)
+        message_label.setObjectName("lyrxNoticeMessage")
+        message_label.setWordWrap(True)
+        text_box.addWidget(message_label)
+
+        top.addLayout(text_box, 1)
+
+        close_btn = QPushButton("×")
+        close_btn.setObjectName("lyrxNoticeClose")
+        close_btn.setFixedSize(30, 30)
+        close_btn.clicked.connect(self.accept)
+        top.addWidget(close_btn, 0, Qt.AlignTop)
+
+        card_layout.addLayout(top)
+
+        accent = QFrame()
+        accent.setObjectName("lyrxNoticeAccent")
+        accent.setFixedHeight(3)
+        card_layout.addWidget(accent)
+
+        self.setStyleSheet("""
+            QFrame#lyrxNoticeCard {
+                background: #171025;
+                border: 1px solid rgba(151, 71, 255, 145);
+                border-radius: 20px;
+            }
+
+            QLabel#lyrxNoticeIcon {
+                color: white;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #B56CFF,
+                    stop:0.48 #843DFF,
+                    stop:1 #5C20D8
+                );
+                border: 1px solid #C08AFF;
+                border-radius: 21px;
+                font-size: 22px;
+                font-weight: 800;
+            }
+
+            QLabel#lyrxNoticeTitle {
+                color: #FFFFFF;
+                font-size: 15px;
+                font-weight: 800;
+            }
+
+            QLabel#lyrxNoticeMessage {
+                color: #C9BBDD;
+                font-size: 12px;
+            }
+
+            QPushButton#lyrxNoticeClose {
+                color: #BBA9D1;
+                background: transparent;
+                border: none;
+                border-radius: 15px;
+                font-size: 21px;
+                font-weight: 600;
+            }
+
+            QPushButton#lyrxNoticeClose:hover {
+                color: white;
+                background: rgba(139, 67, 255, 45);
+            }
+
+            QFrame#lyrxNoticeAccent {
+                border: none;
+                border-radius: 1px;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #9A4DFF,
+                    stop:0.55 #6F35FF,
+                    stop:1 rgba(111, 53, 255, 0)
+                );
+            }
+        """)
+
+        if auto_close_ms and auto_close_ms > 0:
+            QTimer.singleShot(
+                auto_close_ms,
+                self.accept,
+            )
+
 
 class CreatePlaylistDialog(QDialog):
 
@@ -2658,6 +2831,177 @@ class PlaylistSongRow(QFrame):
 
 
 # ============================================================
+# LYRx DELETE CONFIRMATION
+# ============================================================
+
+class DeletePlaylistDialog(QDialog):
+    def __init__(self, playlist_name, parent=None, is_dark=True):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowTitle("Delete Playlist")
+        self.setFixedSize(430, 250)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 26, 28, 24)
+        root.setSpacing(14)
+
+        icon = QLabel("×")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setFixedSize(48, 48)
+        icon.setStyleSheet("""
+            QLabel {
+                color: #FCA5A5;
+                background: rgba(239, 68, 68, 28);
+                border: 1px solid rgba(248, 113, 113, 100);
+                border-radius: 24px;
+                font-size: 28px;
+                font-weight: 800;
+            }
+        """)
+        root.addWidget(icon, 0, Qt.AlignHCenter)
+
+        title = QLabel(f'Delete "{playlist_name}"?')
+        title.setAlignment(Qt.AlignCenter)
+        title.setWordWrap(True)
+        title.setStyleSheet("font-size: 20px; font-weight: 800;")
+        root.addWidget(title)
+
+        note = QLabel("This playlist will be removed from LYRx. This action cannot be undone.")
+        note.setAlignment(Qt.AlignCenter)
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #AFA4C8; font-size: 12px;")
+        root.addWidget(note)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+
+        cancel = QPushButton("Keep Playlist")
+        delete = QPushButton("Delete")
+        for button in (cancel, delete):
+            button.setCursor(Qt.PointingHandCursor)
+            button.setFixedHeight(40)
+            button.setMinimumWidth(120)
+
+        cancel.clicked.connect(self.reject)
+        delete.clicked.connect(self.accept)
+
+        cancel.setStyleSheet("""
+            QPushButton {
+                color: #E9E1F7; background: #241936;
+                border: 1px solid #44315F; border-radius: 11px;
+                font-weight: 700;
+            }
+            QPushButton:hover { background: #302047; }
+        """)
+        delete.setStyleSheet("""
+            QPushButton {
+                color: white; background: #DC3F59;
+                border: none; border-radius: 11px; font-weight: 800;
+            }
+            QPushButton:hover { background: #EF476F; }
+        """)
+        buttons.addWidget(cancel)
+        buttons.addWidget(delete)
+        buttons.addStretch()
+        root.addLayout(buttons)
+
+        self.setStyleSheet(
+            "QDialog { background: #171126; color: white; border: 1px solid #3A2858; }"
+            if is_dark else
+            "QDialog { background: #F8F5FC; color: #241936; border: 1px solid #D9CDE8; }"
+        )
+
+
+# ============================================================
+# ADD SONGS SEARCH DIALOG
+# ============================================================
+
+class PlaylistAddSongsDialog(QDialog):
+    def __init__(self, playlist_name, parent=None, is_dark=True):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowTitle("Add Songs")
+        self.setFixedWidth(470)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 26, 28, 24)
+        root.setSpacing(12)
+
+        title = QLabel("Add songs")
+        title.setStyleSheet("font-size: 22px; font-weight: 800;")
+        root.addWidget(title)
+
+        sub = QLabel(f'Search LYRx music providers and add results to "{playlist_name}".')
+        sub.setWordWrap(True)
+        sub.setStyleSheet("color: #AFA4C8; font-size: 12px;")
+        root.addWidget(sub)
+
+        self.query = QLineEdit()
+        self.query.setPlaceholderText("Artist, song, mood… e.g. Alan Walker")
+        self.query.setFixedHeight(44)
+        root.addWidget(self.query)
+
+        count_row = QHBoxLayout()
+        count_row.addWidget(QLabel("Songs to add"))
+        count_row.addStretch()
+        self.count = QSpinBox()
+        self.count.setRange(1, 10)
+        self.count.setValue(5)
+        self.count.setFixedSize(76, 38)
+        count_row.addWidget(self.count)
+        root.addLayout(count_row)
+
+        actions = QHBoxLayout()
+        actions.addStretch()
+        cancel = QPushButton("Cancel")
+        add = QPushButton("Search & Add")
+        cancel.clicked.connect(self.reject)
+        add.clicked.connect(self._accept_if_valid)
+        for button in (cancel, add):
+            button.setCursor(Qt.PointingHandCursor)
+            button.setFixedHeight(40)
+            button.setMinimumWidth(110)
+        add.setStyleSheet("""
+            QPushButton { color: white; background: #7C3AED; border: none;
+                border-radius: 11px; font-weight: 800; padding: 0 16px; }
+            QPushButton:hover { background: #8B5CF6; }
+        """)
+        cancel.setStyleSheet("""
+            QPushButton { color: #E9E1F7; background: #241936;
+                border: 1px solid #44315F; border-radius: 11px; font-weight: 700; }
+        """)
+        actions.addWidget(cancel)
+        actions.addWidget(add)
+        root.addLayout(actions)
+
+        self.setStyleSheet("""
+            QDialog { background: #171126; color: white; }
+            QLineEdit, QSpinBox {
+                color: white; background: #100B1C; border: 1px solid #3B2A58;
+                border-radius: 11px; padding: 0 12px;
+            }
+            QLineEdit:focus, QSpinBox:focus { border: 1px solid #8B5CF6; }
+        """ if is_dark else """
+            QDialog { background: #F8F5FC; color: #241936; }
+            QLineEdit, QSpinBox {
+                color: #241936; background: white; border: 1px solid #D9CDE8;
+                border-radius: 11px; padding: 0 12px;
+            }
+        """)
+
+    def _accept_if_valid(self):
+        if self.query.text().strip():
+            self.accept()
+        else:
+            self.query.setFocus()
+
+    def values(self):
+        return self.query.text().strip(), int(self.count.value())
+
+
+# ============================================================
 # PLAYLIST DETAIL VIEW
 # ============================================================
 
@@ -2673,6 +3017,7 @@ class PlaylistDetailView(QWidget):
     song_remove_requested = Signal(int)
 
     play_all_requested = Signal()
+    add_songs_requested = Signal(str, int)
 
     def __init__(
         self,
@@ -2753,6 +3098,19 @@ class PlaylistDetailView(QWidget):
         self.play_all_button.clicked.connect(
             self.play_all_requested.emit
         )
+
+        self.add_songs_button = QPushButton("＋  Add Songs")
+        self.add_songs_button.setCursor(Qt.PointingHandCursor)
+        self.add_songs_button.setFixedHeight(40)
+        self.add_songs_button.clicked.connect(self.open_add_songs_dialog)
+        self.add_songs_button.setStyleSheet("""
+            QPushButton {
+                color: #EDE9FE; background: #241936; border: 1px solid #5B3C86;
+                border-radius: 10px; padding: 0 15px; font-weight: 750;
+            }
+            QPushButton:hover { background: #32204A; border-color: #8B5CF6; }
+        """)
+        top.addWidget(self.add_songs_button)
 
         top.addWidget(
             self.play_all_button
@@ -2878,6 +3236,18 @@ class PlaylistDetailView(QWidget):
             9
         )
 
+    def open_add_songs_dialog(self):
+        dialog = PlaylistAddSongsDialog(
+            self.playlist.get("name", "Playlist"),
+            self,
+            self.is_dark,
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+        query, count = dialog.values()
+        if query:
+            self.add_songs_requested.emit(query, count)
+
     # ========================================================
     # COVER
     # ========================================================
@@ -2958,7 +3328,7 @@ class PlaylistDetailView(QWidget):
             empty = QLabel(
                 "♫\n\n"
                 "No songs in this playlist yet.\n"
-                "Add songs from Home."
+                "Use + Add Songs to search LYRx providers."
             )
 
             empty.setAlignment(
@@ -3292,6 +3662,8 @@ class PlaylistScreen(QWidget):
         str,
         str
     )
+
+    online_add_requested = Signal(str, str, int)
 
     def __init__(self):
 
@@ -3986,6 +4358,96 @@ class PlaylistScreen(QWidget):
 
         self.rebuild_playlist_cards()
 
+    @staticmethod
+    def _song_metadata(song):
+        if song is None:
+            return {}
+
+        def value(name, default=""):
+            if isinstance(song, dict):
+                return song.get(name, default)
+            return getattr(song, name, default)
+
+        audio_url = str(
+            value("audio_url", "")
+            or value("preview_url", "")
+            or ""
+        ).strip()
+
+        return {
+            "id": str(value("id", "") or ""),
+            "audio_url": audio_url,
+            "preview_url": str(value("preview_url", "") or ""),
+            "image_url": str(value("image_url", "") or ""),
+            "provider": str(value("provider", "") or value("source", "") or ""),
+            "source": str(value("source", "") or value("provider", "") or ""),
+            "duration": int(value("duration", 0) or 0),
+            "share_url": str(value("share_url", "") or ""),
+            "web_url": str(value("web_url", "") or value("url", "") or ""),
+        }
+
+    @staticmethod
+    def _playlist_song_object(song):
+        if not isinstance(song, dict):
+            return None
+
+        audio_url = str(
+            song.get("audio_url", "")
+            or song.get("preview_url", "")
+            or ""
+        ).strip()
+
+        if not audio_url:
+            return None
+
+        # Use LYRx's real unified provider Song model.
+        # NowPlaying expects display_title(), display_artist() and
+        # duration_text(); SimpleNamespace did not provide those methods.
+        provider_name = str(
+            song.get("provider", "")
+            or song.get("source", "")
+            or "Playlist"
+        )
+
+        return Song(
+            id=str(
+                song.get("id", "")
+                or f'playlist::{song.get("title", "")}::{song.get("artist", "")}'
+            ),
+            title=str(
+                song.get("title", "Unknown Track")
+            ),
+            artist=str(
+                song.get("artist", "Unknown Artist")
+            ),
+            image_url=str(
+                song.get("image_url", "")
+                or song.get("image", "")
+            ),
+            audio_url=audio_url,
+            preview_url=str(
+                song.get("preview_url", "")
+                or ""
+            ),
+            duration=int(
+                song.get("duration", 0)
+                or 0
+            ),
+            provider=provider_name,
+            share_url=str(
+                song.get("share_url", "")
+                or ""
+            ),
+            external_url=str(
+                song.get("web_url", "")
+                or ""
+            ),
+            preview_available=bool(
+                song.get("preview_url", "")
+                or audio_url
+            ),
+        )
+
     # ========================================================
     # ADD SONG TO PLAYLIST
     # ========================================================
@@ -3994,7 +4456,8 @@ class PlaylistScreen(QWidget):
         self,
         image_path,
         title,
-        artist
+        artist,
+        song_data=None
     ):
 
         # Always refresh before opening the picker so newly-created
@@ -4029,7 +4492,8 @@ class PlaylistScreen(QWidget):
                 playlist_id,
                 image_path,
                 title,
-                artist
+                artist,
+                **self._song_metadata(song_data)
             )
         )
 
@@ -4049,19 +4513,22 @@ class PlaylistScreen(QWidget):
                 playlist_id
             )
 
-            QMessageBox.information(
+            LYRxNoticeDialog(
                 self,
                 "Added to Playlist",
-                message
-            )
+                message,
+                success=True,
+            ).exec()
 
             return True
 
-        QMessageBox.information(
+        LYRxNoticeDialog(
             self,
-            "Already Added",
-            message
-        )
+            "Already in Playlist",
+            message,
+            success=False,
+            auto_close_ms=2200,
+        ).exec()
 
         return False
 
@@ -4106,6 +4573,10 @@ class PlaylistScreen(QWidget):
             self.play_current_playlist
         )
 
+        self.detail_view.add_songs_requested.connect(
+            self.request_online_add_to_current
+        )
+
         self.detail_view.song_play_requested.connect(
             self.play_detail_song
         )
@@ -4120,6 +4591,26 @@ class PlaylistScreen(QWidget):
             self.detail_view,
             1
         )
+
+    def request_online_add_to_current(self, query, count):
+        if not self.current_playlist:
+            return
+        playlist_id = str(self.current_playlist.get("id", ""))
+        if playlist_id and query:
+            self.online_add_requested.emit(playlist_id, str(query), int(count))
+
+    def refresh_current_playlist(self):
+        if not self.current_playlist:
+            return
+        playlist_id = str(self.current_playlist.get("id", ""))
+        current = self.store.get_playlist(playlist_id)
+        if current is None:
+            return
+        self.current_playlist = current
+        if self.detail_view is not None:
+            self.detail_view.playlist = current
+            self.detail_view.rebuild_songs()
+        self.playlists = self.store.get_playlists()
 
     # ========================================================
     # CLOSE DETAIL
@@ -4189,9 +4680,20 @@ class PlaylistScreen(QWidget):
         self.player_queue = songs
         self.current_index = 0
 
-        self.now_playing.set_queue(
-            self.player_queue
-        )
+        # Provider-backed playlist entries are switched to the online
+        # queue by _play_queue_index().  Only feed the legacy local queue
+        # when this is actually a local/hard-coded playlist.
+        if not any(
+            isinstance(entry, dict)
+            and (
+                entry.get("audio_url")
+                or entry.get("preview_url")
+            )
+            for entry in self.player_queue
+        ):
+            self.now_playing.set_queue(
+                self.player_queue
+            )
 
         self._play_queue_index(0)
 
@@ -4231,9 +4733,20 @@ class PlaylistScreen(QWidget):
 
         self.player_queue = songs
 
-        self.now_playing.set_queue(
-            self.player_queue
-        )
+        # Do not send provider dictionaries through NowPlaying's legacy
+        # local-file queue. _play_queue_index() builds the real online
+        # queue and preserves provider playback URLs.
+        if not any(
+            isinstance(entry, dict)
+            and (
+                entry.get("audio_url")
+                or entry.get("preview_url")
+            )
+            for entry in self.player_queue
+        ):
+            self.now_playing.set_queue(
+                self.player_queue
+            )
 
         self.current_index = index
 
@@ -4315,20 +4828,12 @@ class PlaylistScreen(QWidget):
         if target is None:
             return
 
-        answer = QMessageBox.question(
+        dialog = DeletePlaylistDialog(
+            target.get("name", "Playlist"),
             self,
-            "Delete Playlist",
-            (
-                f'Delete "{target.get("name", "Playlist")}"?\n\n'
-                "This action cannot be undone."
-            ),
-            QMessageBox.Yes
-            |
-            QMessageBox.No,
-            QMessageBox.No
+            self.current_is_dark,
         )
-
-        if answer != QMessageBox.Yes:
+        if dialog.exec() != QDialog.Accepted:
             return
 
         self.store.delete_playlist(
@@ -4472,24 +4977,23 @@ class PlaylistScreen(QWidget):
         artist
     ):
 
-        for index, song in enumerate(
-            self.player_queue
-        ):
+        for index, song in enumerate(self.player_queue):
+            if isinstance(song, dict):
+                song_image = str(song.get("image", ""))
+                song_title = str(song.get("title", ""))
+                song_artist = str(song.get("artist", ""))
+            else:
+                song_image, song_title, song_artist = song
 
             if (
-                song[0] == image_path
-                and
-                song[1] == title
-                and
-                song[2] == artist
+                song_image == image_path
+                and song_title == title
+                and song_artist == artist
             ):
-
                 self.current_index = index
                 break
 
-        self._play_queue_index(
-            self.current_index
-        )
+        self._play_queue_index(self.current_index)
 
     # ========================================================
     # QUEUE PLAY
@@ -4503,25 +5007,41 @@ class PlaylistScreen(QWidget):
         if not self.player_queue:
             return
 
-        if (
-            index < 0
-            or
-            index >= len(
-                self.player_queue
-            )
-        ):
+        if index < 0 or index >= len(self.player_queue):
             return
 
         self.current_index = index
+        entry = self.player_queue[index]
 
-        image_path, title, artist = (
-            self.player_queue[index]
-        )
+        # Provider-backed playlist entry: keep its real stream/preview URL.
+        if isinstance(entry, dict):
+            online_song = self._playlist_song_object(entry)
 
-        self.now_playing.set_current_index(
-            self.current_index
-        )
+            if online_song is not None:
+                online_queue = []
+                for queue_entry in self.player_queue:
+                    queue_song = self._playlist_song_object(queue_entry)
+                    if queue_song is not None:
+                        online_queue.append(queue_song)
 
+                self.now_playing.set_online_queue(
+                    online_queue or [online_song],
+                    current_song=online_song,
+                )
+                self.now_playing.update_online_song(
+                    online_song,
+                    preserve_queue=True,
+                )
+                return
+
+            image_path = str(entry.get("image", ""))
+            title = str(entry.get("title", "Unknown"))
+            artist = str(entry.get("artist", "Unknown Artist"))
+        else:
+            image_path, title, artist = entry
+
+        # Legacy/hard-coded local playlist entry.
+        self.now_playing.set_current_index(self.current_index)
         self.now_playing.update_song(
             image_path,
             title,

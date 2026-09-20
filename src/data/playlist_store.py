@@ -1,5 +1,6 @@
 from pathlib import Path
 import random
+import json
 
 
 # ============================================================
@@ -7,6 +8,7 @@ import random
 # ============================================================
 
 FILE_DIR = Path(__file__).resolve()
+PLAYLISTS_FILE = Path.home() / ".lyrx" / "playlists.json"
 
 
 # ============================================================
@@ -120,10 +122,42 @@ class PlaylistStore:
     """
 
     def __init__(self):
-
         self.playlists = []
+        if not self.load():
+            self.reset()
+            self.save()
 
-        self.reset()
+    # ========================================================
+    # PERSISTENCE
+    # ========================================================
+
+    def load(self):
+        try:
+            if not PLAYLISTS_FILE.exists():
+                return False
+            data = json.loads(PLAYLISTS_FILE.read_text(encoding="utf-8"))
+            if not isinstance(data, list):
+                return False
+            self.playlists = [
+                item for item in data
+                if isinstance(item, dict) and item.get("id")
+            ]
+            return bool(self.playlists)
+        except Exception as error:
+            print("Playlist load error:", error)
+            return False
+
+    def save(self):
+        try:
+            PLAYLISTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            PLAYLISTS_FILE.write_text(
+                json.dumps(self.playlists, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            return True
+        except Exception as error:
+            print("Playlist save error:", error)
+            return False
 
     # ========================================================
     # RESET
@@ -249,14 +283,32 @@ class PlaylistStore:
     def song_from_tuple(
         image_path,
         title,
-        artist
+        artist,
+        **metadata
     ):
-
-        return {
-            "image": image_path,
-            "title": title,
-            "artist": artist,
+        song = {
+            "image": str(image_path or ""),
+            "title": str(title or "Unknown"),
+            "artist": str(artist or "Unknown Artist"),
         }
+
+        # Keep real provider playback metadata with the playlist entry.
+        for key in (
+            "id",
+            "audio_url",
+            "preview_url",
+            "image_url",
+            "provider",
+            "source",
+            "duration",
+            "share_url",
+            "web_url",
+        ):
+            value = metadata.get(key)
+            if value not in (None, ""):
+                song[key] = value
+
+        return song
 
     # ========================================================
     # CONVERT DICT -> TUPLE
@@ -289,7 +341,8 @@ class PlaylistStore:
         playlist_id,
         image_path,
         title,
-        artist
+        artist,
+        **metadata
     ):
 
         playlist = self.get_playlist(
@@ -303,7 +356,8 @@ class PlaylistStore:
         song = self.song_from_tuple(
             image_path,
             title,
-            artist
+            artist,
+            **metadata
         )
 
         new_key = self.song_key(
@@ -349,6 +403,7 @@ class PlaylistStore:
 
             playlist["thumbnail"] = image_path
 
+        self.save()
         return (
             True,
             f'"{title}" added to "{playlist.get("name", "Playlist")}".'
@@ -388,6 +443,7 @@ class PlaylistStore:
         removed = songs.pop(
             song_index
         )
+        self.save()
 
         # ----------------------------------------------------
         # UPDATE THUMBNAIL
@@ -469,6 +525,7 @@ class PlaylistStore:
         self.playlists.append(
             playlist
         )
+        self.save()
 
         return playlist
 
@@ -496,9 +553,9 @@ class PlaylistStore:
                 )
             ) == playlist_id:
 
-                return self.playlists.pop(
-                    index
-                )
+                removed = self.playlists.pop(index)
+                self.save()
+                return removed
 
         return None
 
@@ -520,11 +577,12 @@ class PlaylistStore:
             return []
 
         return [
-            self.song_to_tuple(song)
+            dict(song)
             for song in playlist.get(
                 "songs",
                 []
             )
+            if isinstance(song, dict)
         ]
 
 

@@ -224,196 +224,92 @@ class MoodSection(QWidget):
 
     def build_ui(self):
 
-        root = QVBoxLayout(
-            self
-        )
-
-        root.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        root.setSpacing(
-            12
-        )
-
-        # ==================================================
-        # HEADER
-        # ==================================================
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(12)
 
         header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(10)
 
-        header.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        header.setSpacing(
-            10
-        )
-
-        title = QLabel(
-            "Your Vibe"
-        )
-
+        title = QLabel("Your Vibe")
         title.setStyleSheet("""
         QLabel {
-
             color: white;
-
             font-size: 23px;
-
             font-weight: 700;
-
             background: transparent;
-
         }
         """)
-
-        header.addWidget(
-            title
-        )
-
+        header.addWidget(title)
         header.addStretch()
 
-        self.see_all = QLabel(
-            "See All  →"
-        )
-
-        self.see_all.setCursor(
-            Qt.PointingHandCursor
-        )
-
+        self.see_all = QLabel("See All  →")
+        self.see_all.setCursor(Qt.PointingHandCursor)
         self.see_all.setStyleSheet("""
         QLabel {
-
             color: #A978FF;
-
             font-size: 12px;
-
             font-weight: 600;
-
             background: transparent;
-
         }
-
-        QLabel:hover {
-
-            color: #D0B7FF;
-
-        }
+        QLabel:hover { color: #D0B7FF; }
         """)
+        header.addWidget(self.see_all)
+        root.addLayout(header)
 
-        header.addWidget(
-            self.see_all
-        )
-
-        root.addLayout(
-            header
-        )
-
-        # ==================================================
-        # MOOD ROW
-        # ==================================================
-
-        mood_row = QHBoxLayout()
-
-        mood_row.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        mood_row.setSpacing(
-            12
-        )
-
-        moods = [
-
-            (
-                "Chill",
-                "🌙",
-                "Relax & unwind"
-            ),
-
-            (
-                "Focus",
-                "🎧",
-                "Stay productive"
-            ),
-
-            (
-                "Happy",
-                "☀️",
-                "Good vibes"
-            ),
-
-            (
-                "Workout",
-                "⚡",
-                "Power up"
-            ),
-
-            (
-                "Sleep",
-                "✨",
-                "Drift away"
-            ),
-
-            (
-                "Rainy Day",
-                "☁️",
-                "Cozy moments"
-            ),
-
+        # First six remain exactly the familiar Home row.
+        self.primary_moods = [
+            ("Chill", "🌙", "Relax & unwind"),
+            ("Focus", "🎧", "Stay productive"),
+            ("Happy", "☀️", "Good vibes"),
+            ("Workout", "⚡", "Power up"),
+            ("Sleep", "✨", "Drift away"),
+            ("Rainy Day", "🌧️", "Cozy moments"),
         ]
 
-        for (
-            mood_name,
-            icon,
-            subtitle
-        ) in moods:
+        # Day 29: real additional moods revealed by See All.
+        self.extra_moods = [
+            ("Romantic", "💜", "Love songs"),
+            ("Party", "🎉", "Turn it up"),
+            ("Travel", "🚗", "Road trip"),
+            ("Acoustic", "🎸", "Unplug & breathe"),
+            ("Motivation", "🔥", "Feel unstoppable"),
+            ("Peaceful", "🕊️", "Slow & calm"),
+        ]
 
-            card = MoodCard(
-                mood_name,
-                icon,
-                subtitle
-            )
+        self.primary_row = self._build_mood_row(self.primary_moods)
+        root.addLayout(self.primary_row)
 
-            card.clicked.connect(
-                self.mood_selected.emit
-            )
+        self.extra_container = QWidget()
+        self.extra_container.setAttribute(Qt.WA_TranslucentBackground)
+        extra_row = QHBoxLayout(self.extra_container)
+        extra_row.setContentsMargins(0, 0, 0, 0)
+        extra_row.setSpacing(12)
+        self._populate_row(extra_row, self.extra_moods)
+        self.extra_container.hide()
+        root.addWidget(self.extra_container)
 
-            mood_row.addWidget(
-                card
-            )
+        self.see_all.mousePressEvent = self.handle_see_all
 
-        root.addLayout(
-            mood_row
-        )
+    def _build_mood_row(self, moods):
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+        self._populate_row(row, moods)
+        return row
 
-        # ==================================================
-        # SEE ALL CLICK
-        # ==================================================
+    def _populate_row(self, row, moods):
+        for mood_name, icon, subtitle in moods:
+            card = MoodCard(mood_name, icon, subtitle)
+            card.clicked.connect(self.mood_selected.emit)
+            row.addWidget(card)
 
-        self.see_all.mousePressEvent = (
-            self.handle_see_all
-        )
+    def handle_see_all(self, event):
+        if event.button() != Qt.LeftButton:
+            return
 
-    # ==================================================
-    # SEE ALL
-    # ==================================================
-
-    def handle_see_all(
-        self,
-        event
-    ):
-
-        if event.button() == Qt.LeftButton:
-
-            self.see_all_clicked.emit()
+        expanded = not self.extra_container.isVisible()
+        self.extra_container.setVisible(expanded)
+        self.see_all.setText("Show Less  ↑" if expanded else "See All  →")
+        self.see_all_clicked.emit()

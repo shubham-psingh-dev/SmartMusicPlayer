@@ -417,6 +417,11 @@ class NowPlaying(QWidget):
     # DAY 19 - sends the already-decoded album cover to other UI players.
     cover_pixmap_changed = Signal(object)
 
+    # Real quick actions used by AppWindow.
+    add_current_to_queue_requested = Signal(object)
+    add_current_to_playlist_requested = Signal(object)
+    favorite_current_requested = Signal(object)
+
     def __init__(self):
         super().__init__()
 
@@ -1234,7 +1239,12 @@ class NowPlaying(QWidget):
         self.add_current_to_queue_requested.emit(
             self.current_online_song
         )
-        self.queue_action_btn.setToolTip("Queue request sent")
+        self.queue_action_btn.setText("✓ Queued")
+        self.queue_action_btn.setToolTip("Added to Next Up")
+        QTimer.singleShot(
+            1400,
+            lambda: self.queue_action_btn.setText("☷ Queue")
+        )
 
     def _request_add_to_playlist(self):
         if self.current_online_song is None:
@@ -1244,7 +1254,12 @@ class NowPlaying(QWidget):
         self.add_current_to_playlist_requested.emit(
             self.current_online_song
         )
-        self.playlist_action_btn.setToolTip("Playlist request sent")
+        self.playlist_action_btn.setText("✓ Playlist")
+        self.playlist_action_btn.setToolTip("Choose a LYRx playlist")
+        QTimer.singleShot(
+            1400,
+            lambda: self.playlist_action_btn.setText("♫ Playlist")
+        )
 
     def _share_current_song(self):
         url = self._current_share_url()
@@ -1258,6 +1273,17 @@ class NowPlaying(QWidget):
         QDesktopServices.openUrl(
             QUrl(url)
         )
+
+    def _request_favorite_current(self):
+        if self.current_online_song is None:
+            self.more_action_btn.setToolTip("No online song selected")
+            return
+
+        self.favorite_current_requested.emit(
+            self.current_online_song
+        )
+        self.more_action_btn.setText("♥")
+        self.more_action_btn.setToolTip("Favorite request sent")
 
     def _show_more_hint(self):
         # Intentionally no fake menu. Provider/app actions can be
@@ -1574,13 +1600,31 @@ class NowPlaying(QWidget):
                     + offset
                 ) % total
 
-                (
-                    image_path,
-                    title,
-                    artist
-                ) = self.queue[
-                    index
-                ]
+                entry = self.queue[index]
+
+                # Day 29.6.3:
+                # PlaylistStore can now return provider-backed dicts.
+                # Never tuple-unpack those dictionaries (which caused
+                # "too many values to unpack").  During the brief moment
+                # before the playlist switches to online mode, render the
+                # saved metadata safely.
+                if isinstance(entry, dict):
+                    image_path = str(
+                        entry.get("image", "")
+                        or entry.get("image_path", "")
+                        or entry.get("image_url", "")
+                    )
+                    title = str(
+                        entry.get("title", "Unknown Track")
+                    )
+                    artist = str(
+                        entry.get("artist", "Unknown Artist")
+                    )
+                else:
+                    try:
+                        image_path, title, artist = entry[:3]
+                    except Exception:
+                        continue
 
                 layout.addWidget(
                     self.create_next_song(
@@ -1834,7 +1878,16 @@ class NowPlaying(QWidget):
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(1)
 
-        title = QLabel(song.display_title())
+        display_title = getattr(song, "display_title", None)
+        if callable(display_title):
+            title_text = display_title()
+        else:
+            title_text = str(
+                getattr(song, "title", "")
+                or "Unknown Track"
+            )
+
+        title = QLabel(title_text)
         title.setStyleSheet("""
         QLabel {
             color: white;
@@ -1844,7 +1897,16 @@ class NowPlaying(QWidget):
         }
         """)
 
-        artist = QLabel(song.display_artist())
+        display_artist = getattr(song, "display_artist", None)
+        if callable(display_artist):
+            artist_text = display_artist()
+        else:
+            artist_text = str(
+                getattr(song, "artist", "")
+                or "Unknown Artist"
+            )
+
+        artist = QLabel(artist_text)
         artist.setStyleSheet("""
         QLabel {
             color: #81779B;
@@ -1857,7 +1919,21 @@ class NowPlaying(QWidget):
         text_layout.addWidget(artist)
         layout.addLayout(text_layout, 1)
 
-        duration = QLabel(song.duration_text())
+        duration_method = getattr(song, "duration_text", None)
+        if callable(duration_method):
+            duration_text = duration_method()
+        else:
+            seconds = int(
+                getattr(song, "duration", 0)
+                or 0
+            )
+            duration_text = (
+                f"{seconds // 60}:{seconds % 60:02d}"
+                if seconds > 0
+                else "0:00"
+            )
+
+        duration = QLabel(duration_text)
         duration.setStyleSheet("""
         QLabel {
             color: #756A91;
@@ -2774,6 +2850,89 @@ class NowPlaying(QWidget):
                 "Audio file not found:",
                 music_path
             )
+
+    # ========================================================
+    # DAY 29.2 - PLAY AN EXTERNAL LOCAL AUDIO FILE
+    # ========================================================
+
+    def play_local_file(
+        self,
+        audio_path,
+        title,
+        artist,
+        image_path=""
+    ):
+        audio_file = Path(str(audio_path))
+
+        if (
+            not audio_file.exists()
+            or not audio_file.is_file()
+        ):
+            print(
+                "Local audio file not found:",
+                audio_path
+            )
+            return
+
+        self._prepare_new_track_transition()
+
+        self.playback_source = "local"
+        self.current_online_song = None
+        self.online_autoplay_pending = False
+        self.online_stream_url = ""
+        self.online_retry_count = 0
+        self.current_online_duration_seconds = 0
+
+        self.current_image_path = image_path or ""
+        self.current_title = str(title or audio_file.stem)
+        self.current_artist = str(artist or "Local Music")
+
+        self.audio_player.stop()
+
+        self.song.setText(
+            self.current_title
+        )
+        self.artist.setText(
+            self.current_artist
+        )
+
+        # Exact embedded cover for this local file, or LYRx LOCAL fallback.
+        # Never reuse artwork from Believer/Faded/Arcade/etc.
+        self.album.clear(); self.album.setText("")
+        local_cover=QPixmap(str(image_path)) if image_path else QPixmap()
+        if not local_cover.isNull():
+            scaled_cover=local_cover.scaled(206,206,Qt.KeepAspectRatioByExpanding,Qt.SmoothTransformation)
+            self.album.setPixmap(scaled_cover)
+            self.cover_pixmap_changed.emit(scaled_cover)
+        else:
+            self.album.setText("♫")
+
+        self.slider.blockSignals(True)
+        self.slider.setValue(0)
+        self.slider.blockSignals(False)
+        self.current_time.setText("0:00")
+        self.total_time.setText("0:00")
+
+        self.song_changed.emit(
+            image_path or "",
+            self.current_title,
+            self.current_artist,
+        )
+
+        self.audio_player.setSource(
+            QUrl.fromLocalFile(
+                str(audio_file.resolve())
+            )
+        )
+        self.audio_player.play()
+        self.refresh_next_up()
+
+        print(
+            "LYRx local file:",
+            self.current_title,
+            "-",
+            self.current_artist,
+        )
 
     # ========================================================
     # MEDIA STATUS

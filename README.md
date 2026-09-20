@@ -320,5 +320,96 @@ one learning activity at a time without overcrowding the interface.
 > Kids Mode is being built around a simple principle:
 > **Listen • Learn • Imagine**
 
+- [x] Day 29 - Final UX, Local Library, Playlists, Favorites, AI Actions & Splash Experience
+
+### 🎛️ Home & Discovery Experience
+
+- Made **Your Vibe** mood shortcuts functional
+- Added expandable mood discovery with additional moods
+- Connected mood selections to the real Discover search flow
+- Made **Playlists for You** cards open real playlists
+- Made Home playlist navigation and View All actions functional
+- Refined the LYRx sidebar logo/symbol sizing
+
+### 💿 Local Music Library
+
+- Added **Add Local Music** workflow for desktop audio files
+- Supports importing multiple local audio files
+- Persists imported local-library paths between sessions
+- Rebuilds local metadata when the application starts
+- Added local metadata extraction using Mutagen
+- Reads title, artist, album and duration where metadata is available
+- Supports embedded artwork from MP3/ID3, FLAC and M4A/MP4 sources
+- Added a dedicated **LYRx LOCAL** artwork fallback when a local file has no embedded cover
+- Local tracks use their own artwork and never fall back to unrelated demo-song artwork
+- Added real local-track duration display
+- Local tracks play through the real LYRx Now Playing pipeline
+- Local artwork is synchronized with the main player and floating player
+- Preserved offline/local playback behavior without requiring an online provider
+
+### ❤️ Favorites & Playlists
+
+- Improved Favorites layout into a structured multi-column grid
+- Added functional playlist creation and persistence
+- Added playlist opening and playlist-specific playback
+- Added online songs to playlists from the playback/discovery workflow
+- Added playlist queue/Next Up integration
+- Added playlist song removal controls
+- Added playlist artwork handling and dynamic artwork propagation
+- Added modern LYRx-styled confirmation/notification UI for playlist actions
+- Improved playlist song playback so online playlist tracks use their actual playable source rather than artwork/cache paths
+
+### 🤖 LYRx AI Assistant — App Actions
+
+LYRx AI was extended beyond conversational music discovery into application-aware actions.
+
+The assistant can now work with LYRx's existing music state for tasks such as:
+
+- Discovering and playing music through the existing provider pipeline
+- Working with the user's Favorites collection
+- Creating/working with playlists through LYRx's playlist system
+- Playing a requested track from the user's saved music context where a playable track is available
+- Connecting AI requests to real application actions instead of presenting only text responses
+
+The AI action layer is intentionally built around LYRx's existing providers, player, Favorites and Playlist stores so that unsupported actions are not presented as completed when they are not actually available.
+
+### 🎚️ Quick Actions & Playback Integration
+
+- Improved Now Playing action integration
+- Connected queue/playlist/share action foundations with the real player state where supported
+- Preserved provider-aware online playback and local offline playback
+- Improved online queue handling and Next Up synchronization
+- Fixed playlist queue data-shape compatibility between Playlist and Now Playing layers
+- Fixed online queue objects so Next Up can render provider-backed song metadata safely
+
+### 🎬 LYRx Cinematic Splash Experience
+
+Day 29 also introduced a branded startup experience inspired by modern streaming applications.
+
+- Added LYRx intro video splash screen
+- Added dedicated opening LYRx artwork
+- Added dedicated closing LYRx artwork
+- Preserved the original purple LYRx visual identity of the intro video
+- Added a smooth transition from the intro experience into the main application
+- Removed the need for a manual Skip button for the current release build
+- Fixed splash rendering issues that could cause black-screen pauses
+- Fixed painter/rendering errors in the splash layer
+- Kept the main application launch flow intact after the cinematic intro
+
+### 🧪 Day 29 QA / Stability
+
+- Tested Home mood navigation
+- Tested playlist creation/opening/playback
+- Tested online playlist tracks and queue behavior
+- Tested Favorites integration
+- Tested local music import and playback
+- Tested local metadata/artwork handling
+- Tested Now Playing artwork synchronization
+- Tested LYRx AI music actions
+- Tested Kids Mode regression after major playback changes
+- Tested startup splash and main-window transition
+- Fixed multiple queue/data-model compatibility issues discovered during integration testing
+
+> Day 29 goal: move LYRx from a feature-complete prototype toward a coherent, testable alpha release where the major user flows connect to real application state instead of isolated demo UI.
 
 Version: LYRx Alpha 1.0

@@ -916,16 +916,35 @@ class MusicCard(QFrame):
         else:
 
             favorite_item = {
-
-                "image_path":
-                    self.image_path,
-
-                "title":
-                    self.title_text,
-
-                "artist":
-                    self.artist_text,
+                "image_path": self.image_path,
+                "title": self.title_text,
+                "artist": self.artist_text,
             }
+
+            # Online cards retain real playback/provider metadata.
+            if self.song_data is not None:
+                song = self.song_data
+                def song_value(name, default=""):
+                    if isinstance(song, dict):
+                        return song.get(name, default)
+                    return getattr(song, name, default)
+
+                favorite_item.update({
+                    "id": str(song_value("id", "") or ""),
+                    "image_url": str(song_value("image_url", "") or self.image_path),
+                    "audio_url": str(
+                        song_value("audio_url", "")
+                        or song_value("preview_url", "")
+                        or ""
+                    ),
+                    "preview_url": str(song_value("preview_url", "") or ""),
+                    "duration": int(song_value("duration", 0) or 0),
+                    "provider": str(
+                        song_value("provider", "")
+                        or song_value("source", "")
+                        or "Online"
+                    ),
+                })
 
             already_exists = any(
 

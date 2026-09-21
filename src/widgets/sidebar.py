@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from core.language_manager import language_manager, tr
+from core.paths import asset_path
 
 from PySide6.QtCore import (
     Qt,
@@ -35,28 +36,9 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 # ASSETS
 # ============================================================
 
-SYMBOL_PATH = (
-    BASE_DIR
-    / "assets"
-    / "icons"
-    / "logo"
-    / "LYRx_symbol.png"
-)
-
-WORDMARK_PATH = (
-    BASE_DIR
-    / "assets"
-    / "icons"
-    / "logo"
-    / "LYRx_wordmark.png"
-)
-
-NAV_ICON_PATH = (
-    BASE_DIR
-    / "assets"
-    / "icons"
-    / "navigation"
-)
+SYMBOL_PATH = asset_path("icons", "logo", "LYRx_symbol.png")
+WORDMARK_PATH = asset_path("icons", "logo", "LYRx_wordmark.png")
+NAV_ICON_PATH = asset_path("icons", "navigation")
 
 
 # ============================================================

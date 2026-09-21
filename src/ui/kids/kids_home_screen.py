@@ -2,6 +2,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
+from core.paths import asset_path
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
     QScrollArea, QSizePolicy, QGridLayout, QLineEdit
@@ -209,10 +211,7 @@ class KidsHomeScreen(QWidget):
         self.hero_image.setAlignment(Qt.AlignCenter | Qt.AlignBottom)
         self.hero_image.setMinimumWidth(400)
 
-        banner_path = (
-            Path(__file__).resolve().parents[3]
-            / "assets" / "icons" / "logo" / "kids_banner.png"
-        )
+        banner_path = asset_path("icons", "logo", "kids_banner.png")
         pixmap = QPixmap(str(banner_path))
         if not pixmap.isNull():
             self.hero_image.setPixmap(

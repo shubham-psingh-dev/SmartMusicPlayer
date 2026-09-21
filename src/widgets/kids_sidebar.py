@@ -2,13 +2,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
+from core.paths import asset_path
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
 )
-
-
-def asset_path(*parts):
-    return Path(__file__).resolve().parents[2].joinpath("assets", *parts)
 
 
 class KidsNavButton(QPushButton):

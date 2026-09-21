@@ -10,6 +10,8 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
+from core.paths import asset_path
+
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
@@ -23,15 +25,7 @@ from PySide6.QtWidgets import (
 # PATHS
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parents[3]
-
-HEADPHONE_PATH = (
-    BASE_DIR
-    / "assets"
-    / "images"
-    / "hero"
-    / "headphones.png"
-)
+HEADPHONE_PATH = asset_path("images", "hero", "headphones.png")
 
 
 # =========================================================

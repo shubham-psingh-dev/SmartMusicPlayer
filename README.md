@@ -1,415 +1,811 @@
+```{=html}
 <p align="center">
-<img src="assets/icons/logo/LYRx_symbol.png" width="170">
+```
+`<img src="assets/icons/logo/LYRx_symbol.png" width="120" alt="LYRx">`{=html}
+```{=html}
 </p>
-
+```
+```{=html}
 <h1 align="center">
-<img src="assets/icons/logo/LYRx_wordmark.png" width="170">
+```
+LYRx
+```{=html}
 </h1>
-
+```
+```{=html}
 <p align="center">
-A futuristic offline desktop music player built with Python & PySide6.
+```
+`<strong>`{=html}A modular desktop music platform built with Python &
+PySide6.`</strong>`{=html}
+```{=html}
 </p>
+```
+```{=html}
+<p align="center">
+```
+Online discovery • Local music • Playlists • Favorites • AI Assistant •
+Kids Mode • Firebase Auth
+```{=html}
+</p>
+```
+
+------------------------------------------------------------------------
+
+## 🎵 About LYRx
+
+**LYRx** is a Windows desktop music platform designed around a modular
+architecture rather than a single monolithic player.
+
+It combines online music discovery through provider integrations with a
+real local music library, persistent playlists and favorites, an
+application-aware AI Assistant, a dedicated Kids Mode, authentication,
+customizable settings, and a polished Now Playing experience.
+
+The project is built as a portfolio-grade application with an emphasis
+on:
+
+-   real application state instead of isolated demo UI
+-   provider abstraction
+-   reusable PySide6 components
+-   persistent user data
+-   local media metadata and artwork
+-   safe separation between playable and downloadable media
+-   modular screens and services
+-   a production Windows build through PyInstaller
+
+------------------------------------------------------------------------
 
+## ✨ Core Features
 
-# LYRx
+### 🏠 Home & Discovery
 
-LYRx is a modern offline desktop music player built with Python.
-
-Unlike traditional music players, LYRx focuses on a premium user experience with beautiful animations, mood-based music discovery, and a clean modern interface.
-
----
-
-## Features (Planned)
-
-- Modern UI
-- Floating Mini Player
-- Album Art Support
-- Mood-based Music
-- Smart Library
-- Lyrics
-- Favorites
-- Playlists
-- Dynamic Themes
-- Beautiful Animations
-
----
-
-## Tech Stack
-
-- Python
-- PySide6
-- Qt Designer
-- Mutagen
-- Pillow
-
----
-
-## Status
-
-🚧 Currently in Development
-
-## Development Progress
-
-- [x] Day 1 - Project Setup
-- [x] Day 2 - Git & GitHub
-- [x] Day 3 - PySide6 Basics
-- [x] Day 4 - Window Foundation
-- [x] Day 5 - Hero Banner & Music Cards
-- [x] Day 6 - HomeScreen Architecture
-- [x] Day 7 - Sidebar & Navigation UI
-- [x] Day 8 - Main UI Components & Visual Enhancement
-- [x] Day 9 - HomeScreen & Now Playing UI Polish
-- [x] Day 10 - Premium Hero Banner, Mood Section & Music UI Enhancement
-- [x] Day 11 - Complete automatic next-song playback
-- [x] Day 12 - Implemented shuffle and repeat playback controls
-- [x] Day 13 - (a) Upgraded MusicCard UI and interaction experience
-             - (b) Implemented persistent Favorites functionality
-             - (c) Improved song duration and metadata handling
-             - (d) Refined music browsing and selection flow
-- [x] Day 14 - Navigation & Floating Player Integration
-- [x] Day 15 - Refine sidebar and make Library playable
-- [x] Day 16 - Enabled Dark Mode Toggle Theme
-- [x] Day 17 - Added Playlists feature into Sidebar Panel
-- [x] Day 18 - LYRx AI Assistant Integration
-
-Introduced the first functional AI assistant inside LYRx.
-
-The AI Assistant is now integrated directly into the desktop music player instead of being only a visual demo.
-
-### Features Completed
-
-- Added dedicated **LYRx AI Assistant** screen
-- Integrated AI Assistant with the main sidebar navigation
-- Added responsive dark/light theme support
-- Added conversational chat interface
-- Added user and AI message bubbles
-- Added quick music prompts
-- Added **Clear Chat** functionality
-- Added local music-aware recommendation logic
-- Added mood-based music suggestions
-- Added song discovery responses based on the current LYRx catalog
-
-### AI Player Controls
-
-LYRx AI can now understand player commands such as:
-
-- `Play Believer`
-- `Play Faded`
-- `Pause song`
-- `Resume song`
-- `Stop song`
-- `Next song`
-- `Previous song`
-
-These commands are connected to the actual LYRx audio player.
-
-- [x] Day 19 — Online Music Streaming Integration
-
-### Completed
-
-- Added unified `Song` model for online tracks
-- Added `MusicService`
-- Integrated Jamendo online music catalog
-- Added asynchronous online music loading in Discover
-- Added online album artwork
-- Added real online audio streaming
-- Added online queue support
-- Added online Next / Previous controls
-- Added online Next Up queue
-- Added online Next Up thumbnails
-- Synced online songs with Now Playing
-- Synced online songs with Floating Player
-- Added floating player online artwork support
-- Preserved local music playback compatibility
-- Added online stream error handling and retry support
-
-- [x] Day 20 -  Multi-Provider Online Music Search
-
-### Completed
-
-- Added unified multi-provider music architecture
-- Added ProviderRegistry
-- Integrated iTunes catalog provider
-- Retained Jamendo provider as online playable fallback
-- Added mainstream Hindi / Bollywood / English catalog discovery
-- Added artist and song search support
-- Added genre and mood-ready provider architecture
-- Added online album artwork support
-- Added online song playback pipeline
-- Added provider-independent Song model
-- Added preview/full playback capability detection
-
-### Current Provider Support
-
-- iTunes / Apple catalog:
-  - Mainstream song discovery
-  - Hindi / Bollywood / English music
-  - Album artwork
-  - Artist / album metadata
-  - Preview playback
-- Jamendo:
-  - Independent online catalog
-  - Full-track playback where available
-
-- [x] Day 21 - YT BOX & Online Playback Improvements
-
-### Added
-- Dedicated YT BOX page for YouTube music/video discovery
-- YouTube metadata search with dynamic result cards
-- YouTube favorites with persistent local storage
-- YouTube favorites integrated into the main Favorites page
-- Add YouTube results to existing playlists
-- Create a new playlist directly from the Add to Playlist dialog
-- Modernized Add to Playlist popup UI
-- Improved online queue handling for iTunes tracks
-- Fixed iTunes Next Up direct-click playback
-- Improved Next / Previous behavior for online songs
-
-- [x] Day 22 - Finalize YT Box discovery and official playback fallback
-- [x] Day 23 - Add Firebase authentication and Google sign-in
-- [x] Day 24 - Firebase phone OTP authentication
-- [x] Day 25 - Professional Settings & Personalization
-
-### Implemented
-
-- Category-based Settings dashboard with dedicated detail pages and back navigation
-- Firebase-aware Profile & Account screen
-- Editable first name, last name, date of birth, gender and profile photo
-- Per-user local profile persistence using Firebase UID
-- Change/remove profile photo with LYRx-styled confirmation dialogs
-- Dark/light appearance controls with animated custom toggle switches
-- Compact-layout preference persistence
-- Playback preferences connected to the real player:
-  - Autoplay
-  - Gapless transition behavior
-  - Crossfade-style fade transitions
-  - Volume-normalization preference groundwork
-- Audio/network preferences:
-  - Streaming quality preference
-  - Data Saver mode
-  - Provider-aware source selection where supported
-  - Reduced online artwork fetching in Data Saver mode
-- Downloads & Storage groundwork:
-  - Configurable download directory
-  - Open download directory
-  - Real cache directory
-  - Cache-size reporting
-  - Clear-cache action
-- Privacy & Security:
-  - Private listening preference
-  - Firebase account-security shortcut
-  - Privacy Policy link
-- Notifications:
-  - Music recommendation preference
-  - Application update preference
-  - Windows desktop test notification
-- Language & Region:
-  - English current UI
-  - Persistent region preference
-  - Internationalization-ready roadmap
-- Accessibility:
-  - Reduce Motion behavior
-  - Larger Settings text
-- About LYRx:
-  - Version/build information
-  - Technology information
-  - Website, Privacy Policy and Terms links
-
-- [x] Day 26 - Offline downloads foundation
-- [x] Day 27 - Multilingual UI & Premium Now Playing
-
-### 🌍 Multilingual Experience
-- Added centralized `LanguageManager`
-- Added reusable global `UITranslator`
-- Added live runtime language switching
-- Added English language support
-- Added Hindi (हिन्दी) language support
-- Added French (Français) language support
-- Language preference persists between sessions
-- Major LYRx screens now update without restarting the application
-- Song titles, artist names, user content, and provider metadata remain unchanged
-
-### 🎧 Premium Now Playing Experience
-- Redesigned Now Playing panel with a premium LYRx visual style
-- Added custom vector-based playback controls
-- Added dynamic Play / Pause button states
-- Added polished Previous and Next controls
-- Added functional Shuffle and Repeat active states
-- Added purple neon Play/Pause glow
-- Added playback-aware animated mini equalizer
-- Equalizer and glow animation react to actual playback state
-- Improved album artwork presentation and purple glow
-- Improved seek/progress and volume controls
-- Added dynamic volume percentage
-- Improved Next Up queue presentation
-- Added online/local audio status presentation
-- Added live English, Hindi, and French translations to Now Playing
-
-### 🎵 Future Playback Actions
-The Now Playing interface also includes UI foundations for:
-- Add to Queue
-- Add to Playlist
-- Share
-- More track actions
-
-These actions are intentionally reserved for deeper application/provider integration before the commercial release.
-
-- [x] Day 28 - LYRx Kids Mode
-
-LYRx now includes a dedicated Kids Mode designed as a separate,
-child-friendly experience inside the same desktop application.
-
-### ✨ Kids Mode Features
-
-- Dedicated Kids Mode home experience
-- Separate child-friendly sidebar and navigation
-- Custom LYRx Kids visual identity and hero experience
-- Kids-only content discovery
-- Kids Music
-- Audible Stories
-- Poems & Rhymes
-- Spiritual content
-- Persistent Kids Favorites
-- Search inside Kids content sections
-- Dedicated Kids mini/floating player
-- Main LYRx player isolated from Kids Mode
-- Kids-specific playback experience
-- Popular for Kids discovery shortcuts
-
-### 🎓 Study & Learn
-
-Kids Mode also introduces an interactive learning area with:
-
-- English Alphabets
-- Numbers from 1–100
-- Visual tens & ones number learning
-- Hindi वर्णमाला
-- French Alphabet
-- Colors & Shapes
-- Interactive Kids Math
-- Addition
-- Subtraction
-- Multiplication
-- Division
-
-Study & Learn uses category-based navigation so children can explore
-one learning activity at a time without overcrowding the interface.
-
-### 🛡️ Parental Controls & Kids Safety
-
-- Dedicated Kids Settings
-- Safe Search controls
-- Explicit-content filtering
-- Harmful-content filtering
-- Persistent parental preferences
-- Parent Exit PIN protection
-- Separate Kids Mode environment
-- Child-focused discovery filtering
-
-### 🎨 Kids UX
-
-- Dedicated Kids Mode theme
-- Child-friendly typography and spacing
-- Custom Kids banner artwork
-- LYRx Kids navigation icon
-- Larger visual learning elements
-- Dedicated window controls
-- Responsive scrollable learning grids
-- Separate Kids Mode navigation from the main LYRx interface
-
-> Kids Mode is being built around a simple principle:
-> **Listen • Learn • Imagine**
-
-- [x] Day 29 - Final UX, Local Library, Playlists, Favorites, AI Actions & Splash Experience
-
-### 🎛️ Home & Discovery Experience
-
-- Made **Your Vibe** mood shortcuts functional
-- Added expandable mood discovery with additional moods
-- Connected mood selections to the real Discover search flow
-- Made **Playlists for You** cards open real playlists
-- Made Home playlist navigation and View All actions functional
-- Refined the LYRx sidebar logo/symbol sizing
-
-### 💿 Local Music Library
-
-- Added **Add Local Music** workflow for desktop audio files
-- Supports importing multiple local audio files
-- Persists imported local-library paths between sessions
-- Rebuilds local metadata when the application starts
-- Added local metadata extraction using Mutagen
-- Reads title, artist, album and duration where metadata is available
-- Supports embedded artwork from MP3/ID3, FLAC and M4A/MP4 sources
-- Added a dedicated **LYRx LOCAL** artwork fallback when a local file has no embedded cover
-- Local tracks use their own artwork and never fall back to unrelated demo-song artwork
-- Added real local-track duration display
-- Local tracks play through the real LYRx Now Playing pipeline
-- Local artwork is synchronized with the main player and floating player
-- Preserved offline/local playback behavior without requiring an online provider
-
-### ❤️ Favorites & Playlists
-
-- Improved Favorites layout into a structured multi-column grid
-- Added functional playlist creation and persistence
-- Added playlist opening and playlist-specific playback
-- Added online songs to playlists from the playback/discovery workflow
-- Added playlist queue/Next Up integration
-- Added playlist song removal controls
-- Added playlist artwork handling and dynamic artwork propagation
-- Added modern LYRx-styled confirmation/notification UI for playlist actions
-- Improved playlist song playback so online playlist tracks use their actual playable source rather than artwork/cache paths
-
-### 🤖 LYRx AI Assistant — App Actions
-
-LYRx AI was extended beyond conversational music discovery into application-aware actions.
-
-The assistant can now work with LYRx's existing music state for tasks such as:
-
-- Discovering and playing music through the existing provider pipeline
-- Working with the user's Favorites collection
-- Creating/working with playlists through LYRx's playlist system
-- Playing a requested track from the user's saved music context where a playable track is available
-- Connecting AI requests to real application actions instead of presenting only text responses
-
-The AI action layer is intentionally built around LYRx's existing providers, player, Favorites and Playlist stores so that unsupported actions are not presented as completed when they are not actually available.
-
-### 🎚️ Quick Actions & Playback Integration
-
-- Improved Now Playing action integration
-- Connected queue/playlist/share action foundations with the real player state where supported
-- Preserved provider-aware online playback and local offline playback
-- Improved online queue handling and Next Up synchronization
-- Fixed playlist queue data-shape compatibility between Playlist and Now Playing layers
-- Fixed online queue objects so Next Up can render provider-backed song metadata safely
-
-### 🎬 LYRx Cinematic Splash Experience
-
-Day 29 also introduced a branded startup experience inspired by modern streaming applications.
-
-- Added LYRx intro video splash screen
-- Added dedicated opening LYRx artwork
-- Added dedicated closing LYRx artwork
-- Preserved the original purple LYRx visual identity of the intro video
-- Added a smooth transition from the intro experience into the main application
-- Removed the need for a manual Skip button for the current release build
-- Fixed splash rendering issues that could cause black-screen pauses
-- Fixed painter/rendering errors in the splash layer
-- Kept the main application launch flow intact after the cinematic intro
-
-### 🧪 Day 29 QA / Stability
-
-- Tested Home mood navigation
-- Tested playlist creation/opening/playback
-- Tested online playlist tracks and queue behavior
-- Tested Favorites integration
-- Tested local music import and playback
-- Tested local metadata/artwork handling
-- Tested Now Playing artwork synchronization
-- Tested LYRx AI music actions
-- Tested Kids Mode regression after major playback changes
-- Tested startup splash and main-window transition
-- Fixed multiple queue/data-model compatibility issues discovered during integration testing
-
-> Day 29 goal: move LYRx from a feature-complete prototype toward a coherent, testable alpha release where the major user flows connect to real application state instead of isolated demo UI.
-
-Version: LYRx Alpha 1.0
+-   Premium dark/purple LYRx interface
+-   Hero banner and personalized-style home sections
+-   **Your Vibe** mood shortcuts
+-   Expandable mood discovery
+-   Mood selections connected to real online Discover searches
+-   **Playlists for You** with functional playlist navigation
+-   Floating player
+-   Responsive music-card based browsing
+
+### 🔎 Online Music
+
+LYRx uses a provider/service architecture so online music sources can be
+handled through normalized application models.
+
+Current provider/service integrations include:
+
+-   Spotify integration
+-   iTunes integration
+-   Jamendo integration
+-   YouTube-related workflows
+-   Provider-aware playback and search handling
+
+The application normalizes provider results into LYRx's internal song
+model so the UI and player do not need to depend on one provider's data
+structure.
+
+> Availability and playback behavior depend on the provider and the
+> specific track/source.
+
+### 🎧 Now Playing & Playback
+
+-   Full Now Playing screen
+-   Play / pause
+-   Previous / next
+-   Shuffle
+-   Repeat
+-   Queue / Next Up
+-   Animated playback feedback
+-   Floating mini-player
+-   Online playback
+-   Local offline playback
+-   Provider-aware source handling
+-   Local artwork synchronization
+-   Playlist-specific playback and queue integration
+
+LYRx avoids presenting unknown provider bitrate/quality values as facts.
+When exact quality information is unavailable, playback is represented
+as online audio rather than a fabricated quality label.
+
+------------------------------------------------------------------------
+
+## 💻 Local Music Library
+
+LYRx can work with music stored directly on the user's Windows PC.
+
+### Import
+
+-   Add multiple local audio files
+-   Supports common formats including:
+    -   MP3
+    -   WAV
+    -   FLAC
+    -   M4A
+    -   AAC
+    -   OGG
+    -   WMA
+-   Imported file paths persist between sessions
+-   Missing files are ignored when the library is restored
+
+### Metadata
+
+Using **Mutagen**, LYRx can read available:
+
+-   Title
+-   Artist
+-   Album
+-   Duration
+-   Embedded artwork
+
+Embedded artwork support includes common:
+
+-   MP3 / ID3 artwork
+-   FLAC pictures
+-   M4A / MP4 cover artwork
+
+### Local Artwork
+
+Local tracks follow a strict artwork rule:
+
+1.  Use the track's own embedded artwork when available.
+2.  Otherwise use the dedicated **LYRx LOCAL** fallback artwork.
+3.  Do not reuse unrelated demo-song artwork.
+
+The same local artwork can flow through:
+
+**Library → Now Playing → Floating Player**
+
+### Offline Playback
+
+Local files are played directly through the desktop audio pipeline and
+do not require an online provider.
+
+------------------------------------------------------------------------
+
+## ❤️ Favorites
+
+-   Persistent Favorites
+-   Online song favorites
+-   Favorites browsing
+-   Structured multi-column card layout
+-   Integration with LYRx playback workflows
+-   AI Assistant can work with the user's saved music context where the
+    relevant action is supported
+
+------------------------------------------------------------------------
+
+## 📚 Playlists
+
+LYRx supports real user playlist workflows rather than static visual
+playlist cards.
+
+-   Create playlists
+-   Open playlists
+-   Persist playlist data
+-   Add online songs
+-   Remove playlist songs
+-   Playlist-specific playback
+-   Playlist queue / Next Up
+-   Playlist artwork handling
+-   Home playlist shortcuts
+-   Modern LYRx-styled playlist notifications and confirmations
+
+Playlist playback uses the actual playable song/source representation
+instead of confusing artwork-cache paths with audio paths.
+
+------------------------------------------------------------------------
+
+## 🤖 LYRx AI Assistant
+
+The LYRx AI Assistant is integrated with the application's music state.
+
+Depending on the available provider/player state, it can connect
+natural-language requests to actions such as:
+
+-   discovering music
+-   playing music
+-   working with Favorites
+-   creating/working with playlists
+-   using saved music context
+-   connecting requests to the existing LYRx player and provider
+    pipeline
+
+The AI action layer is intentionally connected to LYRx's real stores,
+providers and player instead of treating every requested action as a
+completed text-only response.
+
+> AI availability and specific actions can depend on configured
+> credentials, provider availability and the current application state.
+
+------------------------------------------------------------------------
+
+## 👶 Kids Mode
+
+LYRx includes a separate **Kids Mode** environment designed around a
+simpler, child-focused experience.
+
+### Kids Experience
+
+-   Dedicated Kids Mode shell
+-   Separate navigation
+-   Dedicated Kids Music
+-   Stories
+-   Poems & Rhymes
+-   Spiritual content
+-   Favorites
+-   Study & Learn
+-   Kids Settings
+-   Separate Kids player experience
+-   Kid-oriented search/content filtering
+-   Dedicated Kids artwork and branding
+
+### Study & Learn
+
+The learning area includes interactive categories such as:
+
+-   Alphabets
+-   Numbers
+-   Hindi वर्णमाला / word learning
+-   French basics
+-   Colors & Shapes
+-   Kids Math
+-   visual learning/sticker-style elements
+
+### Safety / Parental Controls
+
+-   Safe Search
+-   Content filtering
+-   Harmful-content filtering
+-   Persistent parental preferences
+-   Parent Exit PIN
+-   Dedicated Kids Settings
+-   Separate Kids Mode environment
+
+Kids Mode is built around:
+
+**Listen • Learn • Imagine**
+
+------------------------------------------------------------------------
+
+## 🔐 Authentication
+
+LYRx includes Firebase-backed authentication workflows.
+
+Implemented authentication paths include:
+
+-   Email / Password
+-   Google
+-   Microsoft
+-   Phone OTP flow
+
+Phone authentication can also be exercised with Firebase test/fictional
+phone credentials without requiring the project's production SMS billing
+flow.
+
+------------------------------------------------------------------------
+
+## ⚙️ Settings & Personalization
+
+LYRx includes a categorized Settings experience covering areas such as:
+
+-   Profile & Account
+-   Appearance
+-   Playback
+-   Audio Quality
+-   Downloads & Storage
+-   Privacy & Security
+-   Notifications
+-   Language & Region
+-   Accessibility
+-   About LYRx
+
+Additional playback preferences include:
+
+-   Autoplay
+-   Gapless-style behavior
+-   Crossfade-style transitions
+-   Normalize preference persistence
+-   Data Saver
+-   Provider-aware source preferences where supported
+
+Settings use persistent application state so user preferences can
+survive restarts.
+
+------------------------------------------------------------------------
+
+## 🌍 Language Support
+
+The UI includes groundwork for multiple languages, including:
+
+-   English
+-   Hindi
+-   French
+
+The language architecture is designed so additional UI translations can
+be expanded without rebuilding the entire screen structure.
+
+------------------------------------------------------------------------
+
+## 🎬 Cinematic Startup Experience
+
+LYRx includes a branded intro experience with:
+
+-   LYRx intro video
+-   Dedicated opening artwork
+-   Dedicated closing artwork
+-   Purple LYRx visual identity
+-   Smooth transition into the main application
+-   No manual Skip button in the current release build
+
+The startup flow was tested specifically for black-screen and rendering
+issues during integration.
+
+------------------------------------------------------------------------
+
+## 🏗️ Architecture
+
+LYRx follows a modular application structure:
+
+``` text
+LYRx
+│
+├── assets/
+│   ├── icons/
+│   ├── navigation/
+│   ├── album_art/
+│   ├── splash/
+│   └── kids/
+│
+├── data/
+│   ├── playlist_store.py
+│   ├── youtube_favorites_store.py
+│   └── discover_data.py
+│
+├── src/
+│   ├── core/
+│   │   ├── theme_manager.py
+│   │   ├── local_media.py
+│   │   └── paths.py
+│   │
+│   ├── models/
+│   │   └── song.py
+│   │
+│   ├── services/
+│   │   ├── music_service.py
+│   │   ├── provider_registry.py
+│   │   ├── music_provider.py
+│   │   ├── spotify_provider.py
+│   │   ├── itunes_provider.py
+│   │   ├── jamendo_provider.py
+│   │   ├── full_track_resolver.py
+│   │   ├── youtube_service.py
+│   │   └── authentication services
+│   │
+│   ├── widgets/
+│   │   ├── window.py
+│   │   ├── sidebar.py
+│   │   ├── floating_player.py
+│   │   ├── title_bar.py
+│   │   └── cards/
+│   │
+│   └── ui/
+│       ├── home/
+│       ├── discover/
+│       ├── library/
+│       ├── favorites/
+│       ├── playlists/
+│       ├── player/
+│       ├── assistant/
+│       ├── settings/
+│       ├── kids/
+│       └── splash/
+│
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── LYRx.spec
+└── README.md
+```
+
+### Main Architectural Idea
+
+``` text
+Provider APIs
+     │
+     ▼
+Provider / Service Layer
+     │
+     ▼
+Normalized Song / App Models
+     │
+     ├──────────────► Home / Discover
+     │
+     ├──────────────► Favorites
+     │
+     ├──────────────► Playlists
+     │
+     ├──────────────► AI Assistant
+     │
+     └──────────────► Now Playing
+                              │
+                              ▼
+                       Audio Player
+                              │
+                              ▼
+                       Floating Player
+```
+
+Local music follows a parallel path:
+
+``` text
+Desktop Audio File
+       │
+       ▼
+Mutagen Metadata Reader
+       │
+       ├── Title
+       ├── Artist
+       ├── Album
+       ├── Duration
+       └── Artwork
+              │
+              ▼
+        LYRx Song / Player
+```
+
+------------------------------------------------------------------------
+
+## 🧰 Tech Stack
+
+  Technology                     Purpose
+  ------------------------------ --------------------------------------
+  **Python 3.11**                Application/runtime
+  **PySide6 / Qt**               Desktop UI
+  **Qt Multimedia**              Audio playback
+  **Mutagen**                    Local media metadata/artwork
+  **Pillow**                     Image processing
+  **Firebase**                   Authentication/backend services
+  **yt-dlp**                     YouTube-related workflows
+  **PyInstaller**                Windows production packaging
+  **QSettings / local stores**   Persistent preferences and app state
+
+------------------------------------------------------------------------
+
+## 📁 Project Structure
+
+The project separates responsibilities instead of putting the complete
+application in one Python file.
+
+### `src/widgets/`
+
+Reusable application-level components such as:
+
+-   main window
+-   sidebar
+-   floating player
+-   title bar
+-   reusable music cards
+
+### `src/ui/`
+
+Feature-specific screens:
+
+-   Home
+-   Discover
+-   Library
+-   Favorites
+-   Playlists
+-   Now Playing
+-   AI Assistant
+-   Settings
+-   Kids Mode
+-   Splash
+
+### `src/services/`
+
+External-provider and service abstraction:
+
+-   provider registry
+-   music service
+-   Spotify
+-   iTunes
+-   Jamendo
+-   YouTube-related workflows
+-   authentication
+
+### `src/data/`
+
+Persistent/application data stores:
+
+-   playlists
+-   YouTube favorites
+-   discovery data
+
+### `src/core/`
+
+Shared application infrastructure:
+
+-   theme management
+-   local media processing
+-   runtime asset/path handling
+
+------------------------------------------------------------------------
+
+## 🖥️ Development Setup
+
+### Requirements
+
+Recommended development environment:
+
+-   Windows 10/11
+-   Python **3.11.x**
+-   Git
+-   VS Code or another Python IDE
+
+### 1. Clone
+
+``` bash
+git clone <YOUR_GITHUB_REPOSITORY_URL>
+cd music_player_desktop
+```
+
+### 2. Create a virtual environment
+
+``` bash
+python -m venv .venv
+```
+
+Activate it on Windows:
+
+``` bat
+.venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+``` bash
+python -m pip install -r requirements.txt
+```
+
+### 4. Configure environment variables
+
+Copy:
+
+``` text
+.env.example
+```
+
+to:
+
+``` text
+.env
+```
+
+Then add the required local credentials/configuration.
+
+**Never commit `.env` to GitHub.**
+
+### 5. Run LYRx
+
+``` bash
+python src/main.py
+```
+
+If your environment uses the explicit Python 3.11 executable:
+
+``` bat
+"C:\Path\To\Python311\python.exe" src\main.py
+```
+
+------------------------------------------------------------------------
+
+## 📦 Building the Windows EXE
+
+LYRx uses PyInstaller for its Windows production build.
+
+The repository includes:
+
+``` text
+LYRx.spec
+build_lyrx.bat
+```
+
+The production build is intended to use **Python 3.11**.
+
+Run from the project root:
+
+``` bat
+build_lyrx.bat
+```
+
+The generated executable is placed under:
+
+``` text
+dist\LYRx.exe
+```
+
+The production build has been smoke-tested on the development machine
+with the bundled application assets, including:
+
+-   main LYRx branding
+-   Home hero
+-   Kids Mode branding
+-   Kids hero
+-   splash assets
+-   online playback
+-   local playback
+
+------------------------------------------------------------------------
+
+## 🔒 Security & Configuration
+
+Do not commit private credentials or user-specific data.
+
+The following should remain local/ignored:
+
+``` text
+.env
+user_data/
+build/
+dist/
+__pycache__/
+*.pyc
+```
+
+Use:
+
+``` text
+.env.example
+```
+
+as the public configuration template.
+
+API keys, Firebase credentials, service secrets and other private
+configuration should never be hard-coded into source files or published
+in the repository.
+
+------------------------------------------------------------------------
+
+## ⚠️ Current Limitations
+
+LYRx is a personal portfolio/product project and some capabilities
+depend on external providers and configuration.
+
+Examples:
+
+-   Online playback depends on provider availability and the selected
+    source.
+-   Not every provider exposes the same metadata or playback
+    capabilities.
+-   Download functionality is restricted to
+    provider-approved/downloadable sources; a playable URL is not
+    automatically treated as a downloadable URL.
+-   AI actions depend on configured AI access and the current
+    application state.
+-   Firebase production SMS authentication has separate provider/billing
+    requirements; development/testing can use Firebase test phone
+    numbers.
+-   Local media metadata depends on what is embedded in the user's audio
+    files.
+-   Some advanced media-management features can be expanded as the
+    library grows.
+
+------------------------------------------------------------------------
+
+## 🗺️ Roadmap
+
+Planned future work may include:
+
+-   deeper local library indexing for very large collections
+-   richer ID3/media metadata editing
+-   expanded provider integrations
+-   additional AI-powered music workflows
+-   improved recommendation/personalization systems
+-   more Kids Mode learning content
+-   expanded accessibility
+-   broader language coverage
+-   release automation
+-   installer/distribution improvements
+-   additional Windows testing across clean systems
+
+Roadmap items are **not represented as completed features** until they
+are implemented and tested.
+
+------------------------------------------------------------------------
+
+## 📈 Development Milestones
+
+Selected project milestones:
+
+-   [x] Project foundation and PySide6 architecture
+-   [x] Home and navigation system
+-   [x] Premium music-card and Now Playing UI
+-   [x] Automatic next-song playback
+-   [x] Shuffle and repeat
+-   [x] Persistent Favorites
+-   [x] Library playback
+-   [x] Dark mode / theme system
+-   [x] Playlists
+-   [x] LYRx AI Assistant integration
+-   [x] Firebase authentication
+-   [x] Settings system
+-   [x] Offline/local music library
+-   [x] Local metadata and artwork extraction
+-   [x] Multi-provider online music workflows
+-   [x] Language groundwork
+-   [x] Kids Mode
+-   [x] Kids Study & Learn
+-   [x] Kids parental controls
+-   [x] Functional Home moods / Your Vibe
+-   [x] Functional Playlists for You
+-   [x] AI music actions
+-   [x] Cinematic splash experience
+-   [x] Production Windows EXE build
+-   [x] Production asset-bundling smoke test
+
+------------------------------------------------------------------------
+
+## 📸 Screenshots
+
+Screenshots and product visuals can be added here as the public release
+page is finalized.
+
+Recommended release screenshots:
+
+1.  Home
+2.  Discover
+3.  Now Playing
+4.  Local Library
+5.  Playlists
+6.  AI Assistant
+7.  Kids Mode
+8.  Settings
+9.  Splash / startup experience
+
+------------------------------------------------------------------------
+
+## 🌐 Project
+
+**LYRx Website**
+
+https://shubham-psingh-dev.github.io/lyrx-website/
+
+Add the final public GitHub repository URL here after the release
+repository is confirmed.
+
+------------------------------------------------------------------------
+
+## 👨‍💻 Project Status
+
+**Current stage:** Production-build / release preparation
+
+The Windows production executable has been successfully built with:
+
+-   Python 3.11.9
+-   PyInstaller 6.18.0
+-   Windows 10 x64
+
+The application has been tested from the generated `dist\LYRx.exe`,
+including bundled visual assets and core playback flows.
+
+------------------------------------------------------------------------
+
+## 📄 License
+
+License information will be added before the public release.
+
+Until a license is added, the repository's source code remains subject
+to applicable copyright law. Do not assume that public visibility means
+unrestricted permission to reuse, redistribute, or commercially exploit
+the source.
+
+------------------------------------------------------------------------
+
+```{=html}
+<p align="center">
+```
+Built with Python, PySide6 and a lot of iteration. 💜
+```{=html}
+</p>
+```

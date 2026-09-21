@@ -11,6 +11,7 @@ from PySide6.QtCore import (
     QRect,
 )
 from PySide6.QtGui import QImage, QPainter
+from core.paths import asset_path
 from PySide6.QtWidgets import QWidget, QGraphicsOpacityEffect
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink
 
@@ -89,21 +90,19 @@ class SplashScreen(QWidget):
         self._build_player()
 
     def _resolve_asset(self, relative_path: Path) -> Path:
-        candidates = []
-        cwd = Path.cwd()
-        candidates.append(cwd / relative_path)
+        # Use the same runtime-aware resolver as the rest of the application.
+        # This is essential for PyInstaller one-file builds where bundled assets
+        # live below sys._MEIPASS rather than the source project directory.
+        candidate = asset_path(*relative_path.parts[1:]) if relative_path.parts and relative_path.parts[0] == "assets" else None
+        if candidate is not None and candidate.is_file():
+            return candidate.resolve()
 
-        src_dir = Path(__file__).resolve().parents[2]
-        project_root = src_dir.parent
-        candidates.append(project_root / relative_path)
+        # Development fallback for unusual launch locations.
+        cwd_candidate = Path.cwd() / relative_path
+        if cwd_candidate.is_file():
+            return cwd_candidate.resolve()
 
-        bundled_root = Path(getattr(sys, "_MEIPASS", project_root))
-        candidates.append(bundled_root / relative_path)
-
-        for candidate in candidates:
-            if candidate.is_file():
-                return candidate.resolve()
-        return candidates[1].resolve()
+        return candidate.resolve() if candidate is not None else cwd_candidate.resolve()
 
     def _build_ui(self):
         self.video_surface = _VideoFrameWidget(self)

@@ -533,8 +533,8 @@ Recommended development environment:
 ### 1. Clone
 
 ``` bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd music_player_desktop
+git clone https://github.com/shubham-psingh-dev/SmartMusicPlayer.git
+cd SmartMusicPlayer
 ```
 
 ### 2. Create a virtual environment
@@ -627,11 +627,11 @@ with the bundled application assets, including:
 
 ## 🔒 Security & Configuration
 
-Do not commit private credentials or user-specific data.
+Private credentials and user-specific runtime data are intentionally kept outside the public source repository.
 
-The following should remain local/ignored:
+The following are local/ignored:
 
-``` text
+```text
 .env
 user_data/
 build/
@@ -639,18 +639,6 @@ dist/
 __pycache__/
 *.pyc
 ```
-
-Use:
-
-``` text
-.env.example
-```
-
-as the public configuration template.
-
-API keys, Firebase credentials, service secrets and other private
-configuration should never be hard-coded into source files or published
-in the repository.
 
 ------------------------------------------------------------------------
 
@@ -733,66 +721,86 @@ Selected project milestones:
 
 ------------------------------------------------------------------------
 
-## 📸 Screenshots
+## 📸 Product Preview
 
-Screenshots and product visuals can be added here as the public release
-page is finalized.
+LYRx is designed as a complete desktop music experience, combining online discovery, local music, playlists, AI interaction, Kids Mode, and personalized settings in one application.
 
-Recommended release screenshots:
+### 🏠 Home
 
-1.  Home
-2.  Discover
-3.  Now Playing
-4.  Local Library
-5.  Playlists
-6.  AI Assistant
-7.  Kids Mode
-8.  Settings
-9.  Splash / startup experience
+![LYRx Home](screenshots/01-home.png)
+
+### 🔎 Discover
+
+![LYRx Discover](screenshots/02-discover.png)
+
+### 🎵 Now Playing
+
+![LYRx Now Playing](screenshots/03-now-playing.png)
+
+### 🎼 Playlists
+
+![LYRx Playlists](screenshots/04-playlists.png)
+
+### 📁 Local Music Library
+
+![LYRx Local Library](screenshots/05-local-library.png)
+
+### 🤖 AI Assistant
+
+![LYRx AI Assistant](screenshots/06-ai-assistant.png)
+
+### 🧒 Kids Mode
+
+![LYRx Kids Mode](screenshots/07-kids-mode.png)
+
+### ⚙️ Settings
+
+![LYRx Settings](screenshots/08-settings.png)
 
 ------------------------------------------------------------------------
 
 ## 🌐 Project
 
-**LYRx Website**
+### LYRx Website
 
 https://shubham-psingh-dev.github.io/lyrx-website/
 
-Add the final public GitHub repository URL here after the release
-repository is confirmed.
+### GitHub Repository
+
+https://github.com/shubham-psingh-dev/SmartMusicPlayer
+
+### Windows Release
+
+The latest Windows production build is available from the GitHub Releases page.
 
 ------------------------------------------------------------------------
 
 ## 👨‍💻 Project Status
 
-**Current stage:** Production-build / release preparation
+**Current stage:** Production release — v1.0.0
 
-The Windows production executable has been successfully built with:
+The first production Windows executable has been successfully built with:
 
--   Python 3.11.9
--   PyInstaller 6.18.0
--   Windows 10 x64
+- Python 3.11.9
+- PyInstaller 6.18.0
+- Windows 10 x64
 
-The application has been tested from the generated `dist\LYRx.exe`,
-including bundled visual assets and core playback flows.
+The application has been tested from the generated `dist\LYRx.exe`, including bundled visual assets and core playback flows.
+
+**LYRx v1.0.0 has been published as a GitHub Release with the Windows executable attached as a release asset.**
 
 ------------------------------------------------------------------------
 
 ## 📄 License
 
-License information will be added before the public release.
+No open-source license is currently declared for this repository.
 
-Until a license is added, the repository's source code remains subject
-to applicable copyright law. Do not assume that public visibility means
-unrestricted permission to reuse, redistribute, or commercially exploit
-the source.
+Until a license is added, the repository's source code remains subject to applicable copyright law. Public visibility does not by itself grant permission to reuse, redistribute, or commercially exploit the source code.
 
 ------------------------------------------------------------------------
 
-```{=html}
+
 <p align="center">
-```
 Built with Python, PySide6 and a lot of iteration. 💜
-```{=html}
 </p>
-```
+

@@ -1,33 +1,20 @@
-```{=html}
 <p align="center">
-```
-`<img src="assets/icons/logo/LYRx_symbol.png" width="120" alt="LYRx">`{=html}
-```{=html}
+<img src="assets/icons/logo/LYRx_symbol.png" width="120" alt="LYRx">
 </p>
-```
-```{=html}
+
 <h1 align="center">
-```
-LYRx
-```{=html}
+<img src="assets/icons/logo/LYRx_wordmark.png" width="150" alt="LYRx">
 </h1>
-```
-```{=html}
+
 <p align="center">
-```
-`<strong>`{=html}A modular desktop music platform built with Python &
-PySide6.`</strong>`{=html}
-```{=html}
+<strong>A modular desktop music platform built with Python &
+PySide6.</strong>
 </p>
-```
-```{=html}
+
 <p align="center">
-```
 Online discovery • Local music • Playlists • Favorites • AI Assistant •
 Kids Mode • Firebase Auth
-```{=html}
 </p>
-```
 
 ------------------------------------------------------------------------
 

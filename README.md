@@ -789,6 +789,29 @@ The application has been tested from the generated `dist\LYRx.exe`, including bu
 
 **LYRx v1.0.0 has been published as a GitHub Release with the Windows executable attached as a release asset.**
 
+## Update:
+
+**Current stage:** Production release — v1.0.1
+
+LYRx has reached its first production maintenance release with a standalone Windows distribution.
+
+The production executable has been tested outside the development project directory and can run as a standalone `LYRx.exe` without requiring the development `.env` file on the user's computer.
+
+### v1.0.1 Maintenance Update
+
+LYRx v1.0.1 includes:
+
+- Standalone Firebase authentication configuration
+- Production EXE no longer dependent on the local `.env` file at runtime
+- Improved Windows distribution workflow
+- Login and account creation fields start blank for new authentication flows
+- Existing music, playlist, favorites, AI, Kids Mode, settings, and authentication functionality preserved
+
+### Release
+
+**Latest release:** `LYRx v1.0.1`
+
+The Windows executable is distributed through the GitHub Releases page.
 ------------------------------------------------------------------------
 
 ## 📄 License

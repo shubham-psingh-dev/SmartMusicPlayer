@@ -2,48 +2,94 @@
 """Production PyInstaller spec for LYRx."""
 
 from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_submodules
+
 
 ROOT = Path(SPECPATH)
 SRC = ROOT / "src"
 ASSETS = ROOT / "assets"
 ICON = ASSETS / "icons" / "logo" / "LYRx.ico"
 
-# Keep the EXE self-contained for runtime assets while deliberately NOT
-# bundling .env, user_data, local music, cached artwork, or credentials.
+
+# =========================================================
+# BUNDLED APPLICATION ASSETS
+# =========================================================
+
+# Keep the EXE self-contained for runtime assets.
+#
+# Deliberately DO NOT bundle:
+# - .env
+# - user_data
+# - local music
+# - cached artwork
+# - private credentials
+#
+# Firebase runtime configuration is generated temporarily by
+# build_lyrx.bat and imported as a Python module.
 datas = [
     (str(ASSETS), "assets"),
 ]
 
-# PySide6 multimedia backends and provider/auth modules are partly discovered
-# dynamically in LYRx, so make those modules explicit for the production build.
+
+# =========================================================
+# EXPLICIT HIDDEN IMPORTS
+# =========================================================
+
 hiddenimports = [
+    # PySide6
     "PySide6.QtCore",
     "PySide6.QtGui",
     "PySide6.QtWidgets",
     "PySide6.QtMultimedia",
     "PySide6.QtMultimediaWidgets",
+
+    # Configuration / media
     "dotenv",
     "mutagen",
     "mutagen.id3",
     "mutagen.flac",
     "mutagen.mp4",
+
+    # Providers / services
     "services.spotify_provider",
     "services.itunes_provider",
     "services.jamendo_provider",
     "services.youtube_service",
     "services.full_track_resolver",
+
+    # Authentication
     "services.auth.firebase_auth",
+    "services.auth._runtime_config",
     "services.auth.google_auth",
     "services.auth.phone_auth",
 ]
 
-# Preserve any dynamically imported submodules used by the existing app.
-for package in ("ui", "widgets", "services", "services.auth", "core", "data", "models"):
+
+# =========================================================
+# COLLECT PROJECT SUBMODULES
+# =========================================================
+
+for package in (
+    "ui",
+    "widgets",
+    "services",
+    "services.auth",
+    "core",
+    "data",
+    "models",
+):
     try:
-        hiddenimports.extend(collect_submodules(package))
+        hiddenimports.extend(
+            collect_submodules(package)
+        )
     except Exception:
         pass
+
+
+# =========================================================
+# ANALYSIS
+# =========================================================
 
 analysis = Analysis(
     [str(SRC / "main.py")],
@@ -64,7 +110,19 @@ analysis = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(analysis.pure)
+
+# =========================================================
+# PYZ
+# =========================================================
+
+pyz = PYZ(
+    analysis.pure
+)
+
+
+# =========================================================
+# FINAL WINDOWS EXE
+# =========================================================
 
 exe = EXE(
     pyz,

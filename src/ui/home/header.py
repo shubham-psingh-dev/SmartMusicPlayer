@@ -1570,9 +1570,7 @@ class AccountDialog(QDialog):
             13
         )
 
-        self.email_login_input = QLineEdit(
-            self.store.email()
-        )
+        self.email_login_input = QLineEdit()
 
         self.email_login_input.setPlaceholderText(
             "Email address"
@@ -1929,9 +1927,7 @@ class AccountDialog(QDialog):
             13
         )
 
-        self.name_input = QLineEdit(
-            self.store.display_name()
-        )
+        self.name_input = QLineEdit()
 
         self.name_input.setFixedHeight(
             44
@@ -1941,9 +1937,7 @@ class AccountDialog(QDialog):
             "Display name"
         )
 
-        self.create_email_input = QLineEdit(
-            self.store.email()
-        )
+        self.create_email_input = QLineEdit()
 
         self.create_email_input.setFixedHeight(
             44
